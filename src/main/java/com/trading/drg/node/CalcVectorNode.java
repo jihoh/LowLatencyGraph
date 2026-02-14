@@ -1,0 +1,25 @@
+package com.trading.drg.node;
+
+import com.trading.drg.core.Node;
+import com.trading.drg.fn.VectorFn;
+
+/**
+ * A general-purpose vector node that delegates computation to a functional
+ * interface.
+ */
+public final class CalcVectorNode extends VectorNode {
+    private final Node<?>[] inputs;
+    private final VectorFn fn;
+
+    public CalcVectorNode(String name, int size, double tolerance,
+            Node<?>[] inputs, VectorFn fn) {
+        super(name, size, tolerance);
+        this.inputs = inputs;
+        this.fn = fn;
+    }
+
+    @Override
+    protected void compute(double[] output) {
+        fn.compute(inputs, output);
+    }
+}
