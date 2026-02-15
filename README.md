@@ -145,6 +145,32 @@ var s1 = g.template("swap1", swapTemplate, new SwapConfig(10e6, 0.04));
 var s2 = g.template("swap2", swapTemplate, new SwapConfig(5e6,  0.03));
 ```
 
+### 2.6 Best Practices: Node Granularity
+**Coarse-grained nodes are better than fine-grained nodes.**
+
+Each node introduces a small overhead (dirty checks, array lookups). The Java JIT compiler optimization works best *within* a single lambda, not across multiple graph nodes.
+
+**❌ Bad: Too Fine-Grained**
+```java
+// High overhead: 3 separate nodes for simple math
+var sum = g.compute("sum", (a, b) -> a + b, sourceA, sourceB);
+var mult = g.compute("mult", (s, c) -> s * c, sum, sourceC);
+var res = g.compute("res", (m, d) -> m / d, mult, sourceD);
+```
+
+**✅ Good: Coarse-Grained**
+```java
+// Zero overhead: JIT compiles this into a single machine instruction block
+var res = g.compute("complex_calc", 
+    (a, b, c, d) -> (a + b) * c / d, 
+    sourceA, sourceB, sourceC, sourceD
+);
+```
+
+**Rule of Thumb:** Only split a calculation if:
+1.  You need the intermediate value for *multiple* downstream consumers.
+2.  One input changes much more frequently than others *and* the calculation is very expensive.
+
 ---
 
 ## 3. Architecture

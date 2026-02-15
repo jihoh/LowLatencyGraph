@@ -9,6 +9,7 @@ import com.trading.drg.core.DoubleReadable;
 import com.trading.drg.core.Node;
 import com.trading.drg.disruptor.GraphEvent;
 import com.trading.drg.disruptor.GraphPublisher;
+import com.trading.drg.util.GraphExplain;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -97,6 +98,16 @@ public class TreasurySimulator2 {
 
         disruptor.start();
         RingBuffer<GraphEvent> ringBuffer = disruptor.getRingBuffer();
+
+        // --- Export Graph Visualization ---
+        try {
+            String mermaid = new GraphExplain(engine).toMermaid();
+            java.nio.file.Files.writeString(java.nio.file.Path.of("treasury_graph_2.md"), mermaid);
+            System.out.println("Graph visualization saved to treasury_graph_2.md");
+        } catch (java.io.IOException e) {
+            e.printStackTrace();
+        }
+        // ----------------------------------
 
         // 5. Simulation Loop
         Random rng = new Random(42);

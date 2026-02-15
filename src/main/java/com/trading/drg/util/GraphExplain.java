@@ -85,4 +85,39 @@ public final class GraphExplain {
         }
         return sb.toString();
     }
+
+    /**
+     * Generates a Mermaid JS graph diagram.
+     * <p>
+     * Renders nodes and edges in a format suitable for embedding in Markdown.
+     * </p>
+     */
+    public String toMermaid() {
+        StringBuilder sb = new StringBuilder(4096);
+        sb.append("graph TD;\n");
+        for (int i = 0; i < topology.nodeCount(); i++) {
+            Node<?> node = topology.node(i);
+            String safeName = sanitize(node.name());
+
+            // Stylize nodes based on type/role
+            if (topology.isSource(i)) {
+                sb.append("  ").append(safeName).append("([\"").append(node.name()).append("\"]);\n");
+                sb.append("  style ").append(safeName).append(" fill:#e1f5fe,stroke:#01579b,stroke-width:2px;\n");
+            } else {
+                sb.append("  ").append(safeName).append("[\"").append(node.name()).append("\"];\n");
+            }
+
+            int cc = topology.childCount(i);
+            for (int j = 0; j < cc; j++) {
+                Node<?> child = topology.node(topology.child(i, j));
+                String safeChild = sanitize(child.name());
+                sb.append("  ").append(safeName).append(" --> ").append(safeChild).append(";\n");
+            }
+        }
+        return sb.toString();
+    }
+
+    private static String sanitize(String name) {
+        return name.replaceAll("[^a-zA-Z0-9_]", "_");
+    }
 }
