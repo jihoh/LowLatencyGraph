@@ -26,6 +26,7 @@ public final class DoubleSourceNode implements SourceNode<Double>, DoubleReadabl
     private final DoubleCutoff cutoff;
     private double currentValue;
     private double previousValue = Double.NaN;
+    private double lastStabilizedValue = Double.NaN;
     private boolean dirty;
 
     /**
@@ -70,11 +71,20 @@ public final class DoubleSourceNode implements SourceNode<Double>, DoubleReadabl
 
     @Override
     public boolean stabilize() {
-        // Source nodes stabilize by checking if their updated value
-        // is significantly different from the previous stabilized value.
-        // Even if marked dirty, if the value didn't change (e.g. 100.0 -> 100.0),
-        // we return false to stop propagation.
-        return cutoff.hasChanged(previousValue, currentValue);
+        // Always propagate on first stabilization (lastStabilizedValue is NaN)
+        // to ensure downstream nodes are initialized correctly.
+        if (Double.isNaN(lastStabilizedValue)) {
+            lastStabilizedValue = currentValue;
+            return true;
+        }
+        // Compare against the last stabilized value, not the previous update.
+        // This ensures correct cutoff behavior when updateDouble() is called
+        // multiple times between stabilizations.
+        boolean changed = cutoff.hasChanged(lastStabilizedValue, currentValue);
+        if (changed) {
+            lastStabilizedValue = currentValue;
+        }
+        return changed;
     }
 
     @Override
