@@ -146,30 +146,50 @@ var s2 = g.template("swap2", swapTemplate, new SwapConfig(5e6,  0.03));
 ```
 
 ### 2.6 Best Practices: Node Granularity
-**Coarse-grained nodes are better than fine-grained nodes.**
+**Design Philosophy: Coarse-Grained Business Units**
 
-Each node introduces a small overhead (dirty checks, array lookups). The Java JIT compiler optimization works best *within* a single lambda, not across multiple graph nodes.
+A common mistake is treating the graph like an Abstract Syntax Tree (AST) where every `+`, `-`, and `*` is a node. This performs poorly. Instead, treat nodes as **Business Logic Units** (e.g., "Black-Scholes Pricer", "Risk Aggregator", "Signal Generator").
 
-**❌ Bad: Too Fine-Grained**
+#### Why Coarse-Grained is Faster
+
+1.  **The "Graph Tax"**: Every node introduces overhead:
+    *   **Memory**: Metadata for dirty flags, child indices, and value storage.
+    *   **Traversal**: The engine must iterate, check dirty bits, and look up children in the adjacency array.
+    *   **Cache Misses**: Jumping between nodes evicts helpful data from L1/L2 CPU caches.
+
+2.  **JIT Compilation Scope**:
+    *   **Inside a Node**: The Java HotSpot Compiler (JIT) sees the entire lambda as a single block. It can use CPU registers, SIMD instructions (AVX), and dead-code elimination.
+    *   **Between Nodes**: The JIT sees opaque method calls. It cannot easily optimize across these boundaries.
+
+#### Example: The Cost of Granularity
+
+**❌ Bad: "AST Style" (High Overhead)**
+3 nodes, 3 dirty checks, 3 array lookups, 3 function calls.
 ```java
-// High overhead: 3 separate nodes for simple math
-var sum = g.compute("sum", (a, b) -> a + b, sourceA, sourceB);
-var mult = g.compute("mult", (s, c) -> s * c, sum, sourceC);
-var res = g.compute("res", (m, d) -> m / d, mult, sourceD);
+// Logic: (a + b) * c
+var sum  = g.compute("sum",  (a, b) -> a + b, srcA, srcB);
+var prod = g.compute("prod", (s, c) -> s * c, sum, srcC); 
 ```
 
-**✅ Good: Coarse-Grained**
+**✅ Good: "Business Logic Style" (Zero Overhead)**
+1 node. The math `(a + b) * c` compiles to a single FMA (Fused Multiply-Add) machine instruction.
 ```java
-// Zero overhead: JIT compiles this into a single machine instruction block
-var res = g.compute("complex_calc", 
-    (a, b, c, d) -> (a + b) * c / d, 
-    sourceA, sourceB, sourceC, sourceD
+var result = g.compute("total_calc", 
+    (a, b, c) -> (a + b) * c, 
+    srcA, srcB, srcC
 );
 ```
 
-**Rule of Thumb:** Only split a calculation if:
-1.  You need the intermediate value for *multiple* downstream consumers.
-2.  One input changes much more frequently than others *and* the calculation is very expensive.
+#### When to Split Nodes?
+Only pay the "Graph Tax" when you buy something valuable:
+
+1.  **Reusability**: Is the intermediate value (e.g., `fair_price`) needed by *multiple* other nodes (e.g., `execution_logic` AND `risk_report`)?
+2.  **Frequency Mismatch**: Does one input update 1000x/sec while another updates 1x/hour?
+    *   *Example*: `HeavyCalc(MarketData) + ConfigShift`.
+    *   Split this so `ConfigShift` doesn't trigger the heavy calc when it changes.
+3.  **Feedback Loops**: You need a cycle (e.g., `Time` -> `State` -> `NextTime`).
+
+**Rule of Thumb**: Start with large, comprehensive nodes. Break them down only when architectural reuse demands it.
 
 ---
 
