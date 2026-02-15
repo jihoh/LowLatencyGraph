@@ -31,6 +31,7 @@ public class TreasurySimulator2 {
         String[] venues = { "Btec", "Fenics", "Dweb" };
 
         // Create topology for each tenor
+        List<DoubleReadable> allMids = new ArrayList<>();
         for (String tenor : tenors) {
             String prefix = "UST_" + tenor;
             List<DoubleReadable> bidInputs = new ArrayList<>();
@@ -53,14 +54,30 @@ public class TreasurySimulator2 {
 
             // Aggregation Logic (Weighted Average)
             // Function: (p1, q1, p2, q2, ...) -> sum(p*q) / sum(q)
-            g.computeN(prefix + ".wBid",
+            var wBid = g.computeN(prefix + ".wBid",
                     bidInputs.toArray(new DoubleReadable[0]),
                     TreasurySimulator2::weightedAvg);
 
-            g.computeN(prefix + ".wAsk",
+            var wAsk = g.computeN(prefix + ".wAsk",
                     askInputs.toArray(new DoubleReadable[0]),
                     TreasurySimulator2::weightedAvg);
+
+            // Calculate Mid for this instrument
+            var mid = g.compute(prefix + ".mid", (b, a) -> (b + a) / 2.0, wBid, wAsk);
+            allMids.add(mid);
         }
+
+        // Global Score Aggregation (Average of all Mids)
+        // Function: (m1, m2, ...) -> sum(m) / count(m)
+        g.computeN("Global.Score",
+                allMids.toArray(new DoubleReadable[0]),
+                inputs -> {
+                    double sum = 0;
+                    for (double v : inputs) {
+                        sum += v;
+                    }
+                    return inputs.length == 0 ? 0 : sum / inputs.length;
+                });
 
         // 2. Build Engine
         var context = g.buildWithContext();
@@ -138,34 +155,34 @@ public class TreasurySimulator2 {
 
             double mid = 100.0 + rng.nextGaussian() * 0.1;
             double spread = 0.015625;
+            double bidPx = mid - spread / 2.0;
+            double askPx = mid + spread / 2.0;
 
-            // Publish 4 events (Bid, Ask, BidQty, AskQty)
-            publish(ringBuffer, bidIds[k], mid - spread / 2, false);
-            publish(ringBuffer, bidQtyIds[k], 1000 + rng.nextInt(5000), false);
-            publish(ringBuffer, askIds[k], mid + spread / 2, false);
-            publish(ringBuffer, askQtyIds[k], 1000 + rng.nextInt(5000), true); // Trigger stabilize
+            publish(ringBuffer, bidIds[k], bidPx, false);
+            publish(ringBuffer, bidQtyIds[k], 1000 + rng.nextInt(500), false);
+            publish(ringBuffer, askIds[k], askPx, false);
+            publish(ringBuffer, askQtyIds[k], 1000 + rng.nextInt(500), true); // End of batch
         }
 
         latch.await();
-
-        long elapsed = System.nanoTime() - tStart;
-        System.out.printf("\nProcessed %d updates (batches) in %.1f ms (%.0f batches/sec)\n",
-                totalUpdates, elapsed / 1e6, 1e9 * totalUpdates / elapsed);
+        long tEnd = System.nanoTime();
+        double nanosPerOp = (double) (tEnd - tStart) / totalUpdates;
+        System.out.printf("Done. %.2f ns/op\n", nanosPerOp);
 
         disruptor.shutdown();
     }
 
     // Weighted Average Logic: Pairs of (Value, Weight)
     private static double weightedAvg(double[] inputs) {
-        double num = 0.0;
-        double den = 0.0;
+        double sumProd = 0.0;
+        double sumW = 0.0;
         for (int i = 0; i < inputs.length; i += 2) {
-            double px = inputs[i];
-            double qty = inputs[i + 1];
-            num += px * qty;
-            den += qty;
+            double val = inputs[i];
+            double w = inputs[i + 1];
+            sumProd += val * w;
+            sumW += w;
         }
-        return den == 0 ? 0 : num / den;
+        return (sumW == 0) ? 0.0 : sumProd / sumW;
     }
 
     private static void publish(RingBuffer<GraphEvent> rb, int nodeId, double value, boolean batchEnd) {
@@ -179,14 +196,16 @@ public class TreasurySimulator2 {
     }
 
     private static void printSnapshot(String tenor, Map<String, Node<?>> nodes) {
-        Node<?> nBid = nodes.get("UST_" + tenor + ".wBid");
-        Node<?> nAsk = nodes.get("UST_" + tenor + ".wAsk");
+        String p = "UST_" + tenor;
+        Node<?> wBid = nodes.get(p + ".wBid");
+        Node<?> wAsk = nodes.get(p + ".wAsk");
+        Node<?> score = nodes.get("Global.Score");
 
-        if (nBid instanceof DoubleReadable b && nAsk instanceof DoubleReadable a) {
-            double bid = b.doubleValue();
-            double ask = a.doubleValue();
-            System.out.printf("[UST_%s] Weighted Bid: %.5f | Weighted Ask: %.5f | Spread: %.5f\n",
-                    tenor, bid, ask, ask - bid);
+        if (wBid instanceof DoubleReadable && wAsk instanceof DoubleReadable) {
+            double b = ((DoubleReadable) wBid).doubleValue();
+            double a = ((DoubleReadable) wAsk).doubleValue();
+            double s = (score instanceof DoubleReadable) ? ((DoubleReadable) score).doubleValue() : Double.NaN;
+            System.out.printf("[%s] wBid: %.4f | wAsk: %.4f | Global.Score: %.4f\n", tenor, b, a, s);
         }
     }
 }
