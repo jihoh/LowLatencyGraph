@@ -226,7 +226,95 @@ engine.stabilize(); // Deterministically restores exact state
 
 ---
 
-## 5. Implementation Details
+## 5. Full Disruptor Integration
+
+A complete end-to-end example showing how to drive the graph from a Disruptor RingBuffer.
+
+### 5.1 The Setup (Startup Phase)
+
+```java
+// 1. Build the Graph
+var g = GraphBuilder.create("market_data_engine");
+var bidNode = g.doubleSource("Bid", 100.0);
+var askNode = g.doubleSource("Ask", 101.0);
+var midNode = g.compute("Mid", (b, a) -> (b + a) / 2, bidNode, askNode);
+
+// 2. Build Context & Engine
+GraphContext context = g.buildWithContext();
+StabilizationEngine engine = context.engine();
+
+// 3. CACHE NODE IDs (Critical for Zero-GC)
+// Do this once at startup.
+int bidId = context.getNodeId("Bid");
+int askId = context.getNodeId("Ask");
+
+// 4. Setup Disruptor
+Disruptor<GraphEvent> disruptor = new Disruptor<>(
+    GraphEvent::new,               // Event Factory
+    1024,                          // Ring Buffer Size
+    DaemonThreadFactory.INSTANCE,  // Thread Factory
+    ProducerType.SINGLE,           // Producer Type
+    new BlockingWaitStrategy()     // Wait Strategy
+);
+
+// 5. Connect the GraphPublisher
+// GraphPublisher implements EventHandler<GraphEvent>
+GraphPublisher publisher = new GraphPublisher(engine);
+
+// Optional: Callback after each stabilization
+publisher.setPostStabilizationCallback((epoch, count) -> {
+    // Read outputs here (thread-safe, we are in the consumer thread)
+    // No locking needed.
+    System.out.println("New Mid: " + midNode.doubleValue());
+});
+
+// 6. Wire it up
+disruptor.handleEventsWith(publisher::onEvent);
+disruptor.start();
+RingBuffer<GraphEvent> rb = disruptor.getRingBuffer();
+```
+
+### 5.2 The Producer (Hot Path)
+
+This loop runs on the network I/O thread. It must be garbage-free.
+
+```java
+public void onMarketData(int instrumentId, double price) {
+    long seq = rb.next();
+    try {
+        // 1. Get mutable event (Zero allocation)
+        GraphEvent event = rb.get(seq);
+        
+        // 2. Map external ID to internal Graph ID (int -> int)
+        // (Assuming you have a simple array/map for this)
+        int graphNodeId = (instrumentId == 1) ? bidId : askId;
+
+        // 3. Populate Event
+        // batchEnd = true means "stabilize after this event"
+        // batchEnd = false means "just update state, don't stabilize yet"
+        boolean triggerStabilize = true; 
+        
+        event.setDoubleUpdate(graphNodeId, price, triggerStabilize, seq);
+        
+    } finally {
+        // 4. Publish
+        rb.publish(seq);
+    }
+}
+```
+
+### 5.3 Batching and Coalescing
+
+The `GraphPublisher` is smart about batching.
+
+1.  **User-driven Batching**: If you set `batchEnd=false` on the event, the engine marks the node dirty but DOES NOT stabilize. You can update 50 inputs and then set `batchEnd=true` on the 51st to trigger a single stabilization.
+2.  **Disruptor Batching**: If the consumer falls behind, the Disruptor delivers a batch of events. The `GraphPublisher` processes all updates in the batch and stabilizes ONLY ONCE at the end of the batch (via the `endOfBatch` boolean from Disruptor).
+
+This automatic coalescing is key to high throughput under load.
+
+---
+
+## 6. Implementation Details
 
 To achieve zero garbage generation:
 
