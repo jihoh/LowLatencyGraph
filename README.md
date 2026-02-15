@@ -180,14 +180,38 @@ var result = g.compute("total_calc",
 );
 ```
 
+### 2.7 Boolean Logic & Conditionals
+The graph supports boolean logic for implementing payoff structures, barriers, and regime switching. Use `condition` to create a boolean signal and `select` to switch between values.
+
+```java
+GraphBuilder g = GraphBuilder.create("option_payoff");
+
+// 1. Define inputs
+var spot = g.doubleSource("spot", 100.0);
+var strike = g.doubleSource("strike", 100.0);
+
+// 2. Create a boolean condition (Spot > Strike)
+var isInTheMoney = g.condition("isITM", spot, s -> s > 110.0); // Predicate on 'spot'
+
+// 3. Select output based on condition
+// logic: if (isITM) then (Spot - Strike) else 0.0
+var intrinsic = g.select("intrinsic", isInTheMoney,
+    g.compute("diff", (s, k) -> s - k, spot, strike), // True branch
+    g.doubleSource("zero", 0.0)                       // False branch
+);
+```
+**Key Components:**
+- **`g.condition(name, input, predicate)`**: Creates a `BooleanNode` that updates whenever `input` changes.
+- **`g.select(name, condition, trueNode, falseNode)`**: Acts as a multiplexer. It subscribes to all inputs but only propagates the value corresponding to the current state of `condition`.
+
 #### When to Split Nodes?
 Only pay the "Graph Tax" when you buy something valuable:
 
-1.  **Reusability**: Is the intermediate value (e.g., `fair_price`) needed by *multiple* other nodes (e.g., `execution_logic` AND `risk_report`)?
-2.  **Frequency Mismatch**: Does one input update 1000x/sec while another updates 1x/hour?
+- **Reusability**: Is the intermediate value (e.g., `fair_price`) needed by *multiple* other nodes (e.g., `execution_logic` AND `risk_report`)?
+- **Frequency Mismatch**: If `A` updates 1M times/sec and `B` updates 1 time/hour, do NOT merge them into one monolithic node.
     *   *Example*: `HeavyCalc(MarketData) + ConfigShift`.
     *   Split this so `ConfigShift` doesn't trigger the heavy calc when it changes.
-3.  **Feedback Loops**: You need a cycle (e.g., `Time` -> `State` -> `NextTime`).
+- **Feedback Loops**: You cannot have cycles. If `A` depends on `B` and `B` depends on `A`, you must break the loop with a stateful node (like `EMA`).
 
 **Rule of Thumb**: Start with large, comprehensive nodes. Break them down only when architectural reuse demands it.
 
