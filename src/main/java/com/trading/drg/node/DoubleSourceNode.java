@@ -72,6 +72,12 @@ public final class DoubleSourceNode implements SourceNode<Double>, DoubleReadabl
     public boolean stabilize() {
         // Source nodes stabilize by checking if their updated value
         // is significantly different from the previous stabilized value.
+
+        // Fix: If previous value is NaN (initial state), always propagate.
+        if (Double.isNaN(previousValue)) {
+            return true;
+        }
+
         // Even if marked dirty, if the value didn't change (e.g. 100.0 -> 100.0),
         // we return false to stop propagation.
         return cutoff.hasChanged(previousValue, currentValue);

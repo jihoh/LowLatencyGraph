@@ -42,6 +42,14 @@ public final class StabilizationEngine {
     public StabilizationEngine(TopologicalOrder topology) {
         this.topology = topology;
         this.dirty = new boolean[topology.nodeCount()];
+
+        // Fix: Mark all source nodes as dirty initially so their values propagate
+        // on the first stabilize() call.
+        for (int i = 0; i < topology.nodeCount(); i++) {
+            if (topology.isSource(i)) {
+                dirty[i] = true;
+            }
+        }
     }
 
     public void setListener(StabilizationListener listener) {
