@@ -218,6 +218,11 @@ public class TreasurySimulator3 {
         Random rng = new Random(42);
         System.out.println("Starting producer...");
 
+        // Pre-resolve node IDs (Zero-GC hot path)
+        int yieldId = context.getNodeId("Mkt.UST_5Y.Yield");
+        int spreadId = context.getNodeId("Mkt.SwapSpread.5Y");
+        int rateId = context.getNodeId("Mkt.SOFR.Rate");
+
         for (int i = 0; i < totalUpdates; i++) {
             // Random walk on Market Data
             double yieldShock = rng.nextGaussian() * 0.01;
@@ -229,9 +234,9 @@ public class TreasurySimulator3 {
             // random values for speed
             // Or assumes "last produced".
 
-            publish(ringBuffer, "Mkt.UST_5Y.Yield", 4.50 + yieldShock, false);
-            publish(ringBuffer, "Mkt.SwapSpread.5Y", 0.15 + spreadShock, false);
-            publish(ringBuffer, "Mkt.SOFR.Rate", 4.40 + rateShock, true); // Trigger stabilize
+            publish(ringBuffer, yieldId, 4.50 + yieldShock, false);
+            publish(ringBuffer, spreadId, 0.15 + spreadShock, false);
+            publish(ringBuffer, rateId, 4.40 + rateShock, true); // Trigger stabilize
         }
 
         latch.await();
@@ -243,11 +248,11 @@ public class TreasurySimulator3 {
         disruptor.shutdown();
     }
 
-    private static void publish(RingBuffer<GraphEvent> rb, String name, double value, boolean batchEnd) {
+    private static void publish(RingBuffer<GraphEvent> rb, int nodeId, double value, boolean batchEnd) {
         long seq = rb.next();
         try {
             GraphEvent event = rb.get(seq);
-            event.setDoubleUpdate(name, value, batchEnd, seq);
+            event.setDoubleUpdate(nodeId, value, batchEnd, seq);
         } finally {
             rb.publish(seq);
         }

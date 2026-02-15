@@ -21,7 +21,7 @@ package com.trading.drg.disruptor;
  * </ul>
  */
 public final class GraphEvent {
-    private String nodeName;
+    private int nodeId = -1;
     private double doubleValue;
     private int vectorIndex = -1;
     private boolean batchEnd;
@@ -30,13 +30,13 @@ public final class GraphEvent {
     /**
      * Configures the event for a scalar double update.
      * 
-     * @param nodeName Target node.
+     * @param nodeId   Target node ID (topological index).
      * @param value    New value.
      * @param batchEnd If true, forces a graph stabilization after this event.
      * @param seqId    The sequence ID (for correlation/logging).
      */
-    public void setDoubleUpdate(String nodeName, double value, boolean batchEnd, long seqId) {
-        this.nodeName = nodeName;
+    public void setDoubleUpdate(int nodeId, double value, boolean batchEnd, long seqId) {
+        this.nodeId = nodeId;
         this.doubleValue = value;
         this.vectorIndex = -1;
         this.batchEnd = batchEnd;
@@ -46,23 +46,23 @@ public final class GraphEvent {
     /**
      * Configures the event for a vector element update.
      * 
-     * @param nodeName Target node.
+     * @param nodeId   Target node ID (topological index).
      * @param index    Index in the vector to update.
      * @param value    New value.
      * @param batchEnd If true, forces a graph stabilization after this event.
      * @param seqId    The sequence ID.
      */
-    public void setVectorElementUpdate(String nodeName, int index, double value,
+    public void setVectorElementUpdate(int nodeId, int index, double value,
             boolean batchEnd, long seqId) {
-        this.nodeName = nodeName;
+        this.nodeId = nodeId;
         this.doubleValue = value;
         this.vectorIndex = index;
         this.batchEnd = batchEnd;
         this.sequenceId = seqId;
     }
 
-    public String nodeName() {
-        return nodeName;
+    public int nodeId() {
+        return nodeId;
     }
 
     public double doubleValue() {
@@ -86,7 +86,7 @@ public final class GraphEvent {
     }
 
     public void clear() {
-        nodeName = null;
+        nodeId = -1;
         doubleValue = 0;
         vectorIndex = -1;
         batchEnd = false;

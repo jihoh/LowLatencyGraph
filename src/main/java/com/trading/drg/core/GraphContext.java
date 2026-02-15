@@ -55,4 +55,17 @@ public final class GraphContext {
     public <T extends Node<?>> T node(String name) {
         return (T) nodesByName.get(name);
     }
+
+    /**
+     * Resolves a node name to its topological index (ID).
+     * This ID is stable for the lifetime of the graph and should be used
+     * for zero-allocation updates on the hot path.
+     *
+     * @param name The node name.
+     * @return The node's topological index.
+     * @throws IllegalArgumentException if the node format is unknown.
+     */
+    public int getNodeId(String name) {
+        return engine.topology().topoIndex(name);
+    }
 }

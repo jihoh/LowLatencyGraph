@@ -45,11 +45,11 @@ public final class GraphPublisher {
     private final StabilizationEngine engine;
     private final TopologicalOrder topology;
 
-    // Fast lookup maps for source nodes.
-    // We separate double and vector sources to avoid instance checks in the hot
-    // path.
-    private final Map<String, DoubleSourceNode> doubleSources = new HashMap<>();
-    private final Map<String, VectorSourceNode> vectorSources = new HashMap<>();
+    // Fast lookup array for source nodes.
+    // sourceNodes[i] is the source node at topological index i, or null if it's not
+    // a source.
+    // This allows O(1) array access in the hot path.
+    private final Node<?>[] sourceNodes;
 
     private PostStabilizationCallback postStabilize;
 
@@ -60,15 +60,12 @@ public final class GraphPublisher {
     public GraphPublisher(StabilizationEngine engine) {
         this.engine = engine;
         this.topology = engine.topology();
+        this.sourceNodes = new Node<?>[topology.nodeCount()];
 
         // Pre-scan the topology to cache source nodes for fast access.
         for (int i = 0; i < topology.nodeCount(); i++) {
             if (topology.isSource(i)) {
-                Node<?> node = topology.node(i);
-                if (node instanceof DoubleSourceNode dsn)
-                    doubleSources.put(dsn.name(), dsn);
-                else if (node instanceof VectorSourceNode vsn)
-                    vectorSources.put(vsn.name(), vsn);
+                sourceNodes[i] = topology.node(i);
             }
         }
     }
@@ -91,24 +88,23 @@ public final class GraphPublisher {
      *                   batch.
      */
     public void onEvent(GraphEvent event, long sequence, boolean endOfBatch) {
-        final String nodeName = event.nodeName();
+        final int nodeId = event.nodeId();
 
         // 1. Apply the update to the source node
-        if (event.isVectorUpdate()) {
-            // Vector element update: O(1) lookup + array index update
-            VectorSourceNode vsn = vectorSources.get(nodeName);
-            if (vsn != null) {
-                vsn.updateAt(event.vectorIndex(), event.doubleValue());
-                // Mark dirty immediately, but don't propagate yet
-                engine.markDirty(topology.topoIndex(nodeName));
-            }
-        } else {
-            // Scalar double update: O(1) lookup
-            DoubleSourceNode dsn = doubleSources.get(nodeName);
-            if (dsn != null) {
-                dsn.updateDouble(event.doubleValue());
-                // Mark dirty immediately
-                engine.markDirty(topology.topoIndex(nodeName));
+        if (nodeId >= 0 && nodeId < sourceNodes.length) {
+            Node<?> node = sourceNodes[nodeId];
+            if (node != null) {
+                if (event.isVectorUpdate()) {
+                    if (node instanceof VectorSourceNode vsn) {
+                        vsn.updateAt(event.vectorIndex(), event.doubleValue());
+                        engine.markDirty(nodeId);
+                    }
+                } else {
+                    if (node instanceof DoubleSourceNode dsn) {
+                        dsn.updateDouble(event.doubleValue());
+                        engine.markDirty(nodeId);
+                    }
+                }
             }
         }
 

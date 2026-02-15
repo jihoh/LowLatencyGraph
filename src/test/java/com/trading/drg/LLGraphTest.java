@@ -250,7 +250,9 @@ public class LLGraphTest {
         pub.setPostStabilizationCallback((ep, n) -> fired[0] = true);
 
         var evt = new GraphEvent();
-        evt.setDoubleUpdate("bid", 100.0, true, 1);
+        // Zero-GC: Resolve ID first
+        int bidId = engine.topology().topoIndex("bid");
+        evt.setDoubleUpdate(bidId, 100.0, true, 1);
         pub.onEvent(evt, 1, false);
         check("Publisher callback fired", fired[0]);
         check("mid updated to 100.5", Math.abs(mid.doubleValue() - 100.5) < 1e-10);

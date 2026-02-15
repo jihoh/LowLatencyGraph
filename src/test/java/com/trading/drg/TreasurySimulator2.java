@@ -102,19 +102,37 @@ public class TreasurySimulator2 {
         Random rng = new Random(42);
         System.out.println("Starting producer...");
 
+        // Pre-resolve node IDs (Zero-GC hot path)
+        int[] bidIds = new int[tenors.length * venues.length];
+        int[] bidQtyIds = new int[tenors.length * venues.length];
+        int[] askIds = new int[tenors.length * venues.length];
+        int[] askQtyIds = new int[tenors.length * venues.length];
+
+        int idx = 0;
+        for (String tenor : tenors) {
+            String prefix = "UST_" + tenor;
+            for (String venue : venues) {
+                String base = prefix + "." + venue;
+                bidIds[idx] = context.getNodeId(base + ".bid");
+                bidQtyIds[idx] = context.getNodeId(base + ".bidQty");
+                askIds[idx] = context.getNodeId(base + ".ask");
+                askQtyIds[idx] = context.getNodeId(base + ".askQty");
+                idx++;
+            }
+        }
+
         for (int i = 0; i < totalUpdates; i++) {
-            String tenor = tenors[rng.nextInt(tenors.length)];
-            String venue = venues[rng.nextInt(venues.length)];
-            String base = "UST_" + tenor + "." + venue;
+            // Pick random instrument by index
+            int k = rng.nextInt(tenors.length * venues.length);
 
             double mid = 100.0 + rng.nextGaussian() * 0.1;
             double spread = 0.015625;
 
             // Publish 4 events (Bid, Ask, BidQty, AskQty)
-            publish(ringBuffer, base + ".bid", mid - spread / 2, false);
-            publish(ringBuffer, base + ".bidQty", 1000 + rng.nextInt(5000), false);
-            publish(ringBuffer, base + ".ask", mid + spread / 2, false);
-            publish(ringBuffer, base + ".askQty", 1000 + rng.nextInt(5000), true); // Trigger stabilize
+            publish(ringBuffer, bidIds[k], mid - spread / 2, false);
+            publish(ringBuffer, bidQtyIds[k], 1000 + rng.nextInt(5000), false);
+            publish(ringBuffer, askIds[k], mid + spread / 2, false);
+            publish(ringBuffer, askQtyIds[k], 1000 + rng.nextInt(5000), true); // Trigger stabilize
         }
 
         latch.await();
@@ -139,11 +157,11 @@ public class TreasurySimulator2 {
         return den == 0 ? 0 : num / den;
     }
 
-    private static void publish(RingBuffer<GraphEvent> rb, String name, double value, boolean batchEnd) {
+    private static void publish(RingBuffer<GraphEvent> rb, int nodeId, double value, boolean batchEnd) {
         long seq = rb.next();
         try {
             GraphEvent event = rb.get(seq);
-            event.setDoubleUpdate(name, value, batchEnd, seq);
+            event.setDoubleUpdate(nodeId, value, batchEnd, seq);
         } finally {
             rb.publish(seq);
         }
