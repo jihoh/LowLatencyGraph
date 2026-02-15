@@ -63,7 +63,6 @@ public final class DoubleSourceNode implements SourceNode<Double>, DoubleReadabl
      * Sets the dirty flag to ensure propagation during next stabilization.
      */
     public void updateDouble(double value) {
-        this.previousValue = this.currentValue;
         this.currentValue = value;
         this.dirty = true;
     }
@@ -75,12 +74,17 @@ public final class DoubleSourceNode implements SourceNode<Double>, DoubleReadabl
 
         // Fix: If previous value is NaN (initial state), always propagate.
         if (Double.isNaN(previousValue)) {
+            previousValue = currentValue; // Capture state
             return true;
         }
 
         // Even if marked dirty, if the value didn't change (e.g. 100.0 -> 100.0),
         // we return false to stop propagation.
-        return cutoff.hasChanged(previousValue, currentValue);
+        boolean changed = cutoff.hasChanged(previousValue, currentValue);
+        if (changed) {
+            previousValue = currentValue; // Capture state only on change
+        }
+        return changed;
     }
 
     @Override
