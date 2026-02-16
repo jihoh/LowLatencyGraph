@@ -57,6 +57,9 @@ public final class MapNode implements Node<Map<String, Double>> {
         this.writer = new MapWriter();
         Arrays.fill(currentValues, Double.NaN);
         Arrays.fill(previousValues, Double.NaN);
+
+        // Initialize view once
+        this.mapView = new FlyweightMap();
     }
 
     @Override
@@ -73,69 +76,123 @@ public final class MapNode implements Node<Map<String, Double>> {
         fn.compute(inputs, writer);
 
         // Check for changes
-        for (int i = 0; i < currentValues.length; i++)
+        for (int i = 0; i < currentValues.length; i++) {
             if (Double.isNaN(previousValues[i]) ||
                     Math.abs(currentValues[i] - previousValues[i]) > tolerance) {
-                // Invalidate view
-                mapView = null;
+                // View is always valid, just pointing to changed data
                 return true;
             }
+        }
         return false;
     }
 
     @Override
     public Map<String, Double> value() {
-        // Zero-allocation view
-        if (mapView == null) {
-            mapView = new AbstractMap<String, Double>() {
-                @Override
-                public Double get(Object key) {
-                    Integer idx = keyIndex.get(key);
-                    return idx == null ? null : currentValues[idx];
-                }
-
-                @Override
-                public boolean containsKey(Object key) {
-                    return keyIndex.containsKey(key);
-                }
-
-                @Override
-                public int size() {
-                    return keys.length;
-                }
-
-                @Override
-                public Set<Entry<String, Double>> entrySet() {
-                    return new AbstractSet<Entry<String, Double>>() {
-                        @Override
-                        public Iterator<Entry<String, Double>> iterator() {
-                            return new Iterator<Entry<String, Double>>() {
-                                private int index = 0;
-
-                                @Override
-                                public boolean hasNext() {
-                                    return index < keys.length;
-                                }
-
-                                @Override
-                                public Entry<String, Double> next() {
-                                    if (index >= keys.length)
-                                        throw new NoSuchElementException();
-                                    final int i = index++;
-                                    return new SimpleImmutableEntry<>(keys[i], currentValues[i]);
-                                }
-                            };
-                        }
-
-                        @Override
-                        public int size() {
-                            return keys.length;
-                        }
-                    };
-                }
-            };
-        }
         return mapView;
+    }
+
+    // Zero-allocation Map implementation
+    private class FlyweightMap extends AbstractMap<String, Double> {
+        private final FlyweightEntrySet entrySet = new FlyweightEntrySet();
+
+        @Override
+        public Double get(Object key) {
+            Integer idx = keyIndex.get(key);
+            return idx == null ? null : currentValues[idx];
+        }
+
+        @Override
+        public boolean containsKey(Object key) {
+            return keyIndex.containsKey(key);
+        }
+
+        @Override
+        public int size() {
+            return keys.length;
+        }
+
+        @Override
+        public Set<Map.Entry<String, Double>> entrySet() {
+            return entrySet;
+        }
+    }
+
+    private class FlyweightEntrySet extends AbstractSet<Map.Entry<String, Double>> {
+        @Override
+        public Iterator<Map.Entry<String, Double>> iterator() {
+            return new FlyweightIterator();
+        }
+
+        @Override
+        public int size() {
+            return keys.length;
+        }
+    }
+
+    private class FlyweightIterator implements Iterator<Map.Entry<String, Double>> {
+        private int index = 0;
+        private final FlyweightEntry entry = new FlyweightEntry();
+
+        @Override
+        public boolean hasNext() {
+            return index < keys.length;
+        }
+
+        @Override
+        public Map.Entry<String, Double> next() {
+            if (index >= keys.length)
+                throw new NoSuchElementException();
+            entry.setIndex(index++);
+            return entry;
+        }
+    }
+
+    private class FlyweightEntry implements Map.Entry<String, Double> {
+        private int index;
+
+        void setIndex(int index) {
+            this.index = index;
+        }
+
+        @Override
+        public String getKey() {
+            return keys[index];
+        }
+
+        @Override
+        public Double getValue() {
+            return currentValues[index];
+        }
+
+        @Override
+        public Double setValue(Double value) {
+            throw new UnsupportedOperationException("MapNode view is immutable via iterator");
+        }
+
+        @Override
+        public String toString() {
+            return keys[index] + "=" + currentValues[index];
+        }
+
+        @Override
+        public int hashCode() {
+            return keys[index].hashCode() ^ Double.hashCode(currentValues[index]);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Map.Entry))
+                return false;
+            Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
+            Object k1 = getKey();
+            Object k2 = e.getKey();
+            if (k1 == k2 || (k1 != null && k1.equals(k2))) {
+                Object v1 = getValue();
+                Object v2 = e.getValue();
+                return v1 == v2 || (v1 != null && v1.equals(v2));
+            }
+            return false;
+        }
     }
 
     public double get(String key) {
