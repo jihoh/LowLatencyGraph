@@ -2,7 +2,6 @@ package com.trading.drg.node;
 
 import com.trading.drg.core.DoubleCutoff;
 import com.trading.drg.core.DoubleReadable;
-import com.trading.drg.core.Node;
 
 /**
  * Abstract base class for nodes that produce a single double value.
@@ -17,7 +16,7 @@ import com.trading.drg.core.Node;
  * <h3>Subclassing</h3>
  * Subclasses only need to implement the {@link #compute()} method.
  */
-public abstract class DoubleNode implements Node<Double>, DoubleReadable {
+public abstract class DoubleNode implements DoubleReadable {
     private final String name;
     private final DoubleCutoff cutoff;
 

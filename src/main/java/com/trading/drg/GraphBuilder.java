@@ -143,7 +143,7 @@ public final class GraphBuilder {
         var node = new CalcDoubleNode(name, cutoff, () -> fn.apply(in.doubleValue()));
         register(node);
         // Explicitly record dependency
-        addEdge(((Node<?>) in).name(), name);
+        addEdge(in.name(), name);
         return node;
     }
 
@@ -163,8 +163,8 @@ public final class GraphBuilder {
         var node = new CalcDoubleNode(name, cutoff,
                 () -> fn.apply(in1.doubleValue(), in2.doubleValue()));
         register(node);
-        addEdge(((Node<?>) in1).name(), name);
-        addEdge(((Node<?>) in2).name(), name);
+        addEdge(in1.name(), name);
+        addEdge(in2.name(), name);
         return node;
     }
 
@@ -179,9 +179,9 @@ public final class GraphBuilder {
         var node = new CalcDoubleNode(name, cutoff,
                 () -> fn.apply(in1.doubleValue(), in2.doubleValue(), in3.doubleValue()));
         register(node);
-        addEdge(((Node<?>) in1).name(), name);
-        addEdge(((Node<?>) in2).name(), name);
-        addEdge(((Node<?>) in3).name(), name);
+        addEdge(in1.name(), name);
+        addEdge(in2.name(), name);
+        addEdge(in3.name(), name);
         return node;
     }
 
@@ -208,7 +208,7 @@ public final class GraphBuilder {
         register(node);
         // Register all dependencies
         for (DoubleReadable input : inputs)
-            addEdge(((Node<?>) input).name(), name);
+            addEdge(input.name(), name);
         return node;
     }
 
@@ -242,7 +242,7 @@ public final class GraphBuilder {
         checkNotBuilt();
         var node = new CalcDoubleNode(name, DoubleCutoffs.EXACT, () -> vec.valueAt(index));
         register(node);
-        addEdge(((Node<?>) vec).name(), name);
+        addEdge(vec.name(), name);
         return node;
     }
 
@@ -274,7 +274,7 @@ public final class GraphBuilder {
         checkNotBuilt();
         var node = new BooleanNode(name, () -> pred.test(input.doubleValue()));
         register(node);
-        addEdge(((Node<?>) input).name(), name);
+        addEdge(input.name(), name);
         return node;
     }
 
@@ -289,8 +289,8 @@ public final class GraphBuilder {
                 () -> cond.booleanValue() ? ifTrue.doubleValue() : ifFalse.doubleValue());
         register(node);
         addEdge(cond.name(), name);
-        addEdge(((Node<?>) ifTrue).name(), name);
-        addEdge(((Node<?>) ifFalse).name(), name);
+        addEdge(ifTrue.name(), name);
+        addEdge(ifFalse.name(), name);
         return node;
     }
 

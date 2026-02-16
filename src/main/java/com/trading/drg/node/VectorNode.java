@@ -1,6 +1,5 @@
 package com.trading.drg.node;
 
-import com.trading.drg.core.Node;
 import com.trading.drg.core.VectorReadable;
 
 /**
@@ -21,7 +20,7 @@ import com.trading.drg.core.VectorReadable;
  * and {@code previousValues}.
  * Logic writes directly into these arrays, avoiding GC pressure.
  */
-public abstract class VectorNode implements Node<double[]>, VectorReadable {
+public abstract class VectorNode implements VectorReadable {
     private final String name;
     private final double tolerance;
     private final double[] currentValues;

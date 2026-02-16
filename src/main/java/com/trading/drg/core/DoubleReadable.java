@@ -14,7 +14,7 @@ package com.trading.drg.core;
  * Most numeric calculation nodes (e.g., standard arithmetic, pricing models)
  * should implement this.
  */
-public interface DoubleReadable {
+public interface DoubleReadable extends Node<Double> {
 
     /**
      * Returns the current value as a primitive double.
