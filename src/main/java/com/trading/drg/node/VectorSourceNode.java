@@ -24,6 +24,7 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorReada
         this.size = size;
         this.currentValues = new double[size];
         this.previousValues = new double[size];
+        java.util.Arrays.fill(previousValues, Double.NaN);
     }
 
     /**
@@ -45,7 +46,7 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorReada
 
     @Override
     public void update(double[] values) {
-        System.arraycopy(currentValues, 0, previousValues, 0, size);
+        // Only update current values. Do NOT touch previousValues until stabilize()
         System.arraycopy(values, 0, currentValues, 0, size);
         dirty = true;
     }
@@ -55,17 +56,32 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorReada
      * Useful for spot shocks to a curve point.
      */
     public void updateAt(int index, double value) {
-        previousValues[index] = currentValues[index];
         currentValues[index] = value;
         dirty = true;
     }
 
     @Override
     public boolean stabilize() {
-        for (int i = 0; i < size; i++)
-            if (Math.abs(currentValues[i] - previousValues[i]) > tolerance)
-                return true;
-        return false;
+        // Check for initialization (first run)
+        if (Double.isNaN(previousValues[0])) {
+            System.arraycopy(currentValues, 0, previousValues, 0, size);
+            return true;
+        }
+
+        // Check for changes
+        boolean changed = false;
+        for (int i = 0; i < size; i++) {
+            if (Math.abs(currentValues[i] - previousValues[i]) > tolerance) {
+                changed = true;
+                break;
+            }
+        }
+
+        if (changed) {
+            // Commit new state
+            System.arraycopy(currentValues, 0, previousValues, 0, size);
+        }
+        return changed;
     }
 
     @Override
