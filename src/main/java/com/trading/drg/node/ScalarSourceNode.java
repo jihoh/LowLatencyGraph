@@ -2,10 +2,10 @@ package com.trading.drg.node;
 
 import com.trading.drg.api.*;
 
-import com.trading.drg.api.DoubleCutoff;
-import com.trading.drg.api.DoubleValue;
+import com.trading.drg.api.ScalarCutoff;
+import com.trading.drg.api.ScalarValue;
 import com.trading.drg.api.SourceNode;
-import com.trading.drg.util.DoubleCutoffs;
+import com.trading.drg.util.ScalarCutoffs;
 
 /**
  * A source node acting as an input for double values.
@@ -22,9 +22,9 @@ import com.trading.drg.util.DoubleCutoffs;
  * engine.markDirty(nodeId)
  * to ensure the new value is picked up during the next stabilization pass.
  */
-public final class DoubleSourceNode implements SourceNode<Double>, DoubleValue {
+public final class ScalarSourceNode implements SourceNode<Double>, ScalarValue {
     private final String name;
-    private final DoubleCutoff cutoff;
+    private final ScalarCutoff cutoff;
     private double currentValue;
     private double previousValue = Double.NaN;
 
@@ -35,7 +35,7 @@ public final class DoubleSourceNode implements SourceNode<Double>, DoubleValue {
      * @param initialValue Initial value (defaults to NaN if not provided).
      * @param cutoff       Strategy to determine if updates are meaningful.
      */
-    public DoubleSourceNode(String name, double initialValue, DoubleCutoff cutoff) {
+    public ScalarSourceNode(String name, double initialValue, ScalarCutoff cutoff) {
         this.name = name;
         this.cutoff = cutoff;
         this.currentValue = initialValue;
@@ -44,8 +44,8 @@ public final class DoubleSourceNode implements SourceNode<Double>, DoubleValue {
     /**
      * Creates a named source node with EXACT change detection.
      */
-    public DoubleSourceNode(String name, double initialValue) {
-        this(name, initialValue, DoubleCutoffs.EXACT);
+    public ScalarSourceNode(String name, double initialValue) {
+        this(name, initialValue, ScalarCutoffs.EXACT);
     }
 
     @Override

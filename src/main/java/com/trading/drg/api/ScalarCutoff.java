@@ -21,7 +21,7 @@ package com.trading.drg.api;
  * ignoring micro-changes.
  */
 @FunctionalInterface
-public interface DoubleCutoff {
+public interface ScalarCutoff {
 
     /**
      * Determines if the double value has changed enough to warrant propagation.

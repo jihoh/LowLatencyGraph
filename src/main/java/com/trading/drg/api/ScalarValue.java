@@ -22,7 +22,7 @@ package com.trading.drg.api;
  * nodes should
  * check for this interface and call doubleValue() instead of value().
  */
-public interface DoubleValue extends Node<Double> {
+public interface ScalarValue extends Node<Double> {
 
     /**
      * Returns the current value as a primitive double.

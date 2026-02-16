@@ -2,15 +2,15 @@ package com.trading.drg.node;
 
 import com.trading.drg.api.*;
 
-import com.trading.drg.api.DoubleCutoff;
-import com.trading.drg.api.DoubleValue;
+import com.trading.drg.api.ScalarCutoff;
+import com.trading.drg.api.ScalarValue;
 
 /**
  * Abstract base class for nodes that produce a single double value.
  *
- * This class implements the DoubleValue interface to allow zero-boxing access
+ * This class implements the ScalarValue interface to allow zero-boxing access
  * to its value. It also handles the boilerplate of state management (current vs
- * previous value) and change detection via DoubleCutoff.
+ * previous value) and change detection via ScalarCutoff.
  *
  * Design:
  * - Template Method: The stabilize() method is final and implements the change,
@@ -22,15 +22,15 @@ import com.trading.drg.api.DoubleValue;
  * Implement compute() to define how the node calculates its new value based on
  * its inputs.
  */
-public abstract class DoubleNode implements DoubleValue {
+public abstract class ScalarNode implements ScalarValue {
     private final String name;
-    private final DoubleCutoff cutoff;
+    private final ScalarCutoff cutoff;
 
     // Primitive fields for zero-allocation state
     private double currentValue = Double.NaN;
     private double previousValue = Double.NaN;
 
-    protected DoubleNode(String name, DoubleCutoff cutoff) {
+    protected ScalarNode(String name, ScalarCutoff cutoff) {
         this.name = name;
         this.cutoff = cutoff;
     }

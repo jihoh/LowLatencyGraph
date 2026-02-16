@@ -3,40 +3,40 @@ package com.trading.drg.util;
 import com.trading.drg.api.*;
 import com.trading.drg.engine.*;
 
-import com.trading.drg.api.DoubleCutoff;
+import com.trading.drg.api.ScalarCutoff;
 
 /**
- * Standard implementations of DoubleCutoff.
+ * Standard implementations of ScalarCutoff.
  *
  * This utility class provides common strategies for determining if a node's
  * value
  * has changed enough to warrant propagation.
  */
-public final class DoubleCutoffs {
-    private DoubleCutoffs() {
+public final class ScalarCutoffs {
+    private ScalarCutoffs() {
         // Utility class
     }
 
     /** Always propagates change (returns true). */
-    public static final DoubleCutoff ALWAYS = (p, c) -> true;
+    public static final ScalarCutoff ALWAYS = (p, c) -> true;
 
     /**
      * Never propagates change (returns false).
      * Useful for sinks or side-effect-only nodes.
      */
-    public static final DoubleCutoff NEVER = (p, c) -> false;
+    public static final ScalarCutoff NEVER = (p, c) -> false;
 
     /**
      * Propagates if bits are different (handles NaN canonicalization naturally).
      * Ideal for exact equality checks.
      */
-    public static final DoubleCutoff EXACT = (p, c) -> Double.doubleToRawLongBits(p) != Double.doubleToRawLongBits(c);
+    public static final ScalarCutoff EXACT = (p, c) -> Double.doubleToRawLongBits(p) != Double.doubleToRawLongBits(c);
 
     /**
      * Propagates if absolute difference exceeds tolerance.
      * Logic: |current - previous| > tolerance
      */
-    public static DoubleCutoff absoluteTolerance(double tol) {
+    public static ScalarCutoff absoluteTolerance(double tol) {
         return (p, c) -> Math.abs(c - p) > tol;
     }
 
@@ -44,7 +44,7 @@ public final class DoubleCutoffs {
      * Propagates if relative difference exceeds tolerance.
      * Logic: |current - previous| / max(|current|, |previous|) > tolerance
      */
-    public static DoubleCutoff relativeTolerance(double tol) {
+    public static ScalarCutoff relativeTolerance(double tol) {
         return (p, c) -> {
             double d = Math.max(Math.abs(p), Math.abs(c));
             return d != 0.0 && Math.abs(c - p) / d > tol;
