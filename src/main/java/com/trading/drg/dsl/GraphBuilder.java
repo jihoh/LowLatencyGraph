@@ -23,9 +23,20 @@ import java.util.*;
  * ...
  */
 public final class GraphBuilder {
-    // ... (fields omitted)
+    private final String graphName;
 
-    // ... (constructor omitted)
+    // Accumulate nodes and edges in lists before compiling to CSR format
+    private final List<Node<?>> nodes = new ArrayList<>();
+    private final Map<String, Node<?>> nodesByName = new HashMap<>();
+    private final List<Edge> edges = new ArrayList<>();
+    private final List<String> sourceNames = new ArrayList<>();
+
+    // Flag to prevent modification after building
+    private boolean built;
+
+    private GraphBuilder(String graphName) {
+        this.graphName = graphName;
+    }
 
     /**
      * Creates a new GraphBuilder instance.
@@ -61,6 +72,21 @@ public final class GraphBuilder {
     public ScalarSourceNode scalarSource(String name, double initialValue, ScalarCutoff cutoff) {
         checkNotBuilt();
         var node = new ScalarSourceNode(name, initialValue, cutoff);
+        register(node);
+        sourceNames.add(name);
+        return node;
+    }
+
+    /**
+     * Creates a vector source node.
+     *
+     * @param name Unique name.
+     * @param size Number of elements.
+     * @return The created VectorSourceNode.
+     */
+    public VectorSourceNode vectorSource(String name, int size) {
+        checkNotBuilt();
+        var node = new VectorSourceNode(name, size);
         register(node);
         sourceNames.add(name);
         return node;
@@ -160,11 +186,21 @@ public final class GraphBuilder {
         return node;
     }
 
-    // ... (Vector Compute omitted)
+    /**
+     * computeVector: Creates a vector computation node.
+     */
+    public VectorCalcNode computeVector(String name, int size, double tolerance,
+            Node<?>[] inputs, VectorFn fn) {
+        checkNotBuilt();
+        var node = new VectorCalcNode(name, size, tolerance, inputs, fn);
+        register(node);
+        for (Node<?> in : inputs)
+            addEdge(in.name(), name);
+        return node;
+    }
 
     /**
      * Extract a single element from a vector node.
-     * This creates a virtual edge that reads a specific index. Zero-cost accessor.
      */
     public ScalarCalcNode vectorElement(String name, VectorValue vec, int index) {
         checkNotBuilt();
@@ -174,7 +210,24 @@ public final class GraphBuilder {
         return node;
     }
 
-    // ... (Map nodes omitted)
+    // ── Map nodes ────────────────────────────────────────────────
+
+    /**
+     * Creates a MapNode for reporting/debugging.
+     * Uses default tolerance of 1e-9.
+     */
+    public MapNode mapNode(String name, String[] keys, Node<?>[] inputs, MapComputeFn fn) {
+        return mapNode(name, keys, inputs, fn, 1e-9);
+    }
+
+    public MapNode mapNode(String name, String[] keys, Node<?>[] inputs, MapComputeFn fn, double tolerance) {
+        checkNotBuilt();
+        var node = new MapNode(name, keys, inputs, fn, tolerance);
+        register(node);
+        for (Node<?> in : inputs)
+            addEdge(in.name(), name);
+        return node;
+    }
 
     // ── Conditionals / signals ───────────────────────────────────
 

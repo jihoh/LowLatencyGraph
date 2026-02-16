@@ -1,17 +1,16 @@
 package com.trading.drg;
 
 import com.trading.drg.api.*;
-import com.trading.drg.engine.*;
-import com.trading.drg.dsl.*;
 import com.trading.drg.wiring.*;
 import com.trading.drg.node.*;
+import com.trading.drg.dsl.GraphBuilder;
 
 import com.lmax.disruptor.BlockingWaitStrategy;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
-import com.trading.drg.api.DoubleValue;
+import com.trading.drg.api.ScalarValue;
 import com.trading.drg.api.Node;
 import com.trading.drg.wiring.GraphEvent;
 import com.trading.drg.wiring.GraphPublisher;
@@ -47,14 +46,14 @@ public class SwapPricerDemo {
 
         // --- Layer 1: Market Data ---
         // 5Y Benchmark Yield
-        var yield5Y = g.doubleSource("Mkt.UST_5Y.Yield", 4.50);
+        var yield5Y = g.scalarSource("Mkt.UST_5Y.Yield", 4.50);
         // 5Y Swap Spread (bps)
-        var spread5Y = g.doubleSource("Mkt.SwapSpread.5Y", 0.15); // 15 bps
+        var spread5Y = g.scalarSource("Mkt.SwapSpread.5Y", 0.15); // 15 bps
         // Overnight Rate for Discounting
-        var sofrRate = g.doubleSource("Mkt.SOFR.Rate", 4.40);
+        var sofrRate = g.scalarSource("Mkt.SOFR.Rate", 4.40);
         // Trade Notional (Constants can contain "Const" in name for clarity, but they
         // are just sources/params)
-        var notional = g.doubleSource("Mkt.Notional", 10_000_000.0);
+        var notional = g.scalarSource("Mkt.Notional", 10_000_000.0);
 
         // --- Layer 2: Derived Curves & Rates ---
 
@@ -68,7 +67,7 @@ public class SwapPricerDemo {
         var discountCurve = g.computeVector("Calc.DiscountCurve", curvePoints, 1e-15,
                 new Node[] { sofrRate },
                 (inputs, output) -> {
-                    double r = ((DoubleValue) inputs[0]).doubleValue() / 100.0;
+                    double r = ((ScalarValue) inputs[0]).doubleValue() / 100.0;
                     for (int i = 0; i < output.length; i++) {
                         double t = i + 1.0;
                         output[i] = 1.0 / Math.pow(1.0 + r, t);
@@ -91,13 +90,13 @@ public class SwapPricerDemo {
         // The builder doesn't let us manually add edges easily if we use this closure.
         // Wait, GraphBuilder DOES NOT have a zero-arg compute that returns a node AND
         // calculate annuity factor by summing discount factors
-        List<DoubleValue> dfs = new ArrayList<>();
+        List<ScalarValue> dfs = new ArrayList<>();
         for (int i = 0; i < curvePoints; i++) {
             dfs.add(g.vectorElement("Calc.DF." + (i + 1) + "Y", discountCurve, i));
         }
 
         var annuityFactorS = g.computeN("Risk.AnnuityFactor",
-                dfs.toArray(new DoubleValue[0]),
+                dfs.toArray(new ScalarValue[0]),
                 (inputs) -> {
                     double sum = 0;
                     for (double d : inputs)
@@ -131,10 +130,10 @@ public class SwapPricerDemo {
 
         var report = g.mapNode("Report.SwapDetails", reportKeys, reportInputs,
                 (inputs, writer) -> {
-                    writer.put("NPV", ((DoubleValue) inputs[0]).doubleValue());
-                    writer.put("DV01", ((DoubleValue) inputs[1]).doubleValue());
-                    writer.put("Rate", ((DoubleValue) inputs[2]).doubleValue());
-                    writer.put("Spread", ((DoubleValue) inputs[3]).doubleValue());
+                    writer.put("NPV", ((ScalarValue) inputs[0]).doubleValue());
+                    writer.put("DV01", ((ScalarValue) inputs[1]).doubleValue());
+                    writer.put("Rate", ((ScalarValue) inputs[2]).doubleValue());
+                    writer.put("Spread", ((ScalarValue) inputs[3]).doubleValue());
                 });
 
         // 2. Build Engine

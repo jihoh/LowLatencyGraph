@@ -6,11 +6,11 @@ import com.trading.drg.dsl.*;
 import com.trading.drg.wiring.*;
 import com.trading.drg.node.*;
 
-import com.trading.drg.core.StabilizationEngine;
-import com.trading.drg.disruptor.GraphEvent;
-import com.trading.drg.disruptor.GraphPublisher;
-import com.trading.drg.GraphBuilder;
-import com.trading.drg.core.GraphContext;
+import com.trading.drg.engine.StabilizationEngine;
+import com.trading.drg.wiring.GraphEvent;
+import com.trading.drg.wiring.GraphPublisher;
+import com.trading.drg.dsl.GraphBuilder;
+import com.trading.drg.engine.GraphContext;
 import org.junit.Test;
 import static org.junit.Assert.*;
 

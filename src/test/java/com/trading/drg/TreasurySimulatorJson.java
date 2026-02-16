@@ -6,14 +6,14 @@ import com.trading.drg.dsl.*;
 import com.trading.drg.wiring.*;
 import com.trading.drg.node.*;
 
-import com.trading.drg.core.DoubleValue;
-import com.trading.drg.core.Node;
+import com.trading.drg.api.ScalarValue;
+import com.trading.drg.api.Node;
 import com.trading.drg.io.GraphDefinition;
 import com.trading.drg.io.JsonGraphCompiler;
 import com.trading.drg.io.JsonParser;
-import com.trading.drg.node.DoubleNode;
-import com.trading.drg.node.DoubleSourceNode;
-import com.trading.drg.util.DoubleCutoffs;
+import com.trading.drg.node.ScalarNode;
+import com.trading.drg.node.ScalarSourceNode;
+import com.trading.drg.util.ScalarCutoffs;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -80,34 +80,34 @@ public class TreasurySimulatorJson {
                 updates, elapsed / 1e6, 1e9 * updates / elapsed);
     }
 
-    private static void update(Map<String, Node<?>> nodes, com.trading.drg.core.StabilizationEngine engine, String name,
+    private static void update(Map<String, Node<?>> nodes, com.trading.drg.engine.StabilizationEngine engine, String name,
             double val) {
-        if (nodes.get(name) instanceof DoubleSourceNode dsn) {
+        if (nodes.get(name) instanceof ScalarSourceNode dsn) {
             dsn.updateDouble(val);
             engine.markDirty(name);
         }
     }
 
     private static void printSnapshot(String tenor, Map<String, Node<?>> nodes) {
-        double bid = ((DoubleValue) nodes.get("UST_" + tenor + ".wBid")).doubleValue();
-        double ask = ((DoubleValue) nodes.get("UST_" + tenor + ".wAsk")).doubleValue();
+        double bid = ((ScalarValue) nodes.get("UST_" + tenor + ".wBid")).doubleValue();
+        double ask = ((ScalarValue) nodes.get("UST_" + tenor + ".wAsk")).doubleValue();
         System.out.printf("[UST_%s] Weighted Bid: %.5f | Weighted Ask: %.5f | Spread: %.5f\n",
                 tenor, bid, ask, ask - bid);
     }
 
     // Custom Node for Weighted Average that supports late binding of dependencies
-    private static class WeightedAvgNode extends DoubleNode implements JsonGraphCompiler.DependencyInjectable {
-        private DoubleValue[] inputs;
+    private static class WeightedAvgNode extends ScalarNode implements JsonGraphCompiler.DependencyInjectable {
+        private ScalarValue[] inputs;
 
         public WeightedAvgNode(String name) {
-            super(name, DoubleCutoffs.EXACT);
+            super(name, ScalarCutoffs.EXACT);
         }
 
         @Override
         public void injectDependencies(Node<?>[] upstreams) {
-            this.inputs = new DoubleValue[upstreams.length];
+            this.inputs = new ScalarValue[upstreams.length];
             for (int i = 0; i < upstreams.length; i++) {
-                this.inputs[i] = (DoubleValue) upstreams[i];
+                this.inputs[i] = (ScalarValue) upstreams[i];
             }
         }
 

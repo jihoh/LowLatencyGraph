@@ -6,11 +6,11 @@ import com.trading.drg.dsl.*;
 import com.trading.drg.wiring.*;
 import com.trading.drg.node.*;
 
-import com.trading.drg.api.DoubleValue;
+import com.trading.drg.api.ScalarValue;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.fn.TemplateFactory;
-import com.trading.drg.node.DoubleSourceNode;
-import com.trading.drg.node.DoubleCalcNode;
+import com.trading.drg.node.ScalarSourceNode;
+import com.trading.drg.node.ScalarCalcNode;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -26,18 +26,18 @@ public class TemplateDemo {
     record VenueConfig(String instrument, String venue) {
     }
 
-    record VenueBook(DoubleSourceNode bidPx, DoubleSourceNode bidQty,
-            DoubleSourceNode askPx, DoubleSourceNode askQty) {
+    record VenueBook(ScalarSourceNode bidPx, ScalarSourceNode bidQty,
+            ScalarSourceNode askPx, ScalarSourceNode askQty) {
     }
 
     static final TemplateFactory<VenueConfig, VenueBook> VENUE_TEMPLATE = (g, pfx, c) -> {
         // e.g., "UST_10Y.Btec.bid"
         String base = c.instrument + "." + c.venue;
         return new VenueBook(
-                g.doubleSource(base + ".bid", 100.0),
-                g.doubleSource(base + ".bidQty", 1000.0),
-                g.doubleSource(base + ".ask", 100.015625), // 1/64 spread roughly
-                g.doubleSource(base + ".askQty", 1000.0));
+                g.scalarSource(base + ".bid", 100.0),
+                g.scalarSource(base + ".bidQty", 1000.0),
+                g.scalarSource(base + ".ask", 100.015625), // 1/64 spread roughly
+                g.scalarSource(base + ".askQty", 1000.0));
     };
 
     // 2. Instrument Template: Aggregates multiple venues
@@ -45,7 +45,7 @@ public class TemplateDemo {
     }
 
     record Instrument(VenueBook btec, VenueBook fenics, VenueBook dweb,
-            DoubleCalcNode wBid, DoubleCalcNode wAsk) {
+            ScalarCalcNode wBid, ScalarCalcNode wAsk) {
     }
 
     static final TemplateFactory<InstConfig, Instrument> INST_TEMPLATE = (g, pfx, c) -> {
@@ -57,7 +57,7 @@ public class TemplateDemo {
         // Weighted Bid = Sum(Px * Qty) / Sum(Qty)
         // Inputs: 6 nodes (3 px, 3 qty)
         var wBid = g.computeN(pfx + ".wBid",
-                new DoubleValue[] {
+                new ScalarValue[] {
                         btec.bidPx(), btec.bidQty(),
                         fenics.bidPx(), fenics.bidQty(),
                         dweb.bidPx(), dweb.bidQty()
@@ -70,7 +70,7 @@ public class TemplateDemo {
 
         // Weighted Ask
         var wAsk = g.computeN(pfx + ".wAsk",
-                new DoubleValue[] {
+                new ScalarValue[] {
                         btec.askPx(), btec.askQty(),
                         fenics.askPx(), fenics.askQty(),
                         dweb.askPx(), dweb.askQty()

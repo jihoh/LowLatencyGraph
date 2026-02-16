@@ -6,16 +6,16 @@ import com.trading.drg.dsl.*;
 import com.trading.drg.wiring.*;
 import com.trading.drg.node.*;
 
-import com.trading.drg.core.DoubleValue;
-import com.trading.drg.core.Node;
-import com.trading.drg.core.TopologicalOrder;
-import com.trading.drg.disruptor.GraphEvent;
-import com.trading.drg.disruptor.GraphPublisher;
+import com.trading.drg.api.ScalarValue;
+import com.trading.drg.api.Node;
+import com.trading.drg.engine.TopologicalOrder;
+import com.trading.drg.wiring.GraphEvent;
+import com.trading.drg.wiring.GraphPublisher;
 import com.trading.drg.fn.TemplateFactory;
 import com.trading.drg.io.JsonGraphCompiler;
 import com.trading.drg.io.JsonParser;
-import com.trading.drg.node.DoubleCalcNode;
-import com.trading.drg.node.DoubleSourceNode;
+import com.trading.drg.node.ScalarCalcNode;
+import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.node.VectorSourceNode;
 
 public class LLGraphTest {
@@ -57,9 +57,9 @@ public class LLGraphTest {
 
     static void testBasic() {
         System.out.println("── 1. Basic bid/ask → mid/spread ──");
-        var g = LLGraph.builder("basic");
-        var bid = g.doubleSource("bid", 99.5);
-        var ask = g.doubleSource("ask", 100.5);
+        var g = GraphBuilder.create("basic");
+        var bid = g.scalarSource("bid", 99.5);
+        var ask = g.scalarSource("ask", 100.5);
         var mid = g.compute("mid", (b, a) -> (b + a) / 2.0, bid, ask);
         var spread = g.compute("spread", (a, b) -> a - b, ask, bid);
 
@@ -79,11 +79,11 @@ public class LLGraphTest {
 
     static void testQuoter() {
         System.out.println("\n── 2. Quoter ──");
-        var g = LLGraph.builder("quoter");
-        var theo = g.doubleSource("theo", 100.0);
-        var vol = g.doubleSource("vol", 0.20);
-        var inv = g.doubleSource("inv", 0.0);
-        var baseSpread = g.doubleSource("base_spread", 0.10);
+        var g = GraphBuilder.create("quoter");
+        var theo = g.scalarSource("theo", 100.0);
+        var vol = g.scalarSource("vol", 0.20);
+        var inv = g.scalarSource("inv", 0.0);
+        var baseSpread = g.scalarSource("base_spread", 0.10);
         var skew = g.compute("skew", i -> i * 0.01, inv);
         var aSpread = g.compute("aspread", (bs, v) -> bs * (1.0 + v), baseSpread, vol);
         var quoteBid = g.compute("bid", (t, s, sk) -> t - s / 2.0 + sk, theo, aSpread, skew);
@@ -100,7 +100,7 @@ public class LLGraphTest {
 
     static void testVector() {
         System.out.println("\n── 3. Vector (curve) ──");
-        var g = LLGraph.builder("curve");
+        var g = GraphBuilder.create("curve");
         var rates = g.vectorSource("rates", 4);
         rates.update(new double[] { 0.045, 0.048, 0.050, 0.052 });
         double[] tenors = { 0.25, 0.5, 1.0, 2.0 };
@@ -123,14 +123,14 @@ public class LLGraphTest {
 
     static void testMapNode() {
         System.out.println("\n── 4. MapNode (Greeks) ──");
-        var g = LLGraph.builder("greeks");
-        var price = g.doubleSource("price", 100.0);
-        var vol = g.doubleSource("vol", 0.20);
+        var g = GraphBuilder.create("greeks");
+        var price = g.scalarSource("price", 100.0);
+        var vol = g.scalarSource("vol", 0.20);
         var greeks = g.mapNode("greeks", new String[] { "delta", "gamma", "vega" },
                 new Node<?>[] { price, vol },
                 (inputs, out) -> {
-                    double p = ((DoubleSourceNode) inputs[0]).doubleValue();
-                    double v = ((DoubleSourceNode) inputs[1]).doubleValue();
+                    double p = ((ScalarSourceNode) inputs[0]).doubleValue();
+                    double v = ((ScalarSourceNode) inputs[1]).doubleValue();
                     out.put("delta", 0.55);
                     out.put("gamma", 0.02);
                     out.put("vega", v * 0.5);
@@ -146,10 +146,10 @@ public class LLGraphTest {
 
     static void testSignals() {
         System.out.println("\n── 5. Signals & select ──");
-        var g = LLGraph.builder("sig");
-        var vol = g.doubleSource("vol", 0.15);
-        var tight = g.doubleSource("tight", 100.0);
-        var wide = g.doubleSource("wide", 99.5);
+        var g = GraphBuilder.create("sig");
+        var vol = g.scalarSource("vol", 0.15);
+        var tight = g.scalarSource("tight", 100.0);
+        var wide = g.scalarSource("wide", 99.5);
         var lowVol = g.condition("low_vol", vol, v -> v < 0.20);
         var quote = g.select("quote", lowVol, tight, wide);
 
@@ -167,11 +167,11 @@ public class LLGraphTest {
 
     static void testTemplate() {
         System.out.println("\n── 6. Template ──");
-        var g = LLGraph.builder("portfolio");
-        var rate = g.doubleSource("rate", 0.05);
+        var g = GraphBuilder.create("portfolio");
+        var rate = g.scalarSource("rate", 0.05);
         record Cfg(double notional, double fixedRate) {
         }
-        record Out(DoubleCalcNode npv) {
+        record Out(ScalarCalcNode npv) {
         }
 
         TemplateFactory<Cfg, Out> tmpl = (b, pfx, c) -> {
@@ -180,7 +180,7 @@ public class LLGraphTest {
         };
         var s1 = g.template("swap1", tmpl, new Cfg(10_000_000, 0.04));
         var s2 = g.template("swap2", tmpl, new Cfg(5_000_000, 0.06));
-        var total = g.computeN("total", new DoubleValue[] { s1.npv(), s2.npv() }, d -> d[0] + d[1]);
+        var total = g.computeN("total", new ScalarValue[] { s1.npv(), s2.npv() }, d -> d[0] + d[1]);
 
         var engine = g.build();
         engine.markDirty("rate");
@@ -191,8 +191,8 @@ public class LLGraphTest {
 
     static void testCutoff() {
         System.out.println("\n── 7. Cutoff ──");
-        var g = LLGraph.builder("cutoff");
-        var x = g.doubleSource("x", 1.0);
+        var g = GraphBuilder.create("cutoff");
+        var x = g.scalarSource("x", 1.0);
         var y = g.compute("y", v -> v * 2.0, x);
 
         var engine = g.build();
@@ -211,9 +211,9 @@ public class LLGraphTest {
         boolean caught = false;
         try {
             var t = TopologicalOrder.builder();
-            t.addNode(new DoubleSourceNode("a", 0));
-            t.addNode(new DoubleSourceNode("b", 0));
-            t.addNode(new DoubleSourceNode("c", 0));
+            t.addNode(new ScalarSourceNode("a", 0));
+            t.addNode(new ScalarSourceNode("b", 0));
+            t.addNode(new ScalarSourceNode("c", 0));
             t.addEdge("a", "b");
             t.addEdge("b", "c");
             t.addEdge("c", "a");
@@ -228,23 +228,23 @@ public class LLGraphTest {
         System.out.println("\n── 9. JSON compilation ──");
         String json = """
                 { "graph": { "name": "test", "version": "1.0", "nodes": [
-                    { "name": "x", "type": "double_source", "source": true, "properties": { "initial_value": 42.0 } },
-                    { "name": "y", "type": "double_source", "source": true, "properties": { "initial_value": 7.0 } }
+                    { "name": "x", "type": "scalar_source", "source": true, "properties": { "initial_value": 42.0 } },
+                    { "name": "y", "type": "scalar_source", "source": true, "properties": { "initial_value": 7.0 } }
                 ]}}""";
         var def = JsonParser.parse(json);
         var compiled = new JsonGraphCompiler().registerBuiltIns().compile(def);
         compiled.engine().markDirty("x");
         compiled.engine().markDirty("y");
         compiled.engine().stabilize();
-        var x = (DoubleSourceNode) compiled.nodesByName().get("x");
+        var x = (ScalarSourceNode) compiled.nodesByName().get("x");
         check("JSON source x = 42", Math.abs(x.doubleValue() - 42.0) < 1e-10);
     }
 
     static void testGraphPublisher() {
         System.out.println("\n── 10. GraphPublisher ──");
-        var g = LLGraph.builder("pub_test");
-        var bid = g.doubleSource("bid", 99.0);
-        var ask = g.doubleSource("ask", 101.0);
+        var g = GraphBuilder.create("pub_test");
+        var bid = g.scalarSource("bid", 99.0);
+        var ask = g.scalarSource("ask", 101.0);
         var mid = g.compute("mid", (b, a) -> (b + a) / 2.0, bid, ask);
         var engine = g.build();
         engine.markDirty("bid");
@@ -266,9 +266,9 @@ public class LLGraphTest {
 
     static void testBenchmark() {
         System.out.println("\n── 11. Benchmark ──");
-        var g = LLGraph.builder("bench");
-        var bid = g.doubleSource("bid", 99.5);
-        var ask = g.doubleSource("ask", 100.5);
+        var g = GraphBuilder.create("bench");
+        var bid = g.scalarSource("bid", 99.5);
+        var ask = g.scalarSource("ask", 100.5);
         var mid = g.compute("mid", (b, a) -> (b + a) / 2.0, bid, ask);
         var spread = g.compute("spread", (a, b) -> a - b, ask, bid);
         var skew = g.compute("skew", s -> s * 0.01, spread);

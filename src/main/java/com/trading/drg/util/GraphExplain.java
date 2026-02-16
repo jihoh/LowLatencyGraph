@@ -6,8 +6,8 @@ import com.trading.drg.engine.*;
 import com.trading.drg.api.Node;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.engine.TopologicalOrder;
-import com.trading.drg.node.DoubleNode;
-import com.trading.drg.node.DoubleSourceNode;
+import com.trading.drg.node.ScalarNode;
+import com.trading.drg.node.ScalarSourceNode;
 
 /**
  * Diagnostic utility for inspecting graph state and topology.
@@ -43,9 +43,9 @@ public final class GraphExplain {
                 .append("  Type: ").append(node.getClass().getSimpleName()).append('\n')
                 .append("  Is source: ").append(topology.isSource(idx)).append('\n')
                 .append("  Current value: ").append(node.value()).append('\n');
-        if (node instanceof DoubleNode dn)
+        if (node instanceof ScalarNode dn)
             sb.append("  Previous: ").append(dn.previousDoubleValue()).append('\n');
-        else if (node instanceof DoubleSourceNode dsn)
+        else if (node instanceof ScalarSourceNode dsn)
             sb.append("  Previous: ").append(dsn.previousDoubleValue()).append('\n');
         int cc = topology.childCount(idx);
         sb.append("  Children (").append(cc).append("): ");

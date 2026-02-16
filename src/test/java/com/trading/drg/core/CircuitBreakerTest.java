@@ -6,9 +6,9 @@ import com.trading.drg.dsl.*;
 import com.trading.drg.wiring.*;
 import com.trading.drg.node.*;
 
-import com.trading.drg.GraphBuilder;
-import com.trading.drg.node.DoubleSourceNode;
-import com.trading.drg.core.DoubleValue;
+import com.trading.drg.dsl.GraphBuilder;
+import com.trading.drg.node.ScalarSourceNode;
+import com.trading.drg.api.ScalarValue;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -17,7 +17,7 @@ public class CircuitBreakerTest {
     @Test
     public void testCircuitBreakerTrips() {
         GraphBuilder g = GraphBuilder.create("breaker_test");
-        var srcA = g.doubleSource("SrcA", 10.0);
+        var srcA = g.scalarSource("SrcA", 10.0);
 
         // LogicA throws if input > 50
         var logicA = g.compute("LogicA", (a) -> {
@@ -37,7 +37,7 @@ public class CircuitBreakerTest {
         assertTrue(engine.isHealthy());
 
         // 2. Trigger Failure
-        ((DoubleSourceNode) nodes.get("SrcA")).updateDouble(100.0);
+        ((ScalarSourceNode) nodes.get("SrcA")).updateDouble(100.0);
         engine.markDirty("SrcA");
 
         try {
@@ -65,11 +65,11 @@ public class CircuitBreakerTest {
         assertTrue(engine.isHealthy());
 
         // 6. Fix input and retry
-        ((DoubleSourceNode) nodes.get("SrcA")).updateDouble(10.0);
+        ((ScalarSourceNode) nodes.get("SrcA")).updateDouble(10.0);
         engine.markDirty("SrcA");
 
         engine.stabilize();
         assertTrue(engine.isHealthy());
-        assertEquals(10.0, ((DoubleValue) nodes.get("LogicA")).doubleValue(), 0.001);
+        assertEquals(10.0, ((ScalarValue) nodes.get("LogicA")).doubleValue(), 0.001);
     }
 }

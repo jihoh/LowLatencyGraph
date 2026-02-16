@@ -11,7 +11,7 @@ import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
-import com.trading.drg.api.DoubleValue;
+import com.trading.drg.api.ScalarValue;
 import com.trading.drg.api.Node;
 import com.trading.drg.wiring.GraphEvent;
 import com.trading.drg.wiring.GraphPublisher;
@@ -41,20 +41,20 @@ public class BondPricerDemo {
         String[] venues = { "Btec", "Fenics", "Dweb" };
 
         // Create topology for each tenor
-        List<DoubleValue> allMids = new ArrayList<>();
+        List<ScalarValue> allMids = new ArrayList<>();
         for (String tenor : tenors) {
             String prefix = "UST_" + tenor;
-            List<DoubleValue> bidInputs = new ArrayList<>();
-            List<DoubleValue> askInputs = new ArrayList<>();
+            List<ScalarValue> bidInputs = new ArrayList<>();
+            List<ScalarValue> askInputs = new ArrayList<>();
 
             for (String venue : venues) {
                 String base = prefix + "." + venue;
 
                 // Sources
-                var bid = g.doubleSource(base + ".bid", 100.0);
-                var bidQty = g.doubleSource(base + ".bidQty", 1000.0);
-                var ask = g.doubleSource(base + ".ask", 100.015625);
-                var askQty = g.doubleSource(base + ".askQty", 1000.0);
+                var bid = g.scalarSource(base + ".bid", 100.0);
+                var bidQty = g.scalarSource(base + ".bidQty", 1000.0);
+                var ask = g.scalarSource(base + ".ask", 100.015625);
+                var askQty = g.scalarSource(base + ".askQty", 1000.0);
 
                 bidInputs.add(bid);
                 bidInputs.add(bidQty);
@@ -65,11 +65,11 @@ public class BondPricerDemo {
             // Aggregation Logic (Weighted Average)
             // Function: (p1, q1, p2, q2, ...) -> sum(p*q) / sum(q)
             var wBid = g.computeN(prefix + ".wBid",
-                    bidInputs.toArray(new DoubleValue[0]),
+                    bidInputs.toArray(new ScalarValue[0]),
                     BondPricerDemo::weightedAvg);
 
             var wAsk = g.computeN(prefix + ".wAsk",
-                    askInputs.toArray(new DoubleValue[0]),
+                    askInputs.toArray(new ScalarValue[0]),
                     BondPricerDemo::weightedAvg);
 
             // Calculate Mid for this instrument
@@ -80,7 +80,7 @@ public class BondPricerDemo {
         // Global Score Aggregation (Average of all Mids)
         // Function: (m1, m2, ...) -> sum(m) / count(m)
         g.computeN("Global.Score",
-                allMids.toArray(new DoubleValue[0]),
+                allMids.toArray(new ScalarValue[0]),
                 inputs -> {
                     double sum = 0;
                     for (double v : inputs) {
@@ -211,10 +211,10 @@ public class BondPricerDemo {
         Node<?> wAsk = nodes.get(p + ".wAsk");
         Node<?> score = nodes.get("Global.Score");
 
-        if (wBid instanceof DoubleValue && wAsk instanceof DoubleValue) {
-            double b = ((DoubleValue) wBid).doubleValue();
-            double a = ((DoubleValue) wAsk).doubleValue();
-            double s = (score instanceof DoubleValue) ? ((DoubleValue) score).doubleValue() : Double.NaN;
+        if (wBid instanceof ScalarValue && wAsk instanceof ScalarValue) {
+            double b = ((ScalarValue) wBid).doubleValue();
+            double a = ((ScalarValue) wAsk).doubleValue();
+            double s = (score instanceof ScalarValue) ? ((ScalarValue) score).doubleValue() : Double.NaN;
             log.info(String.format("[%s] wBid: %.4f | wAsk: %.4f | Global.Score: %.4f", tenor, b, a, s));
         }
     }

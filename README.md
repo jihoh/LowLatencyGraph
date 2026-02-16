@@ -89,8 +89,8 @@ The "Hello World" of trading.
 
 ```java
 // Sources
-var bid = g.doubleSource("mkt.bid", 100.0);
-var ask = g.doubleSource("mkt.ask", 100.5);
+var bid = g.scalarSource("mkt.bid", 100.0);
+var ask = g.scalarSource("mkt.ask", 100.5);
 
 // Logic: Mid = (Bid + Ask) / 2
 var mid = g.compute("calc.mid", (b, a) -> (b + a) / 2.0, bid, ask);
@@ -103,8 +103,8 @@ var spread = g.compute("calc.spread", (a, b) -> a - b, ask, bid);
 Deriving `EUR/JPY` from `EUR/USD` and `USD/JPY`.
 
 ```java
-var eurUsd = g.doubleSource("mkt.eur_usd", 1.08);
-var usdJpy = g.doubleSource("mkt.usd_jpy", 150.00);
+var eurUsd = g.scalarSource("mkt.eur_usd", 1.08);
+var usdJpy = g.scalarSource("mkt.usd_jpy", 150.00);
 
 // Cross: EUR/JPY = EUR/USD * USD/JPY
 var eurJpy = g.compute("calc.eur_jpy", 
@@ -117,8 +117,8 @@ var eurJpy = g.compute("calc.eur_jpy",
 A strictly normalized signal (-1 to +1) based on liquidity.
 
 ```java
-var bidQ = g.doubleSource("mkt.bid_qty", 1000);
-var askQ = g.doubleSource("mkt.ask_qty", 5000);
+var bidQ = g.scalarSource("mkt.bid_qty", 1000);
+var askQ = g.scalarSource("mkt.ask_qty", 5000);
 
 // Imbalance = (BidQ - AskQ) / (BidQ + AskQ)
 var imbalance = g.compute("sig.imbalance", 
@@ -135,8 +135,8 @@ Calculating the Volume Weighted Average Price of the last N trades.
 *Note: Real VWAP requires state (history). This is a snapshot version.*
 
 ```java
-var p1 = g.doubleSource("trade.p1", 100.50); var v1 = g.doubleSource("trade.v1", 100);
-var p2 = g.doubleSource("trade.p2", 100.55); var v2 = g.doubleSource("trade.v2", 200);
+var p1 = g.scalarSource("trade.p1", 100.50); var v1 = g.scalarSource("trade.v1", 100);
+var p2 = g.scalarSource("trade.p2", 100.55); var v2 = g.scalarSource("trade.v2", 200);
 
 // VWAP = Sum(P*V) / Sum(V)
 // Use computeN for array inputs
@@ -183,13 +183,13 @@ var dfs = g.computeVector("calc.dfs", POINTS, 1e-9,
 
 ```java
 var baseCurve = g.vectorSource("base_curve", 10);
-var shift = g.doubleSource("scenario.shift", 0.0050); // +50bps
+var shift = g.scalarSource("scenario.shift", 0.0050); // +50bps
 
 var shockedCurve = g.computeVector("scen.up50", 10, 1e-9,
     new Node[]{ baseCurve, shift },
     (inputs, output) -> {
         VectorSourceNode curve = (VectorSourceNode)inputs[0];
-        double s = ((DoubleValue)inputs[1]).doubleValue();
+        double s = ((ScalarValue)inputs[1]).doubleValue();
         
         for(int i=0; i<10; i++) {
             output[i] = curve.valueAt(i) + s;
@@ -222,8 +222,8 @@ var slice1Y = g.computeVector("vol.1y_slice", 10, 1e-6,
 Widening the spread if Volatility spikes.
 
 ```java
-var rawSpread = g.doubleSource("algo.spread", 0.02);
-var vol = g.doubleSource("mkt.vol", 0.15);
+var rawSpread = g.scalarSource("algo.spread", 0.02);
+var vol = g.scalarSource("mkt.vol", 0.15);
 
 // 1. Condition: Is Vol > 50%?
 var highVol = g.condition("state.high_vol", vol, v -> v > 0.50);
@@ -244,9 +244,9 @@ Implied price of a product that doesn't trade, derived from proxies.
 e.g., `SynPrice = ProxyA * 0.5 + ProxyB * 0.5 + Spread`
 
 ```java
-var proxyA = g.doubleSource("mkt.proxy_a", 100);
-var proxyB = g.doubleSource("mkt.proxy_b", 101);
-var basis = g.doubleSource("cfg.basis", 0.50);
+var proxyA = g.scalarSource("mkt.proxy_a", 100);
+var proxyB = g.scalarSource("mkt.proxy_b", 101);
+var basis = g.scalarSource("cfg.basis", 0.50);
 
 var synPrice = g.compute("calc.syn",
     (a, b, bases) -> (a * 0.5) + (b * 0.5) + bases,
@@ -258,9 +258,9 @@ var synPrice = g.compute("calc.syn",
 Bundling multiple greek risks into a key-value snapshot for reporting.
 
 ```java
-var npv = g.doubleSource("risk.npv", 1000);
-var delta = g.doubleSource("risk.delta", 50);
-var gamma = g.doubleSource("risk.gamma", 2);
+var npv = g.scalarSource("risk.npv", 1000);
+var delta = g.scalarSource("risk.delta", 50);
+var gamma = g.scalarSource("risk.gamma", 2);
 
 // Map keys defined at build time
 var report = g.mapNode("report.pnl",
@@ -318,7 +318,7 @@ The graph is stateless by default, but you can capture state in the closure.
 Use a 1-element array to hold state inside the lambda. The lambda is instantiated **once** at build time, so the array persists.
 
 ```java
-var price = g.doubleSource("mkt.px", 100.0);
+var price = g.scalarSource("mkt.px", 100.0);
 
 // Capture state in closure
 final double[] state = new double[1]; // [0] = lastEMA
@@ -345,7 +345,7 @@ var ewma = g.compute("sig.ewma", (px) -> {
 CoreGraph supports boolean signals for logic gates and valid/invalid flags.
 
 ```java
-var mid = g.doubleSource("mkt.mid", 100.0);
+var mid = g.scalarSource("mkt.mid", 100.0);
 
 // 1. Create Boolean Signal (Condition)
 // Returns a BooleanNode that is true/false based on the predicate
@@ -378,9 +378,9 @@ var isTradeable = g.compute("sig.tradeable", (v, b) -> v && !b, isValid, isBigRe
 *   **Bad**: `X` -> `SqrX`, `Y` -> `SqrY`, `Sum` -> `Sqrt`. (5 nodes).
 *   **Good**: `X,Y` -> `Calc` (where `Calc = Math.sqrt(x*x + y*y)`). (1 node). The JIT compiler optimizes the internals of the node into efficient machine instructions (SQRTSD).
 
-### 5.2 VectorNode vs. DoubleNodes
+### 5.2 VectorNode vs. ScalarNodes
 
-**Question:** "Why not just use 100 `DoubleNode`s for a Yield Curve?"
+**Question:** "Why not just use 100 `ScalarNode`s for a Yield Curve?"
 
 **Answer: CPU Architecture.**
 1.  **Cache Locality:** `VectorNode` uses a contiguous `double[]`. The CPU pulls in 64 bytes (8 doubles) in a single cycle. With scattered objects, you get cache misses on every access.
@@ -388,7 +388,7 @@ var isTradeable = g.compute("sig.tradeable", (v, b) -> v && !b, isValid, isBigRe
 3.  **Consistency:** Vectors update atomically. There is no risk of a "teared" state where half the curve is old and half is new.
 
 **Rule:**
-*   Distinct Values (`Spot`, `VIX`) -> `DoubleNode`.
+*   Distinct Values (`Spot`, `VIX`) -> `ScalarNode`.
 *   Homogeneous Data (`YieldCurve`, `VolSurface`) -> `VectorNode`.
 
 ### 5.3 Zero-Allocation Rules

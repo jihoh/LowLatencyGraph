@@ -6,9 +6,9 @@ import com.trading.drg.engine.*;
 import java.util.*;
 
 import com.trading.drg.api.*;
-import com.trading.drg.node.DoubleSourceNode;
+import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.node.VectorSourceNode;
-import com.trading.drg.util.DoubleCutoffs;
+import com.trading.drg.util.ScalarCutoffs;
 
 /**
  * Compiles a JSON {@link GraphDefinition} into a live, executable graph.
@@ -37,10 +37,15 @@ public final class JsonGraphCompiler {
 
     /** Register built-in factories (double_source, vector_source). */
     public JsonGraphCompiler registerBuiltIns() {
+        registerFactory("scalar_source", (name, props) -> {
+            double init = getDouble(props, "initial_value", 0.0);
+            ScalarCutoff cutoff = parseCutoff(props);
+            return new ScalarSourceNode(name, init, cutoff);
+        });
         registerFactory("double_source", (name, props) -> {
             double init = getDouble(props, "initial_value", 0.0);
-            DoubleCutoff cutoff = parseCutoff(props);
-            return new DoubleSourceNode(name, init, cutoff);
+            ScalarCutoff cutoff = parseCutoff(props);
+            return new ScalarSourceNode(name, init, cutoff);
         });
         registerFactory("vector_source", (name, props) -> {
             int size = getInt(props, "size", -1);
@@ -98,20 +103,20 @@ public final class JsonGraphCompiler {
                 new StabilizationEngine(topo.build()), nodesByName);
     }
 
-    static DoubleCutoff parseCutoff(Map<String, Object> props) {
+    static ScalarCutoff parseCutoff(Map<String, Object> props) {
         Object o = props.get("cutoff");
         if (o == null)
-            return DoubleCutoffs.EXACT;
+            return ScalarCutoffs.EXACT;
         if (o instanceof String s)
             return switch (s) {
-                case "exact" -> DoubleCutoffs.EXACT;
-                case "always" -> DoubleCutoffs.ALWAYS;
-                case "never" -> DoubleCutoffs.NEVER;
-                case "absolute" -> DoubleCutoffs.absoluteTolerance(getDouble(props, "tolerance", 1e-15));
-                case "relative" -> DoubleCutoffs.relativeTolerance(getDouble(props, "tolerance", 1e-10));
+                case "exact" -> ScalarCutoffs.EXACT;
+                case "always" -> ScalarCutoffs.ALWAYS;
+                case "never" -> ScalarCutoffs.NEVER;
+                case "absolute" -> ScalarCutoffs.absoluteTolerance(getDouble(props, "tolerance", 1e-15));
+                case "relative" -> ScalarCutoffs.relativeTolerance(getDouble(props, "tolerance", 1e-10));
                 default -> throw new IllegalArgumentException("Unknown cutoff: " + s);
             };
-        return DoubleCutoffs.EXACT;
+        return ScalarCutoffs.EXACT;
     }
 
     static double getDouble(Map<String, Object> props, String key, double def) {

@@ -6,7 +6,7 @@ import com.trading.drg.engine.*;
 import com.trading.drg.api.Node;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.engine.TopologicalOrder;
-import com.trading.drg.node.DoubleSourceNode;
+import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.node.VectorSourceNode;
 
 import org.apache.logging.log4j.LogManager;
@@ -117,11 +117,11 @@ public final class GraphPublisher {
                             nodeId, node.getClass().getSimpleName());
                 }
             } else {
-                if (node instanceof DoubleSourceNode dsn) {
+                if (node instanceof ScalarSourceNode dsn) {
                     dsn.updateDouble(event.doubleValue());
                     engine.markDirty(nodeId);
                 } else {
-                    log.error("Received double update for non-DoubleSourceNode: nodeId={} type={}",
+                    log.error("Received double update for non-ScalarSourceNode: nodeId={} type={}",
                             nodeId, node.getClass().getSimpleName());
                 }
             }
