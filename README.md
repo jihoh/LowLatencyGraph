@@ -1,427 +1,513 @@
-# LLGraph
+# CoreGraph Developer Manual
 
-**Low-Latency Deterministic Replayable Graph Engine**
-
----
-
-## 1. Overview
-
-LLGraph is a high-performance, zero-allocation incremental computation framework designed for electronic trading systems. It models calculations as a directed acyclic graph (DAG) where nodes are computations and edges are explicit dependencies.
-
-### Key Properties
-
-- **Deterministic:** Same inputs always produce the same outputs.
-- **Incremental:** Only "dirty" nodes and their downstream dependents are recomputed.
-- **Zero-GC on the Hot Path:** No object allocation during stabilization.
-- **Topology-Driven:** Structure is frozen at build time for maximum optimization (CSR layout).
-- **Single-Threaded:** Designed for use within a lock-free LMAX Disruptor `EventHandler`.
-
-**Performance:** ~100ns per stabilization for typical trading logic (10-20 nodes). >2 million stabilizations/sec on a single core.
+**Version:** 2.2.0
+**Target Audience:** Quantitative Developers, Algo Traders, and System Engineers.
 
 ---
 
-## 2. Quant Cookbook
+## 1. Introduction
 
-Real-world examples for quantitative developers.
+**CoreGraph** is a specialized, high-performance graph engine designed for **low-latency electronic trading**. It allows you to model complex pricing, risk, and signal logic as a **Directed Acyclic Graph (DAG)**.
 
-### 2.1 Hello World: Mid Price
-Simple scalar arithmetic.
+Unlike general-purpose streaming frameworks (RxJava, Akka) or standard OOP, CoreGraph is built with one obsession: **Deterministic, Zero-Allocation execution on the Hot Path.**
 
-```java
-var g = GraphBuilder.create("mid_price");
-
-// Sources
-var bid = g.doubleSource("bid", 99.50);
-var ask = g.doubleSource("ask", 100.50);
-
-// Logic
-var mid = g.compute("mid", (b, a) -> (b + a) / 2.0, bid, ask);
-var spread = g.compute("spread", (a, b) -> a - b, ask, bid);
-
-// Build & Run
-var engine = g.build();
-engine.markDirty("bid"); 
-engine.markDirty("ask");
-engine.stabilize();
-
-System.out.println("Mid: " + mid.doubleValue()); // 100.0
-```
-
-### 2.2 Yield Curve Construction (Vector Operations)
-Building a discount curve from raw rates using vector nodes. `VectorSourceNode` and `computeVector` handle arrays efficiently.
-
-```java
-var g = GraphBuilder.create("curve_builder");
-int points = 4;
-double[] tenors = { 0.25, 0.5, 1.0, 2.0 };
-
-// Vector Source (Market Rates)
-var rates = g.vectorSource("mkt.rates", points);
-
-// Vector Compute (Discount Factors)
-var dfCurve = g.computeVector("calc.df_curve", points, 1e-12,
-    new Node<?>[]{ rates },
-    (inputs, output) -> {
-        var r = (VectorSourceNode) inputs[0];
-        for (int i = 0; i < points; i++) {
-            // Simple bootstraper logic
-            output[i] = 1.0 / (1.0 + r.valueAt(i) * tenors[i]);
-        }
-    });
-
-// Extract single point for downstream use
-var df1y = g.vectorElement("df.1y", dfCurve, 2); // Index 2 is 1.0y
-```
-
-### 2.3 Options Greeks (MapNode)
-Calculating multiple named outputs (Delta, Gamma, Vega) in a single node to share intermediate calculations.
-
-```java
-var g = GraphBuilder.create("option_pricer");
-var spot = g.doubleSource("spot", 100.0);
-var vol  = g.doubleSource("vol", 0.20);
-
-// MapNode names outputs: "px", "delta", "gamma", "vega"
-var pricer = g.mapNode("atm_call", 
-    new String[]{ "px", "delta", "gamma", "vega" },
-    new Node<?>[]{ spot, vol },
-    (inputs, out) -> {
-        double S = ((DoubleReadable)inputs[0]).doubleValue();
-        double sigma = ((DoubleReadable)inputs[1]).doubleValue();
-        
-        // Shared calculations (d1, d2)
-        double d1 = ...; 
-        
-        // Write outputs by name
-        out.put("px",    S * N(d1) - K * N(d2));
-        out.put("delta", N(d1));
-        out.put("gamma", n(d1) / (S * sigma * sqrtT));
-        out.put("vega",  S * n(d1) * sqrtT);
-    });
-
-// Downstream usage
-var delta = pricer.get("delta"); // O(1) access
-```
-
-### 2.4 Circuit Breakers (Conditionals)
-Using `condition` (BooleanNode) and `select` to switch behavior based on market regimes.
-
-```java
-var g = GraphBuilder.create("safety_logic");
-var rawSpread = g.doubleSource("spread", 0.05);
-var vol       = g.doubleSource("vol", 0.15);
-
-// 1. Define Condition (Signal)
-// Only signals TRUE if vol > 50%
-var highVolMode = g.condition("is_high_vol", vol, v -> v > 0.50);
-
-// 2. Conditional Logic
-// If high vol, widen spread by 2x. Else use raw spread.
-var safeSpread = g.select("safe_spread", 
-    highVolMode, 
-    g.compute("wide", s -> s * 2.0, rawSpread), // True logic
-    rawSpread                                   // False logic
-);
-```
-
-### 2.5 Portfolio Pricing (Templates)
-Stamping out identical subgraphs for hundreds of instruments using helper methods (`TemplateFactory`).
-
-```java
-record SwapConfig(double notional, double fixedRate) {}
-record SwapOutputs(CalcDoubleNode npv, CalcDoubleNode dv01) {}
-
-// Template Definition
-TemplateFactory<SwapConfig, SwapOutputs> swapTemplate = (b, prefix, cfg) -> {
-    var npv = b.compute(prefix + ".npv", 
-        (r) -> cfg.notional * (r - cfg.fixedRate), 
-        rateNode);
-    var dv01 = b.compute(prefix + ".dv01", ...);
-    return new SwapOutputs(npv, dv01);
-};
-
-// Instantiation
-var s1 = g.template("swap1", swapTemplate, new SwapConfig(10e6, 0.04));
-var s2 = g.template("swap2", swapTemplate, new SwapConfig(5e6,  0.03));
-```
-
-### 2.6 Best Practices: Node Granularity
-**Design Philosophy: Coarse-Grained Business Units**
-
-A common mistake is treating the graph like an Abstract Syntax Tree (AST) where every `+`, `-`, and `*` is a node. This performs poorly. Instead, treat nodes as **Business Logic Units** (e.g., "Black-Scholes Pricer", "Risk Aggregator", "Signal Generator").
-
-#### Why Coarse-Grained is Faster
-
-1.  **The "Graph Tax"**: Every node introduces overhead:
-    *   **Memory**: Metadata for dirty flags, child indices, and value storage.
-    *   **Traversal**: The engine must iterate, check dirty bits, and look up children in the adjacency array.
-    *   **Cache Misses**: Jumping between nodes evicts helpful data from L1/L2 CPU caches.
-
-2.  **JIT Compilation Scope**:
-    *   **Inside a Node**: The Java HotSpot Compiler (JIT) sees the entire lambda as a single block. It can use CPU registers, SIMD instructions (AVX), and dead-code elimination.
-    *   **Between Nodes**: The JIT sees opaque method calls. It cannot easily optimize across these boundaries.
-
-#### Example: The Cost of Granularity
-
-**❌ Bad: "AST Style" (High Overhead)**
-3 nodes, 3 dirty checks, 3 array lookups, 3 function calls.
-```java
-// Logic: (a + b) * c
-var sum  = g.compute("sum",  (a, b) -> a + b, srcA, srcB);
-var prod = g.compute("prod", (s, c) -> s * c, sum, srcC); 
-```
-
-**✅ Good: "Business Logic Style" (Zero Overhead)**
-1 node. The math `(a + b) * c` compiles to a single FMA (Fused Multiply-Add) machine instruction.
-```java
-var result = g.compute("total_calc", 
-    (a, b, c) -> (a + b) * c, 
-    srcA, srcB, srcC
-);
-```
-
-#### 2.6.2 Best Practices: MapNode vs. Multiple DoubleNodes
-
-For collections of related values (e.g., 2Y venues bids/asks), prefers **multiple `DoubleNode`s** over a single `MapNode`.
-
-**Why? Over-invalidation**.
-*   If you group 10 venues into one `MapNode`, and **only Venue A updates**, the `MapNode` is marked "dirty".
-*   Consequently, **ALL** downstream nodes that depend on the Map will be checked/recomputed, even if they only cared about Venue B (which didn't change).
-*   This breaks the "Reactive" promise of the graph engine and hurts latency.
-
-**Recommendation:**
-*   **Hot Path (Calculation):** Use granular `DoubleNode`s (e.g., `VenueA.Bid`, `VenueB.Bid`). This ensures that an update to Venue A *only* triggers the logic for the best bid calculation, leaving Venue B's logic untouched.
-*   **Reporting / UI:** Use `MapNode` only at the very **end** of the graph (like `Report.SwapDetails`). It is excellent for bundling data for a "Snapshot" to send to a GUI or logger, where a consistent view of the world is required.
-
-#### 2.6.3 Best Practices: VectorNode vs. Multiple DoubleNodes
-
-**Question:** "Why do I need `VectorNode`? Why not just use 100 `DoubleNode`s for a Yield Curve?"
-
-**Answer: CPU Cache & Throughput.**
-
-1.  **Pointer Chasing vs. Contiguous Memory (The Critical Factor)**
-    *   **Multiple DoubleNodes**: 100 separate Java objects scattered in heap memory. The CPU must "chase pointers" to fetch each one, causing massive L1/L2 cache misses.
-    *   **VectorNode**: A single `double[]` array is a contiguous block of memory. The CPU fetches entire cache lines (e.g., 4-8 doubles) in a single cycle. Iterating `array[i]` is orders of magnitude faster than `nodeList.get(i).value()`.
-
-2.  **Graph Traversal Overhead**
-    *   **Split**: 100 nodes = 100x engine overhead (dirty checks, virtual method calls, recursion).
-    *   **Vector**: 1 node = 1x overhead. You pay the administration cost once to process 100 data points.
-
-3.  **Atomic Consistency ("Tearing")**
-    *   **Split**: Updates to a curve might process partially, leaving downstream nodes seeing a "teared" state (half old curve, half new) if batching isn't perfect.
-    *   **Vector**: The array updates atomically. Downstream nodes see either the *entire* old curve or the *entire* new curve.
-
-4.  **Memory Footprint**
-    *   **DoubleNode**: ~48 bytes per point (Header + value + references).
-    *   **VectorNode**: ~8 bytes per point. For large volatility surfaces, this saves Gigabytes.
-
-**Rule of Thumb:**
-*   Use **DoubleNode** for distinct, semantic values (`SpotPrice`, `RiskLimit`).
-*   Use **VectorNode** for homogeneous collections (`YieldCurve`, `VolSurface`, `PnL_Buckets`).
-
-### 2.7 Boolean Logic & Conditionals
-The graph supports boolean logic for implementing payoff structures, barriers, and regime switching. Use `condition` to create a boolean signal and `select` to switch between values.
-
-```java
-GraphBuilder g = GraphBuilder.create("option_payoff");
-
-// 1. Define inputs
-var spot = g.doubleSource("spot", 100.0);
-var strike = g.doubleSource("strike", 100.0);
-
-// 2. Create a boolean condition (Spot > Strike)
-var isInTheMoney = g.condition("isITM", spot, s -> s > 110.0); // Predicate on 'spot'
-
-// 3. Select output based on condition
-// logic: if (isITM) then (Spot - Strike) else 0.0
-var intrinsic = g.select("intrinsic", isInTheMoney,
-    g.compute("diff", (s, k) -> s - k, spot, strike), // True branch
-    g.doubleSource("zero", 0.0)                       // False branch
-);
-```
-**Key Components:**
-- **`g.condition(name, input, predicate)`**: Creates a `BooleanNode` that updates whenever `input` changes.
-- **`g.select(name, condition, trueNode, falseNode)`**: Acts as a multiplexer. It subscribes to all inputs but only propagates the value corresponding to the current state of `condition`.
-
-#### When to Split Nodes?
-Only pay the "Graph Tax" when you buy something valuable:
-
-- **Reusability**: Is the intermediate value (e.g., `fair_price`) needed by *multiple* other nodes (e.g., `execution_logic` AND `risk_report`)?
-- **Frequency Mismatch**: If `A` updates 1M times/sec and `B` updates 1 time/hour, do NOT merge them into one monolithic node.
-    *   *Example*: `HeavyCalc(MarketData) + ConfigShift`.
-    *   Split this so `ConfigShift` doesn't trigger the heavy calc when it changes.
-- **Feedback Loops**: You cannot have cycles. If `A` depends on `B` and `B` depends on `A`, you must break the loop with a stateful node (like `EMA`).
-
-**Rule of Thumb**: Start with large, comprehensive nodes. Break them down only when architectural reuse demands it.
+### Key Capabilities
+*   **Speed:** < 500 nanosecond stabilization latency for typical subgraphs.
+*   **Throughput:** > 2 million updates/second on a single core.
+*   **Predictability:** Zero Garbage Collection (GC) during runtime.
+*   **Safety:** Statically typed, cycle-free topology with explicit ownership.
 
 ---
 
-## 3. Architecture
+## 2. Architecture
 
-### 3.1 Data Flow
+Understanding the internal data flow is critical for writing efficient graph logic.
+
+### 2.1 Data Flow
 
 ```
-[Disruptor Ring Buffer]
-       │
-       ▼
-[GraphPublisher (EventHandler)]
-       │
-       │ (1) Read int nodeId from event (Zero-GC lookup)
-       │ (2) Update primitive primitive source value
-       │ (3) map.markDirty(nodeId)
-       ▼
-[StabilizationEngine]
-       │
-       │ (4) Walk topological order
-       │ (5) Recompute dirty nodes
-       │ (6) Propagate changes
-       ▼
-[Downstream Consumers]
+[Network I/O Thread]                [Graph Consumer Thread]
+        │                                     │
+        ▼                                     ▼
+[Disruptor RingBuffer] ───────► [GraphPublisher (EventHandler)]
+   (Stores Events)                            │
+                                              │ (1) Read Event (int nodeId, double val)
+                                              │ (2) Update Primitive Source Array
+                                              │ (3) Mark 'dirty' bit for Node ID
+                                              ▼
+                                    [StabilizationEngine]
+                                              │
+                                              │ (4) Walk Topological Order
+                                              │ (5) If (dirty || parentChanged):
+                                              │         Compute();
+                                              │         Compare vs Previous;
+                                              │         If (Changed) Mark Children Dirty;
+                                              ▼
+                               [Post-Stabilization Callback]
+                               (Safe place to read outputs)
 ```
 
-### 3.2 Core Components
+### 2.2 Core Components
 
 | Component | Role | Optimization |
 |-----------|------|--------------|
-| `GraphBuilder` | Fluent API to define topology. | Compiles to CSR (Compressed Sparse Row) format. |
-| `StabilizationEngine` | Runtime engine. | Flat array traversal, pre-allocated dirty bits. |
-| `GraphEvent` | Disruptor event holder. | Uses `int nodeId` to avoid String lookups. |
-| `GraphPublisher` | Bridge to Disruptor. | Uses `Node<?>[]` for O(1) source access. |
+| `GraphBuilder` | **Compiler**. Defines topology and validates cycles. | Compiles graph to **CSR (Compressed Sparse Row)** format - flattened integer arrays for cache locality. |
+| `StabilizationEngine` | **Runtime**. Executes the graph. | **Zero-Allocation**. Uses `double[]` for state and `int[]` for connectivity. No object iterators. |
+| `GraphEvent` | **Transport**. Moves data from Network -> Graph. | **Mutable Flyweight**. Lives in the RingBuffer to avoid allocation per message. |
+| `GraphPublisher` | **Bridge**. Connects Disruptor to Engine. | **Batching**. If the consumer falls behind, it updates *all* pending events before stabilizing *once*. |
+
+### 2.3 The "Epoch" Concept
+Every time `stabilize()` is called, the engine increments an internal `epoch` counter.
+*   This creates a **Logical Time** step.
+*   All nodes computed in Epoch `N` see a consistent snapshot of inputs from Epoch `N-1` or `N`.
+*   This guarantees **Atomic Consistency**: You never see "half a curve update".
 
 ---
 
-## 4. Integration Guide
+## 3. Core Concepts
 
-### 4.1 Lookup Caching (Critical for Perf)
-To achieve zero-GC updates, resolve String names to Integers **once** at startup.
+### 3.1 The Push-Wait-Stabilize Pattern
+CoreGraph is **Lazy**. Setting a value does *not* trigger computation immediately.
+
+1.  **Push:** Update one or more source nodes.
+2.  **Wait:** (Optional) Update more sources. The engine just marks bits dirty.
+3.  **Stabilize:** Call `engine.stabilize()`. The engine waves the changes through the graph.
+
+### 3.2 Primitive First
+*   We use `double` and `double[]` everywhere.
+*   **Boxing (`Double`) is banned** on the hot path.
+*   **String Lookups are banned** on the hot path. Use cached `int` IDs.
+
+---
+
+## 4. Quant Cookbook: 12 Real-World Examples
+
+All examples use `GraphBuilder g`.
+
+### Example 1: Mid Price & Spread (Scalar)
+The "Hello World" of trading.
 
 ```java
-// 1. Build Graph
-var g = GraphBuilder.create("engine");
-var bid = g.doubleSource("Mkt.Bid", 100.0);
-var ctx = g.buildWithContext();
+// Sources
+var bid = g.doubleSource("mkt.bid", 100.0);
+var ask = g.doubleSource("mkt.ask", 100.5);
 
-// 2. Cache IDs (Do this in your constructor)
-int bidId = ctx.getNodeId("Mkt.Bid");
+// Logic: Mid = (Bid + Ask) / 2
+var mid = g.compute("calc.mid", (b, a) -> (b + a) / 2.0, bid, ask);
 
-// 3. Hot Loop (Disruptor Producer)
-// No strings allowed here!
-public void onMarketData(MdUpdate md) {
+// Logic: Spread = Ask - Bid
+var spread = g.compute("calc.spread", (a, b) -> a - b, ask, bid);
+```
+
+### Example 2: FX Cross Rate (Triangular Arb)
+Deriving `EUR/JPY` from `EUR/USD` and `USD/JPY`.
+
+```java
+var eurUsd = g.doubleSource("mkt.eur_usd", 1.08);
+var usdJpy = g.doubleSource("mkt.usd_jpy", 150.00);
+
+// Cross: EUR/JPY = EUR/USD * USD/JPY
+var eurJpy = g.compute("calc.eur_jpy", 
+    (eu, uj) -> eu * uj, 
+    eurUsd, usdJpy
+);
+```
+
+### Example 3: Order Book Imbalance (Signal)
+A strictly normalized signal (-1 to +1) based on liquidity.
+
+```java
+var bidQ = g.doubleSource("mkt.bid_qty", 1000);
+var askQ = g.doubleSource("mkt.ask_qty", 5000);
+
+// Imbalance = (BidQ - AskQ) / (BidQ + AskQ)
+var imbalance = g.compute("sig.imbalance", 
+    (bq, aq) -> {
+        double sum = bq + aq;
+        return (sum == 0) ? 0.0 : (bq - aq) / sum;
+    }, 
+    bidQ, askQ
+);
+```
+
+### Example 4: VWAP Snapshot (Weighted Average)
+Calculating the Volume Weighted Average Price of the last N trades.
+*Note: Real VWAP requires state (history). This is a snapshot version.*
+
+```java
+var p1 = g.doubleSource("trade.p1", 100.50); var v1 = g.doubleSource("trade.v1", 100);
+var p2 = g.doubleSource("trade.p2", 100.55); var v2 = g.doubleSource("trade.v2", 200);
+
+// VWAP = Sum(P*V) / Sum(V)
+// Use computeN for array inputs
+var vwap = g.computeN("calc.vwap",
+    new Node[]{ p1, v1, p2, v2 },
+    (inputs) -> {
+        double sumPv = 0, sumV = 0;
+        for(int i=0; i<inputs.length; i+=2) {
+            double p = inputs[i];
+            double v = inputs[i+1];
+            sumPv += p * v;
+            sumV += v;
+        }
+        return (sumV == 0) ? 0 : sumPv / sumV;
+    }
+);
+```
+
+### Example 5: Yield Curve Bootstrap (Vector)
+Calculating Discount Factors from raw rates. `VectorNode` dominates here.
+
+```java
+int POINTS = 10;
+var rates = g.vectorSource("mkt.rates", POINTS); // Input: [0.045, 0.046...]
+
+// Output: Discount Factors df = 1 / (1 + r)^t
+// Times are constant: 1Y, 2Y... 10Y
+double[] times = {1,2,3,4,5,6,7,8,9,10};
+
+var dfs = g.computeVector("calc.dfs", POINTS, 1e-9,
+    new Node[]{ rates },
+    (inputs, output) -> {
+        VectorSourceNode rNode = (VectorSourceNode)inputs[0];
+        for(int i=0; i<POINTS; i++) {
+            double r = rNode.valueAt(i);
+            output[i] = 1.0 / Math.pow(1.0 + r, times[i]);
+        }
+    }
+);
+```
+
+### Example 6: Scenario Analysis (Parallel Shift)
+"What is the curve if rates go up 50bps?"
+
+```java
+var baseCurve = g.vectorSource("base_curve", 10);
+var shift = g.doubleSource("scenario.shift", 0.0050); // +50bps
+
+var shockedCurve = g.computeVector("scen.up50", 10, 1e-9,
+    new Node[]{ baseCurve, shift },
+    (inputs, output) -> {
+        VectorSourceNode curve = (VectorSourceNode)inputs[0];
+        double s = ((DoubleValue)inputs[1]).doubleValue();
+        
+        for(int i=0; i<10; i++) {
+            output[i] = curve.valueAt(i) + s;
+        }
+    }
+);
+```
+
+### Example 7: Volatility Surface Slice (Vector Element)
+Extracting a single "Smile" (Strike vs Vol) at a specific tenor from a full surface.
+
+```java
+// Assume surface is flattened: [T1_K1, T1_K2, ... T2_K1...]
+var surface = g.vectorSource("mkt.vol_surface", 100); 
+
+// We want the slice at Index 20-29 (The 1Y tenor)
+var slice1Y = g.computeVector("vol.1y_slice", 10, 1e-6,
+    new Node[]{ surface },
+    (inputs, output) -> {
+        VectorSourceNode surf = (VectorSourceNode)inputs[0];
+        // Efficient array copy (Zero-GC, effectively System.arraycopy)
+        for(int i=0; i<10; i++) {
+            output[i] = surf.valueAt(20 + i);
+        }
+    }
+);
+```
+
+### Example 8: Safe-Spread Logic (Circuit Breaker)
+Widening the spread if Volatility spikes.
+
+```java
+var rawSpread = g.doubleSource("algo.spread", 0.02);
+var vol = g.doubleSource("mkt.vol", 0.15);
+
+// 1. Condition: Is Vol > 50%?
+var highVol = g.condition("state.high_vol", vol, v -> v > 0.50);
+
+// 2. Logic: If HighVol, 5x spread. Else 1x.
+var wideSpread = g.compute("calc.wide_spread", s -> s * 5.0, rawSpread);
+
+// 3. Selection
+var finalSpread = g.select("final_spread", 
+    highVol, 
+    wideSpread, // True branch
+    rawSpread   // False branch
+);
+```
+
+### Example 9: Synthetic Instrument
+Implied price of a product that doesn't trade, derived from proxies.
+e.g., `SynPrice = ProxyA * 0.5 + ProxyB * 0.5 + Spread`
+
+```java
+var proxyA = g.doubleSource("mkt.proxy_a", 100);
+var proxyB = g.doubleSource("mkt.proxy_b", 101);
+var basis = g.doubleSource("cfg.basis", 0.50);
+
+var synPrice = g.compute("calc.syn",
+    (a, b, bases) -> (a * 0.5) + (b * 0.5) + bases,
+    proxyA, proxyB, basis
+);
+```
+
+### Example 10: P&L Report (MapNode)
+Bundling multiple greek risks into a key-value snapshot for reporting.
+
+```java
+var npv = g.doubleSource("risk.npv", 1000);
+var delta = g.doubleSource("risk.delta", 50);
+var gamma = g.doubleSource("risk.gamma", 2);
+
+// Map keys defined at build time
+var report = g.mapNode("report.pnl",
+    new String[]{ "NPV", "Delta", "Gamma" },
+    new Node[]{ npv, delta, gamma },
+    (inputs, writer) -> {
+        // Fast writer (flyweight)
+        writer.put("NPV",   inputs[0].doubleValue());
+        writer.put("Delta", inputs[1].doubleValue());
+        writer.put("Gamma", inputs[2].doubleValue());
+    }
+);
+```
+
+### Example 11: Mass Production with Templates (TemplateFactory)
+You often need to price 1,000 swaps with identical logic but different parameters (Notional, Fixed Rate).
+Use the `TemplateFactory` pattern.
+
+```java
+// 1. Define Config Record
+record SwapConfig(double notional, double fixedRate) {}
+// 2. Define Output Record (Holds the Nodes)
+record SwapOutputs(Node<?> npv, Node<?> dv01) {}
+
+// 3. Define the Template Logic
+TemplateFactory<SwapConfig, SwapOutputs> swapTemplate = (b, prefix, cfg) -> {
+    // Inputs (could be looked up or passed in)
+    var curve = b.vectorSource("mkt.curve", 10);
+    
+    var npv = b.compute(prefix + ".NPV", 
+        (r) -> cfg.notional * (r[0] - cfg.fixedRate), // Simplified logic
+        curve
+    );
+    
+    var dv01 = b.compute(prefix + ".DV01", ...);
+    
+    return new SwapOutputs(npv, dv01);
+};
+
+// 4. Instantiate 1000 Swaps
+for (int i=0; i<1000; i++) {
+    var cfg = new SwapConfig(1_000_000, 0.05);
+    // "Stamp" the logic into the graph
+    var swap = g.template("Swap" + i, swapTemplate, cfg);
+    
+    // Wire swap.npv() to a report...
+}
+```
+
+### Example 12: Stateful Logic (EWMA)
+Sometimes you need history (e.g., Moving Average).
+The graph is stateless by default, but you can capture state in the closure.
+
+**The Closure Trick:**
+Use a 1-element array to hold state inside the lambda. The lambda is instantiated **once** at build time, so the array persists.
+
+```java
+var price = g.doubleSource("mkt.px", 100.0);
+
+// Capture state in closure
+final double[] state = new double[1]; // [0] = lastEMA
+final boolean[] init = { false };     // Is initialized?
+
+var ewma = g.compute("sig.ewma", (px) -> {
+    if (!init[0]) {
+        state[0] = px; // Init with first price
+        init[0] = true;
+        return px;
+    }
+    
+    double alpha = 0.1;
+    double prev = state[0];
+    double next = alpha * px + (1.0 - alpha) * prev;
+    
+    // Update state for next cycle
+    state[0] = next;
+    return next;
+}, price);
+```
+
+### Example 13: Boolean Logic (Signals)
+CoreGraph supports boolean signals for logic gates and valid/invalid flags.
+
+```java
+var mid = g.doubleSource("mkt.mid", 100.0);
+
+// 1. Create Boolean Signal (Condition)
+// Returns a BooleanNode that is true/false based on the predicate
+var isValid = g.condition("sig.valid", mid, m -> m > 0 && !Double.isNaN(m));
+
+// 2. Use it in downstream logic
+// e.g. "SafePrice" = Mid if Valid, else NaN
+var safePrice = g.compute("calc.safe_price", 
+    (m, valid) -> valid ? m : Double.NaN,
+    mid, isValid
+);
+
+// 3. Complex Boolean Logic
+// You can combine booleans using generic compute
+var isBigRequest = g.condition("sig.big", ...);
+var isTradeable = g.compute("sig.tradeable", (v, b) -> v && !b, isValid, isBigRequest);
+```
+
+---
+
+## 5. Best Practices
+
+### 5.1 Granularity: "Business Units" vs. "AST"
+
+**The "Graph Tax"**: Every node introduces overhead (dirty check, recursion, cache fixup).
+*   **Do Not**: Create a node for every `+` or `-` operator. (AST style).
+*   **Do**: Bundle coherent equations into a single `compute` node. (Business Logic style).
+
+**Example: Euclidean Distance** `sqrt(x^2 + y^2)`
+*   **Bad**: `X` -> `SqrX`, `Y` -> `SqrY`, `Sum` -> `Sqrt`. (5 nodes).
+*   **Good**: `X,Y` -> `Calc` (where `Calc = Math.sqrt(x*x + y*y)`). (1 node). The JIT compiler optimizes the internals of the node into efficient machine instructions (SQRTSD).
+
+### 5.2 VectorNode vs. DoubleNodes
+
+**Question:** "Why not just use 100 `DoubleNode`s for a Yield Curve?"
+
+**Answer: CPU Architecture.**
+1.  **Cache Locality:** `VectorNode` uses a contiguous `double[]`. The CPU pulls in 64 bytes (8 doubles) in a single cycle. With scattered objects, you get cache misses on every access.
+2.  **Engine Overhead:** Processing 1 node is 100x cheaper than processing 100 nodes.
+3.  **Consistency:** Vectors update atomically. There is no risk of a "teared" state where half the curve is old and half is new.
+
+**Rule:**
+*   Distinct Values (`Spot`, `VIX`) -> `DoubleNode`.
+*   Homogeneous Data (`YieldCurve`, `VolSurface`) -> `VectorNode`.
+
+### 5.3 Zero-Allocation Rules
+To maintain the "Zero-GC" promise:
+
+1.  **No `new` in Lambdas**: Never allocate objects inside a `compute` lambda.
+2.  **Use Scratch Buffers**: Use `GraphBuilder.scratchDoubles()` or pass pre-allocated arrays to your functions.
+3.  **No Strings**: Do not perform String concatenation or parsing on the hot path.
+
+### 5.4 Lookup Caching
+String lookups (e.g., `getNode("bid")`) are slow (HashMap access).
+**Always** cache integer IDs at startup:
+
+---
+
+## 6. Integration Guide: Production Wiring
+
+This section details how to integrate CoreGraph into a production trading chassis.
+
+### 6.1 The Lifecycle
+
+1.  **Construction (Cold Path)**: Build the graph, load configuration.
+2.  **Compilation (Warm Path)**: `g.buildWithContext()`. Perform JIT warmup.
+3.  **Optimization (Warm Path)**: Cache all Node IDs.
+4.  **Runtime (Hot Path)**: Enter the event loop.
+
+### 6.2 Caching Node IDs (Crucial)
+
+**Problem:** `engine.getNodeId("Mkt.Bid")` involves hashing a String and checking a Map. This allocates memory and is O(L) where L is string length.
+**Solution:** Resolve all IDs to `int` during startup. The engine uses direct array access (O(1)) for `int` IDs.
+
+```java
+// In your init() method:
+GraphContext ctx = g.buildWithContext();
+
+// Store these in fields
+private final int bidId = ctx.getNodeId("Mkt.Bid");
+private final int askId = ctx.getNodeId("Mkt.Ask");
+```
+
+### 6.3 The Disruptor Pattern
+
+We recommend the **Single Producer, Single Consumer** pattern.
+
+#### Architecture
+`[Network IO] -> [RingBuffer<GraphEvent>] -> [GraphPublisher] -> [StabilizationEngine]`
+
+#### Step 1: The Event Factory
+Pre-allocate 1024 (or power of 2) events in the RingBuffer.
+
+```java
+Disruptor<GraphEvent> disruptor = new Disruptor<>(
+    GraphEvent::new, 1024, DaemonThreadFactory.INSTANCE,
+    ProducerType.SINGLE, new BlockingWaitStrategy()
+);
+```
+
+#### Step 2: The Producer (Hot Loop)
+This runs on your Netty/NIO thread. It must translate network messages to Graph IDs.
+The `batchEnd` flag is critical here. It tells the consumer if it should stabilize now (true) or wait for more updates (false).
+
+```java
+public void onMarketData(int instrumentId, double price) {
     long seq = ringBuffer.next();
     try {
         GraphEvent e = ringBuffer.get(seq);
-        // Use the cached int ID
-        e.setDoubleUpdate(bidId, md.price, true, seq);
+        int graphNodeId = this.nodeMap[instrumentId];
+        
+        // batchEnd=true means "Stabilize now". 
+        // batchEnd=false means "Just update state, I have more changes coming".
+        e.setDoubleUpdate(graphNodeId, price, true, seq); 
     } finally {
         ringBuffer.publish(seq);
     }
 }
 ```
 
+#### Step 3: The Consumer (GraphPublisher) & Batching
+The `GraphPublisher` (included in library) acts as the bridge. It implements `EventHandler<GraphEvent>`.
 
+**Smart Batching:**
+The Disruptor passes a boolean `endOfBatch` to the handler. The `GraphPublisher` uses this to coalesce updates:
+1.  If `endOfBatch == false`, it applies the update but **does not stabilize**.
+2.  If `endOfBatch == true` OR the event's `batchEnd == true`, it **triggers stabilization**.
 
----
-
-## 5. Full Disruptor Integration
-
-A complete end-to-end example showing how to drive the graph from a Disruptor RingBuffer.
-
-### 5.1 The Setup (Startup Phase)
+This means if the consumer is slow, it might process 100 updates and then run 1 graph calculation, maximizing throughput.
 
 ```java
-// 1. Build the Graph
-var g = GraphBuilder.create("market_data_engine");
-var bidNode = g.doubleSource("Bid", 100.0);
-var askNode = g.doubleSource("Ask", 101.0);
-var midNode = g.compute("Mid", (b, a) -> (b + a) / 2, bidNode, askNode);
-
-// 2. Build Context & Engine
-GraphContext context = g.buildWithContext();
-StabilizationEngine engine = context.engine();
-
-// 3. CACHE NODE IDs (Critical for Zero-GC)
-// Do this once at startup.
-int bidId = context.getNodeId("Bid");
-int askId = context.getNodeId("Ask");
-
-// 4. Setup Disruptor
-Disruptor<GraphEvent> disruptor = new Disruptor<>(
-    GraphEvent::new,               // Event Factory
-    1024,                          // Ring Buffer Size
-    DaemonThreadFactory.INSTANCE,  // Thread Factory
-    ProducerType.SINGLE,           // Producer Type
-    new BlockingWaitStrategy()     // Wait Strategy
-);
-
-// 5. Connect the GraphPublisher
-// GraphPublisher implements EventHandler<GraphEvent>
 GraphPublisher publisher = new GraphPublisher(engine);
 
-// Optional: Callback after each stabilization
+// Register a Callback to READ outputs safely AFTER stabilization
 publisher.setPostStabilizationCallback((epoch, count) -> {
-    // Read outputs here (thread-safe, we are in the consumer thread)
-    // No locking needed.
-    System.out.println("New Mid: " + midNode.doubleValue());
+    // This runs on the Graph Thread. Safe to read outputs.
+    double mid = midNode.doubleValue();
+    riskEngine.send(mid);
 });
 
-// 6. Wire it up
 disruptor.handleEventsWith(publisher::onEvent);
 disruptor.start();
-RingBuffer<GraphEvent> rb = disruptor.getRingBuffer();
 ```
 
-### 5.2 The Producer (Hot Path)
+### 6.4 Threading Model
 
-This loop runs on the network I/O thread. It must be garbage-free.
+CoreGraph is **Single-Threaded**.
+*   **The Golden Rule:** Only ONE thread may call `engine.stabilize()` at a time.
+*   **Visibility:** If you read graph outputs from another thread (e.g., UI), you must ensure memory visibility (e.g., via `volatile` reads or passing messages back to a UI queue).
 
-```java
-public void onMarketData(int instrumentId, double price) {
-    long seq = rb.next();
-    try {
-        // 1. Get mutable event (Zero allocation)
-        GraphEvent event = rb.get(seq);
-        
-        // 2. Map external ID to internal Graph ID (int -> int)
-        // (Assuming you have a simple array/map for this)
-        int graphNodeId = (instrumentId == 1) ? bidId : askId;
+**Recommendation:** Pin the Graph Thread to a specific CPU core to avoid context switching.
 
-        // 3. Populate Event
-        // batchEnd = true means "stabilize after this event"
-        // batchEnd = false means "just update state, don't stabilize yet"
-        boolean triggerStabilize = true; 
-        
-        event.setDoubleUpdate(graphNodeId, price, triggerStabilize, seq);
-        
-    } finally {
-        // 4. Publish
-        rb.publish(seq);
-    }
-}
-```
+### 6.5 Monitoring & Observability
 
-### 5.3 Batching and Coalescing
+#### Metrics (JMX/Micrometer)
+Export these counters:
+1.  `stabilization_count`: Total number of stabilizations.
+2.  `nodes_recomputed_per_cycle`: Average nodes touched (Work amplification).
+3.  `stabilization_latency`: Histogram (P99).
 
-The `GraphPublisher` is smart about batching.
-
-1.  **User-driven Batching**: If you set `batchEnd=false` on the event, the engine marks the node dirty but DOES NOT stabilize. You can update 50 inputs and then set `batchEnd=true` on the 51st to trigger a single stabilization.
-2.  **Disruptor Batching**: If the consumer falls behind, the Disruptor delivers a batch of events. The `GraphPublisher` processes all updates in the batch and stabilizes ONLY ONCE at the end of the batch (via the `endOfBatch` boolean from Disruptor).
-
-This automatic coalescing is key to high throughput under load.
-
----
-
-## 6. Implementation Details
-
-To achieve zero garbage generation:
-
-1.  **Topology Flattening**: The graph is converted to integer arrays (`int[] children`, `int[] ordering`). No iterator objects.
-2.  **Primitive State**: Nodes store state in `double` fields or pre-allocated `double[]` arrays. No boxing (`Double`).
-3.  **Pre-allocated Events**: `GraphEvent` is a mutable flyweight in the RingBuffer.
-
-### Benchmarks
-
-| Scenario | Nodes | Throughput | Latency |
-|----------|-------|------------|---------|
-| Treasury Simulator | ~40 | > 2,000,000 ops/sec | < 500ns |
-
-*(Measured on Apple M-series silicon, single threaded)*
+#### Profiling (Java Flight Recorder)
+Run JFR in production.
+*   **Target:** `StabilizationEngine.stabilize()`.
+*   **Success Criteria:** Zero allocation samples inside this method.
+*   **Warning Signs:** `Double.valueOf`, `Iterator.next`, `String.format` appearing in the hot path.
