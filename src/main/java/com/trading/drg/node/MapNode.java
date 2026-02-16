@@ -85,11 +85,55 @@ public final class MapNode implements Node<Map<String, Double>> {
 
     @Override
     public Map<String, Double> value() {
-        // Lazy materialization of the Map object
+        // Zero-allocation view
         if (mapView == null) {
-            mapView = new HashMap<>(keys.length * 2);
-            for (int i = 0; i < keys.length; i++)
-                mapView.put(keys[i], currentValues[i]);
+            mapView = new AbstractMap<String, Double>() {
+                @Override
+                public Double get(Object key) {
+                    Integer idx = keyIndex.get(key);
+                    return idx == null ? null : currentValues[idx];
+                }
+
+                @Override
+                public boolean containsKey(Object key) {
+                    return keyIndex.containsKey(key);
+                }
+
+                @Override
+                public int size() {
+                    return keys.length;
+                }
+
+                @Override
+                public Set<Entry<String, Double>> entrySet() {
+                    return new AbstractSet<Entry<String, Double>>() {
+                        @Override
+                        public Iterator<Entry<String, Double>> iterator() {
+                            return new Iterator<Entry<String, Double>>() {
+                                private int index = 0;
+
+                                @Override
+                                public boolean hasNext() {
+                                    return index < keys.length;
+                                }
+
+                                @Override
+                                public Entry<String, Double> next() {
+                                    if (index >= keys.length)
+                                        throw new NoSuchElementException();
+                                    final int i = index++;
+                                    return new SimpleImmutableEntry<>(keys[i], currentValues[i]);
+                                }
+                            };
+                        }
+
+                        @Override
+                        public int size() {
+                            return keys.length;
+                        }
+                    };
+                }
+            };
         }
         return mapView;
     }
