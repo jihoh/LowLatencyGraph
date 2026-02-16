@@ -1,6 +1,6 @@
 package com.trading.drg.fn;
 
-import com.trading.drg.GraphBuilder;
+import com.trading.drg.dsl.GraphBuilder;
 
 /**
  * Interface for reusable graph sub-structures (templates).

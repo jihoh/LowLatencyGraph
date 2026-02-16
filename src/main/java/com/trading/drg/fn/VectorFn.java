@@ -1,6 +1,6 @@
 package com.trading.drg.fn;
 
-import com.trading.drg.core.Node;
+import com.trading.drg.api.Node;
 
 /**
  * Functional interface for vector computations.

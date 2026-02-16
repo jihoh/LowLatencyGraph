@@ -1,7 +1,9 @@
 package com.trading.drg.node;
 
-import com.trading.drg.core.SourceNode;
-import com.trading.drg.core.VectorReadable;
+import com.trading.drg.api.*;
+
+import com.trading.drg.api.SourceNode;
+import com.trading.drg.api.VectorReadable;
 
 /**
  * A source node for array-based data.

@@ -1,6 +1,8 @@
 package com.trading.drg.node;
 
-import com.trading.drg.core.DoubleCutoff;
+import com.trading.drg.api.*;
+
+import com.trading.drg.api.DoubleCutoff;
 
 /**
  * A general-purpose double node that delegates computation to a functional

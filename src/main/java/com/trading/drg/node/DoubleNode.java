@@ -1,7 +1,9 @@
 package com.trading.drg.node;
 
-import com.trading.drg.core.DoubleCutoff;
-import com.trading.drg.core.DoubleReadable;
+import com.trading.drg.api.*;
+
+import com.trading.drg.api.DoubleCutoff;
+import com.trading.drg.api.DoubleReadable;
 
 /**
  * Abstract base class for nodes that produce a single double value.

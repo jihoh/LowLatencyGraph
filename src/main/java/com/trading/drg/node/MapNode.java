@@ -1,8 +1,10 @@
 package com.trading.drg.node;
 
+import com.trading.drg.api.*;
+
 import java.util.*;
 
-import com.trading.drg.core.Node;
+import com.trading.drg.api.Node;
 import com.trading.drg.fn.MapComputeFn;
 
 /**

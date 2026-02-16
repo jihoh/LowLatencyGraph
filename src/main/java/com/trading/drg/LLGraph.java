@@ -1,5 +1,11 @@
 package com.trading.drg;
 
+import com.trading.drg.api.*;
+import com.trading.drg.engine.*;
+import com.trading.drg.dsl.*;
+import com.trading.drg.wiring.*;
+import com.trading.drg.node.*;
+
 /**
  * ClaudeGraph — Deterministic Replayable Graph engine for pricing and risk.
  *

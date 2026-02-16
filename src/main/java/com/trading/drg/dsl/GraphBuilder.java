@@ -1,6 +1,9 @@
-package com.trading.drg;
+package com.trading.drg.dsl;
 
-import com.trading.drg.core.*;
+import com.trading.drg.api.*;
+import com.trading.drg.engine.*;
+
+import com.trading.drg.api.*;
 import com.trading.drg.fn.*;
 import com.trading.drg.node.*;
 import com.trading.drg.util.DoubleCutoffs;

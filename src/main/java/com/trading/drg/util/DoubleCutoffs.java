@@ -1,6 +1,9 @@
 package com.trading.drg.util;
 
-import com.trading.drg.core.DoubleCutoff;
+import com.trading.drg.api.*;
+import com.trading.drg.engine.*;
+
+import com.trading.drg.api.DoubleCutoff;
 
 /**
  * Standard implementations of {@link DoubleCutoff}.

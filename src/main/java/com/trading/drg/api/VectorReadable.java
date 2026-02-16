@@ -1,4 +1,4 @@
-package com.trading.drg.core;
+package com.trading.drg.api;
 
 /**
  * Interface for nodes that expose an indexed array of double values (vectors).

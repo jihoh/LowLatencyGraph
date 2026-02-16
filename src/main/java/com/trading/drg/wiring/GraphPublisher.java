@@ -1,8 +1,11 @@
-package com.trading.drg.disruptor;
+package com.trading.drg.wiring;
 
-import com.trading.drg.core.Node;
-import com.trading.drg.core.StabilizationEngine;
-import com.trading.drg.core.TopologicalOrder;
+import com.trading.drg.api.*;
+import com.trading.drg.engine.*;
+
+import com.trading.drg.api.Node;
+import com.trading.drg.api.StabilizationEngine;
+import com.trading.drg.api.TopologicalOrder;
 import com.trading.drg.node.DoubleSourceNode;
 import com.trading.drg.node.VectorSourceNode;
 

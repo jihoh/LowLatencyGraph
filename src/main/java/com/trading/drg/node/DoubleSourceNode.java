@@ -1,8 +1,10 @@
 package com.trading.drg.node;
 
-import com.trading.drg.core.DoubleCutoff;
-import com.trading.drg.core.DoubleReadable;
-import com.trading.drg.core.SourceNode;
+import com.trading.drg.api.*;
+
+import com.trading.drg.api.DoubleCutoff;
+import com.trading.drg.api.DoubleReadable;
+import com.trading.drg.api.SourceNode;
 import com.trading.drg.util.DoubleCutoffs;
 
 /**

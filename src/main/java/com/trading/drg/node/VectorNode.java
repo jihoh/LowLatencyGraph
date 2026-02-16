@@ -1,6 +1,8 @@
 package com.trading.drg.node;
 
-import com.trading.drg.core.VectorReadable;
+import com.trading.drg.api.*;
+
+import com.trading.drg.api.VectorReadable;
 
 /**
  * Abstract base class for nodes that produce a fixed-size array of doubles.

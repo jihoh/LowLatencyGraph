@@ -1,4 +1,4 @@
-package com.trading.drg.core;
+package com.trading.drg.api;
 
 /**
  * Specialized Cutoff strategy for primitive doubles.
