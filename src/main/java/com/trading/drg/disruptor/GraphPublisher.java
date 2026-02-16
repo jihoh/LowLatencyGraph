@@ -6,7 +6,8 @@ import com.trading.drg.core.TopologicalOrder;
 import com.trading.drg.node.DoubleSourceNode;
 import com.trading.drg.node.VectorSourceNode;
 
-import lombok.extern.log4j.Log4j2;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Disruptor EventHandler that consumes GraphEvents and drives stabilization.
@@ -41,8 +42,9 @@ import lombok.extern.log4j.Log4j2;
  * enable
  * zero-allocation lookups during event processing.
  */
-@Log4j2
 public final class GraphPublisher {
+    private static final Logger log = LogManager.getLogger(GraphPublisher.class);
+
     private final StabilizationEngine engine;
     private final TopologicalOrder topology;
 

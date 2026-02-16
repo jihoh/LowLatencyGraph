@@ -180,6 +180,19 @@ var result = g.compute("total_calc",
 );
 ```
 
+#### 2.6.2 Best Practices: MapNode vs. Multiple DoubleNodes
+
+For collections of related values (e.g., 2Y venues bids/asks), prefers **multiple `DoubleNode`s** over a single `MapNode`.
+
+**Why? Over-invalidation**.
+*   If you group 10 venues into one `MapNode`, and **only Venue A updates**, the `MapNode` is marked "dirty".
+*   Consequently, **ALL** downstream nodes that depend on the Map will be checked/recomputed, even if they only cared about Venue B (which didn't change).
+*   This breaks the "Reactive" promise of the graph engine and hurts latency.
+
+**Recommendation:**
+*   **Hot Path (Calculation):** Use granular `DoubleNode`s (e.g., `VenueA.Bid`, `VenueB.Bid`). This ensures that an update to Venue A *only* triggers the logic for the best bid calculation, leaving Venue B's logic untouched.
+*   **Reporting / UI:** Use `MapNode` only at the very **end** of the graph (like `Report.SwapDetails`). It is excellent for bundling data for a "Snapshot" to send to a GUI or logger, where a consistent view of the world is required.
+
 ### 2.7 Boolean Logic & Conditionals
 The graph supports boolean logic for implementing payoff structures, barriers, and regime switching. Use `condition` to create a boolean signal and `select` to switch between values.
 

@@ -1,6 +1,7 @@
 package com.trading.drg.core;
 
-import lombok.extern.log4j.Log4j2;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * The core engine that drives the graph stabilization process.
@@ -30,8 +31,9 @@ import lombok.extern.log4j.Log4j2;
  * stabilization cycle,
  * and only if necessary.
  */
-@Log4j2
 public final class StabilizationEngine {
+    private static final Logger log = LogManager.getLogger(StabilizationEngine.class);
+
     private final TopologicalOrder topology;
 
     // The "seen set" or "work list" equivalent.
