@@ -279,20 +279,7 @@ public void onMarketData(MdUpdate md) {
 }
 ```
 
-### 4.2 Snapshotting
-Capture state for replay/debugging.
 
-```java
-var snapshot = new GraphSnapshot(engine.topology());
-snapshot.capture(engine);
-byte[] state = snapshot.exportBytes(); // Persist this
-
-// ... crash happens ...
-
-// Recovery
-snapshot.restore(engine);
-engine.stabilize(); // Deterministically restores exact state
-```
 
 ---
 

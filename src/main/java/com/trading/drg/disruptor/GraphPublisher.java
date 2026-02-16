@@ -1,7 +1,5 @@
 package com.trading.drg.disruptor;
 
-import java.util.*;
-
 import com.trading.drg.core.Node;
 import com.trading.drg.core.StabilizationEngine;
 import com.trading.drg.core.TopologicalOrder;

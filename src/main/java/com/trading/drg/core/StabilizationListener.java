@@ -46,22 +46,4 @@ public interface StabilizationListener {
      * @param nodesStabilized The total number of nodes that were re-evaluated.
      */
     void onStabilizationEnd(long epoch, int nodesStabilized);
-
-    /**
-     * A no-operation implementation (Null Object Pattern) to avoid null checks in
-     * the engine.
-     */
-    StabilizationListener NOOP = new StabilizationListener() {
-        @Override
-        public void onStabilizationStart(long epoch) {
-        }
-
-        @Override
-        public void onNodeStabilized(long epoch, int ti, String name, boolean changed) {
-        }
-
-        @Override
-        public void onStabilizationEnd(long epoch, int n) {
-        }
-    };
 }

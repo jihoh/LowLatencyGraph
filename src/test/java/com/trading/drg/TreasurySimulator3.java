@@ -7,16 +7,10 @@ import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
 import com.trading.drg.core.DoubleReadable;
 import com.trading.drg.core.Node;
-import com.trading.drg.core.VectorReadable;
 import com.trading.drg.disruptor.GraphEvent;
 import com.trading.drg.disruptor.GraphPublisher;
 import com.trading.drg.util.GraphExplain;
-import com.trading.drg.fn.*;
-import com.trading.drg.node.DoubleNode;
-import com.trading.drg.node.DoubleSourceNode;
 import com.trading.drg.node.MapNode;
-import com.trading.drg.node.VectorSourceNode;
-import com.trading.drg.util.DoubleCutoffs;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -81,15 +75,7 @@ public class TreasurySimulator3 {
         // directly,
         // we'll use a dummy dependency to satisfy the API and capture the vector in the
         // closure.
-        var annuityFactor = g.compute("Calc.AnnuityFactor", DoubleCutoffs.EXACT, (dummy) -> {
-            double sum = 0;
-            // Capture discountCurve
-            int size = discountCurve.size();
-            for (int i = 0; i < size; i++)
-                sum += discountCurve.valueAt(i);
-            return sum;
-        }, sofrRate); // sofrRate is a dummy dependency here, just to trigger updates (logic pulls
-                      // from vector)
+
         // We must manually add edge since we bypassed the builder's dependency
         // tracking?
         // The builder doesn't let us manually add edges easily if we use this closure.
@@ -186,7 +172,6 @@ public class TreasurySimulator3 {
         // 2. Build Engine
         var context = g.buildWithContext();
         var engine = context.engine();
-        var nodes = context.nodesByName();
 
         // 3. Disruptor Setup
         Disruptor<GraphEvent> disruptor = new Disruptor<>(
