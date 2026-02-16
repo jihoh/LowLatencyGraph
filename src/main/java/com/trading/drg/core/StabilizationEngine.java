@@ -38,6 +38,9 @@ public final class StabilizationEngine {
     // dirty[i] == true means node i needs to be re-evaluated.
     private final boolean[] dirty;
 
+    // Circuit Breaker state
+    private boolean healthy = true;
+
     // Pre-computed source indices for O(S) cleanup instead of O(N)
     private final int[] sourceIndices;
 
@@ -95,15 +98,24 @@ public final class StabilizationEngine {
      *
      * <p>
      * This method will:
-     * 1. Increment the epoch.
-     * 2. Traverse the graph in topological order.
-     * 3. Recompute dirty nodes.
-     * 4. Propagate changes to children.
-     * 5. Clear source node dirty flags.
+     * 1. Check if the engine is healthy (Circuit Breaker).
+     * 2. Increment the epoch.
+     * 3. Traverse the graph in topological order.
+     * 4. Recompute dirty nodes.
+     * 5. Propagate changes to children.
+     * 6. Clear source node dirty flags.
+     * 7. If errors occurred, mark unhealthy and throw (Fail Fast).
      *
      * @return The number of nodes that were actually recomputed.
+     * @throws IllegalStateException if the engine is already unhealthy.
+     * @throws RuntimeException      if the stabilization failed (wrapped cause).
      */
     public int stabilize() {
+        if (!healthy) {
+            throw new IllegalStateException(
+                    "Graph is in unhealthy state due to previous errors. Manual reset required.");
+        }
+
         epoch++;
         int stabilizedCount = 0;
         final int n = topology.nodeCount();
@@ -112,6 +124,10 @@ public final class StabilizationEngine {
 
         if (hasListener)
             l.onStabilizationStart(epoch);
+
+        // Track errors for this pass
+        boolean passFailed = false;
+        Throwable firstError = null;
 
         try {
             // Linear scan through topological order.
@@ -130,11 +146,21 @@ public final class StabilizationEngine {
                 boolean changed = false;
                 try {
                     changed = node.stabilize();
-                } catch (Exception e) {
+                } catch (Throwable e) {
+                    // Circuit Breaker / Fail Fast logic
+                    passFailed = true;
+                    if (firstError == null)
+                        firstError = e;
+
                     log.error("Failed to stabilize node {}: {}", node.name(), e.getMessage(), e);
-                    // Continue to next node.
-                    // If this node failed, 'changed' remains false, so children won't be visited.
-                    // This isolates the failure to this node and its transitive dependents.
+
+                    if (hasListener) {
+                        l.onNodeError(epoch, ti, node.name(), e);
+                    }
+
+                    // Continue to next node to isolate failure implies we try to stabilize others.
+                    // But we MUST mark the engine as potentially unhealthy if this is critical.
+                    // For now, we continue the loop to attempt partial update.
                     continue;
                 }
 
@@ -163,11 +189,25 @@ public final class StabilizationEngine {
             if (hasListener)
                 l.onStabilizationEnd(epoch, stabilizedCount);
         }
+
+        if (passFailed) {
+            this.healthy = false;
+            throw new RuntimeException("Stabilization failed due to node errors. Graph is now unhealthy.", firstError);
+        }
+
         return stabilizedCount;
     }
 
     public long epoch() {
         return epoch;
+    }
+
+    public boolean isHealthy() {
+        return healthy;
+    }
+
+    public void resetHealth() {
+        this.healthy = true;
     }
 
     public int lastStabilizedCount() {

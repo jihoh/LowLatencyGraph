@@ -40,6 +40,16 @@ public interface StabilizationListener {
     void onNodeStabilized(long epoch, int topoIndex, String nodeName, boolean changed);
 
     /**
+     * Called when a node fails to stabilize due to an exception.
+     *
+     * @param epoch     Current graph epoch.
+     * @param topoIndex The topological index of the node.
+     * @param nodeName  The name of the failing node.
+     * @param error     The exception that occurred.
+     */
+    void onNodeError(long epoch, int topoIndex, String nodeName, Throwable error);
+
+    /**
      * Called when the stabilization pass is fully complete.
      *
      * @param epoch           Current graph epoch.

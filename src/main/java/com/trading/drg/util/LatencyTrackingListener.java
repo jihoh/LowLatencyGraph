@@ -37,6 +37,11 @@ public final class LatencyTrackingListener implements StabilizationListener {
     }
 
     @Override
+    public void onNodeError(long epoch, int ti, String name, Throwable error) {
+        // No-op for latency tracking
+    }
+
+    @Override
     public void onStabilizationEnd(long epoch, int n) {
         lastLatencyNanos = System.nanoTime() - stabilizeStartNanos;
         lastNodesRecomputed = n;
