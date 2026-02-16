@@ -1,6 +1,12 @@
 package com.trading.drg;
 
-import com.trading.drg.core.DoubleReadable;
+import com.trading.drg.api.*;
+import com.trading.drg.engine.*;
+import com.trading.drg.dsl.*;
+import com.trading.drg.wiring.*;
+import com.trading.drg.node.*;
+
+import com.trading.drg.core.DoubleValue;
 import com.trading.drg.core.Node;
 import com.trading.drg.core.TopologicalOrder;
 import com.trading.drg.disruptor.GraphEvent;
@@ -174,7 +180,7 @@ public class LLGraphTest {
         };
         var s1 = g.template("swap1", tmpl, new Cfg(10_000_000, 0.04));
         var s2 = g.template("swap2", tmpl, new Cfg(5_000_000, 0.06));
-        var total = g.computeN("total", new DoubleReadable[] { s1.npv(), s2.npv() }, d -> d[0] + d[1]);
+        var total = g.computeN("total", new DoubleValue[] { s1.npv(), s2.npv() }, d -> d[0] + d[1]);
 
         var engine = g.build();
         engine.markDirty("rate");

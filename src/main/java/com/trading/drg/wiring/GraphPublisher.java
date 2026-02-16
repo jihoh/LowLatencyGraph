@@ -4,8 +4,8 @@ import com.trading.drg.api.*;
 import com.trading.drg.engine.*;
 
 import com.trading.drg.api.Node;
-import com.trading.drg.api.StabilizationEngine;
-import com.trading.drg.api.TopologicalOrder;
+import com.trading.drg.engine.StabilizationEngine;
+import com.trading.drg.engine.TopologicalOrder;
 import com.trading.drg.node.DoubleSourceNode;
 import com.trading.drg.node.VectorSourceNode;
 

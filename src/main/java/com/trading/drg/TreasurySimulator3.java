@@ -11,7 +11,7 @@ import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
-import com.trading.drg.api.DoubleReadable;
+import com.trading.drg.api.DoubleValue;
 import com.trading.drg.api.Node;
 import com.trading.drg.wiring.GraphEvent;
 import com.trading.drg.wiring.GraphPublisher;
@@ -68,7 +68,7 @@ public class TreasurySimulator3 {
         var discountCurve = g.computeVector("Calc.DiscountCurve", curvePoints, 1e-15,
                 new Node[] { sofrRate },
                 (inputs, output) -> {
-                    double r = ((DoubleReadable) inputs[0]).doubleValue() / 100.0;
+                    double r = ((DoubleValue) inputs[0]).doubleValue() / 100.0;
                     for (int i = 0; i < output.length; i++) {
                         double t = i + 1.0;
                         output[i] = 1.0 / Math.pow(1.0 + r, t);
@@ -101,8 +101,8 @@ public class TreasurySimulator3 {
 
         // How to implement AnnuityFactor (Vector -> Double)?
         // Helper: g.compute("Annuity", inputs, (args) -> ...) ?
-        // The `computeN` takes `DoubleReadable[]`.
-        // `VectorReadable` does NOT extend `DoubleReadable`.
+        // The `computeN` takes `DoubleValue[]`.
+        // `VectorValue` does NOT extend `DoubleValue`.
 
         // OK, I will effectively create the node manually and register it if I could.
         // Or I can add a dedicated method to GraphBuilder? No, can't modify library
@@ -113,7 +113,7 @@ public class TreasurySimulator3 {
         // Or better: Implement `CalcDoubleNode` manually and use `g.register` if it was
         // public. It is private.
 
-        // WAIT. `VectorReadable` extends `Node<Vector>`.
+        // WAIT. `VectorValue` extends `Node<Vector>`.
         // I can just fallback to:
         // `var annuity = new CalcDoubleNode("Annuity", cutoff, () -> ...)`
         // But I can't register it.
@@ -129,13 +129,13 @@ public class TreasurySimulator3 {
         // Okay, I will mock the "Sum" by extracting elements. It creates more nodes =
         // more complexity = better test!
         // "Sophisticated at least 10 nodes". This helps!
-        List<DoubleReadable> dfs = new ArrayList<>();
+        List<DoubleValue> dfs = new ArrayList<>();
         for (int i = 0; i < curvePoints; i++) {
             dfs.add(g.vectorElement("Calc.DF." + (i + 1) + "Y", discountCurve, i));
         }
 
         var annuityFactorS = g.computeN("Risk.AnnuityFactor",
-                dfs.toArray(new DoubleReadable[0]),
+                dfs.toArray(new DoubleValue[0]),
                 (inputs) -> {
                     double sum = 0;
                     for (double d : inputs)
@@ -173,10 +173,10 @@ public class TreasurySimulator3 {
 
         var report = g.mapNode("Report.SwapDetails", reportKeys, reportInputs,
                 (inputs, writer) -> {
-                    writer.put("NPV", ((DoubleReadable) inputs[0]).doubleValue());
-                    writer.put("DV01", ((DoubleReadable) inputs[1]).doubleValue());
-                    writer.put("Rate", ((DoubleReadable) inputs[2]).doubleValue());
-                    writer.put("Spread", ((DoubleReadable) inputs[3]).doubleValue());
+                    writer.put("NPV", ((DoubleValue) inputs[0]).doubleValue());
+                    writer.put("DV01", ((DoubleValue) inputs[1]).doubleValue());
+                    writer.put("Rate", ((DoubleValue) inputs[2]).doubleValue());
+                    writer.put("Spread", ((DoubleValue) inputs[3]).doubleValue());
                 });
 
         // 2. Build Engine

@@ -1,8 +1,14 @@
 package com.trading.drg.core;
 
+import com.trading.drg.api.*;
+import com.trading.drg.engine.*;
+import com.trading.drg.dsl.*;
+import com.trading.drg.wiring.*;
+import com.trading.drg.node.*;
+
 import com.trading.drg.GraphBuilder;
 import com.trading.drg.node.DoubleSourceNode;
-import com.trading.drg.core.DoubleReadable;
+import com.trading.drg.core.DoubleValue;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -64,6 +70,6 @@ public class CircuitBreakerTest {
 
         engine.stabilize();
         assertTrue(engine.isHealthy());
-        assertEquals(10.0, ((DoubleReadable) nodes.get("LogicA")).doubleValue(), 0.001);
+        assertEquals(10.0, ((DoubleValue) nodes.get("LogicA")).doubleValue(), 0.001);
     }
 }

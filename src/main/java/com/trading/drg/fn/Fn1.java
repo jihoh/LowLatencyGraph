@@ -5,7 +5,7 @@ package com.trading.drg.fn;
  *
  * <p>
  * Used by
- * {@link com.trading.graph.GraphBuilder#compute(String, Fn1, com.trading.drg.core.DoubleReadable)}
+ * {@link com.trading.graph.GraphBuilder#compute(String, Fn1, com.trading.drg.core.DoubleValue)}
  * to define nodes that transform a single double value into another double
  * value.
  *

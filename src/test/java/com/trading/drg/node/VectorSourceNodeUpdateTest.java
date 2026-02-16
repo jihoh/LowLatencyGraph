@@ -1,5 +1,11 @@
 package com.trading.drg.node;
 
+import com.trading.drg.api.*;
+import com.trading.drg.engine.*;
+import com.trading.drg.dsl.*;
+import com.trading.drg.wiring.*;
+import com.trading.drg.node.*;
+
 import org.junit.Test;
 import static org.junit.Assert.*;
 import java.util.Arrays;

@@ -16,7 +16,7 @@ package com.trading.drg.api;
  * where a downstream node can read a specific element without materializing the
  * whole vector.
  */
-public interface VectorReadable extends Node<double[]> {
+public interface VectorValue extends Node<double[]> {
 
     /**
      * Returns the value at the specified index.

@@ -5,7 +5,7 @@ package com.trading.drg.api;
  *
  * <p>
  * This interface is a critical performance optimization. By implementing
- * {@code DoubleReadable},
+ * {@code DoubleValue},
  * a node allows downstream consumers to access its value without the overhead
  * of boxing/unboxing
  * to {@code Double} objects.
@@ -14,7 +14,7 @@ package com.trading.drg.api;
  * Most numeric calculation nodes (e.g., standard arithmetic, pricing models)
  * should implement this.
  */
-public interface DoubleReadable extends Node<Double> {
+public interface DoubleValue extends Node<Double> {
 
     /**
      * Returns the current value as a primitive double.

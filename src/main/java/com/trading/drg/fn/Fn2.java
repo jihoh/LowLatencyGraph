@@ -5,7 +5,7 @@ package com.trading.drg.fn;
  *
  * <p>
  * Used by
- * {@link com.trading.graph.GraphBuilder#compute(String, Fn2, com.trading.drg.core.DoubleReadable, com.trading.drg.core.DoubleReadable)}.
+ * {@link com.trading.graph.GraphBuilder#compute(String, Fn2, com.trading.drg.core.DoubleValue, com.trading.drg.core.DoubleValue)}.
  *
  * <p>
  * Examples:

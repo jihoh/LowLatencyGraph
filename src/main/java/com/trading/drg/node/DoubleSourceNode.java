@@ -3,7 +3,7 @@ package com.trading.drg.node;
 import com.trading.drg.api.*;
 
 import com.trading.drg.api.DoubleCutoff;
-import com.trading.drg.api.DoubleReadable;
+import com.trading.drg.api.DoubleValue;
 import com.trading.drg.api.SourceNode;
 import com.trading.drg.util.DoubleCutoffs;
 
@@ -23,7 +23,7 @@ import com.trading.drg.util.DoubleCutoffs;
  * is called
  * and cleared after stabilization.
  */
-public final class DoubleSourceNode implements SourceNode<Double>, DoubleReadable {
+public final class DoubleSourceNode implements SourceNode<Double>, DoubleValue {
     private final String name;
     private final DoubleCutoff cutoff;
     private double currentValue;

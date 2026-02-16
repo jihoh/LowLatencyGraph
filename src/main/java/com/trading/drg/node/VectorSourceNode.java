@@ -3,7 +3,7 @@ package com.trading.drg.node;
 import com.trading.drg.api.*;
 
 import com.trading.drg.api.SourceNode;
-import com.trading.drg.api.VectorReadable;
+import com.trading.drg.api.VectorValue;
 
 /**
  * A source node for array-based data.
@@ -12,7 +12,7 @@ import com.trading.drg.api.VectorReadable;
  * Allows feeding entire curves or vectors into the graph efficiently.
  * Supports partial updates via {@link #updateAt(int, double)}.
  */
-public final class VectorSourceNode implements SourceNode<double[]>, VectorReadable {
+public final class VectorSourceNode implements SourceNode<double[]>, VectorValue {
     private final String name;
     private final double tolerance;
     private final int size;

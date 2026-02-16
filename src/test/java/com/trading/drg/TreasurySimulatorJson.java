@@ -1,6 +1,12 @@
 package com.trading.drg;
 
-import com.trading.drg.core.DoubleReadable;
+import com.trading.drg.api.*;
+import com.trading.drg.engine.*;
+import com.trading.drg.dsl.*;
+import com.trading.drg.wiring.*;
+import com.trading.drg.node.*;
+
+import com.trading.drg.core.DoubleValue;
 import com.trading.drg.core.Node;
 import com.trading.drg.io.GraphDefinition;
 import com.trading.drg.io.JsonGraphCompiler;
@@ -83,15 +89,15 @@ public class TreasurySimulatorJson {
     }
 
     private static void printSnapshot(String tenor, Map<String, Node<?>> nodes) {
-        double bid = ((DoubleReadable) nodes.get("UST_" + tenor + ".wBid")).doubleValue();
-        double ask = ((DoubleReadable) nodes.get("UST_" + tenor + ".wAsk")).doubleValue();
+        double bid = ((DoubleValue) nodes.get("UST_" + tenor + ".wBid")).doubleValue();
+        double ask = ((DoubleValue) nodes.get("UST_" + tenor + ".wAsk")).doubleValue();
         System.out.printf("[UST_%s] Weighted Bid: %.5f | Weighted Ask: %.5f | Spread: %.5f\n",
                 tenor, bid, ask, ask - bid);
     }
 
     // Custom Node for Weighted Average that supports late binding of dependencies
     private static class WeightedAvgNode extends DoubleNode implements JsonGraphCompiler.DependencyInjectable {
-        private DoubleReadable[] inputs;
+        private DoubleValue[] inputs;
 
         public WeightedAvgNode(String name) {
             super(name, DoubleCutoffs.EXACT);
@@ -99,9 +105,9 @@ public class TreasurySimulatorJson {
 
         @Override
         public void injectDependencies(Node<?>[] upstreams) {
-            this.inputs = new DoubleReadable[upstreams.length];
+            this.inputs = new DoubleValue[upstreams.length];
             for (int i = 0; i < upstreams.length; i++) {
-                this.inputs[i] = (DoubleReadable) upstreams[i];
+                this.inputs[i] = (DoubleValue) upstreams[i];
             }
         }
 

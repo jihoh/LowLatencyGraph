@@ -7,8 +7,8 @@ import com.trading.drg.wiring.*;
 import com.trading.drg.node.*;
 
 import com.trading.drg.LLGraph;
-import com.trading.drg.api.DoubleReadable;
-import com.trading.drg.api.StabilizationEngine;
+import com.trading.drg.api.DoubleValue;
+import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.fn.TemplateFactory;
 import com.trading.drg.node.DoubleSourceNode;
 import com.trading.drg.node.DoubleCalcNode;
@@ -58,7 +58,7 @@ public class TreasurySimulator {
         // Weighted Bid = Sum(Px * Qty) / Sum(Qty)
         // Inputs: 6 nodes (3 px, 3 qty)
         var wBid = g.computeN(pfx + ".wBid",
-                new DoubleReadable[] {
+                new DoubleValue[] {
                         btec.bidPx(), btec.bidQty(),
                         fenics.bidPx(), fenics.bidQty(),
                         dweb.bidPx(), dweb.bidQty()
@@ -71,7 +71,7 @@ public class TreasurySimulator {
 
         // Weighted Ask
         var wAsk = g.computeN(pfx + ".wAsk",
-                new DoubleReadable[] {
+                new DoubleValue[] {
                         btec.askPx(), btec.askQty(),
                         fenics.askPx(), fenics.askQty(),
                         dweb.askPx(), dweb.askQty()

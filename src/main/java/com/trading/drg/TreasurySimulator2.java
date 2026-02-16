@@ -11,7 +11,7 @@ import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
-import com.trading.drg.api.DoubleReadable;
+import com.trading.drg.api.DoubleValue;
 import com.trading.drg.api.Node;
 import com.trading.drg.wiring.GraphEvent;
 import com.trading.drg.wiring.GraphPublisher;
@@ -41,11 +41,11 @@ public class TreasurySimulator2 {
         String[] venues = { "Btec", "Fenics", "Dweb" };
 
         // Create topology for each tenor
-        List<DoubleReadable> allMids = new ArrayList<>();
+        List<DoubleValue> allMids = new ArrayList<>();
         for (String tenor : tenors) {
             String prefix = "UST_" + tenor;
-            List<DoubleReadable> bidInputs = new ArrayList<>();
-            List<DoubleReadable> askInputs = new ArrayList<>();
+            List<DoubleValue> bidInputs = new ArrayList<>();
+            List<DoubleValue> askInputs = new ArrayList<>();
 
             for (String venue : venues) {
                 String base = prefix + "." + venue;
@@ -65,11 +65,11 @@ public class TreasurySimulator2 {
             // Aggregation Logic (Weighted Average)
             // Function: (p1, q1, p2, q2, ...) -> sum(p*q) / sum(q)
             var wBid = g.computeN(prefix + ".wBid",
-                    bidInputs.toArray(new DoubleReadable[0]),
+                    bidInputs.toArray(new DoubleValue[0]),
                     TreasurySimulator2::weightedAvg);
 
             var wAsk = g.computeN(prefix + ".wAsk",
-                    askInputs.toArray(new DoubleReadable[0]),
+                    askInputs.toArray(new DoubleValue[0]),
                     TreasurySimulator2::weightedAvg);
 
             // Calculate Mid for this instrument
@@ -80,7 +80,7 @@ public class TreasurySimulator2 {
         // Global Score Aggregation (Average of all Mids)
         // Function: (m1, m2, ...) -> sum(m) / count(m)
         g.computeN("Global.Score",
-                allMids.toArray(new DoubleReadable[0]),
+                allMids.toArray(new DoubleValue[0]),
                 inputs -> {
                     double sum = 0;
                     for (double v : inputs) {
@@ -211,10 +211,10 @@ public class TreasurySimulator2 {
         Node<?> wAsk = nodes.get(p + ".wAsk");
         Node<?> score = nodes.get("Global.Score");
 
-        if (wBid instanceof DoubleReadable && wAsk instanceof DoubleReadable) {
-            double b = ((DoubleReadable) wBid).doubleValue();
-            double a = ((DoubleReadable) wAsk).doubleValue();
-            double s = (score instanceof DoubleReadable) ? ((DoubleReadable) score).doubleValue() : Double.NaN;
+        if (wBid instanceof DoubleValue && wAsk instanceof DoubleValue) {
+            double b = ((DoubleValue) wBid).doubleValue();
+            double a = ((DoubleValue) wAsk).doubleValue();
+            double s = (score instanceof DoubleValue) ? ((DoubleValue) score).doubleValue() : Double.NaN;
             log.info(String.format("[%s] wBid: %.4f | wAsk: %.4f | Global.Score: %.4f", tenor, b, a, s));
         }
     }

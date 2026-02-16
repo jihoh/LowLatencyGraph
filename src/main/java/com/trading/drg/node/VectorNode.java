@@ -2,7 +2,7 @@ package com.trading.drg.node;
 
 import com.trading.drg.api.*;
 
-import com.trading.drg.api.VectorReadable;
+import com.trading.drg.api.VectorValue;
 
 /**
  * Abstract base class for nodes that produce a fixed-size array of doubles.
@@ -22,7 +22,7 @@ import com.trading.drg.api.VectorReadable;
  * and {@code previousValues}.
  * Logic writes directly into these arrays, avoiding GC pressure.
  */
-public abstract class VectorNode implements VectorReadable {
+public abstract class VectorNode implements VectorValue {
     private final String name;
     private final double tolerance;
     private final double[] currentValues;

@@ -3,13 +3,13 @@ package com.trading.drg.node;
 import com.trading.drg.api.*;
 
 import com.trading.drg.api.DoubleCutoff;
-import com.trading.drg.api.DoubleReadable;
+import com.trading.drg.api.DoubleValue;
 
 /**
  * Abstract base class for nodes that produce a single double value.
  *
  * <p>
- * This class implements the {@link DoubleReadable} interface to allow
+ * This class implements the {@link DoubleValue} interface to allow
  * zero-boxing access
  * to its value. It also handles the boilerplate of state management (current vs
  * previous value)
@@ -18,7 +18,7 @@ import com.trading.drg.api.DoubleReadable;
  * <h3>Subclassing</h3>
  * Subclasses only need to implement the {@link #compute()} method.
  */
-public abstract class DoubleNode implements DoubleReadable {
+public abstract class DoubleNode implements DoubleValue {
     private final String name;
     private final DoubleCutoff cutoff;
 
