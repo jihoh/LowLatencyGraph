@@ -28,18 +28,18 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 /**
- * TreasurySimulator3: Swap Outright Pricer
+ * SwapPricerDemo: Swap Outright Pricer
  * 
  * Topology Depth: 4 Layers
  * Nodes: >10
  * Logic: Fixed-Float Swap Valuation
  */
-public class TreasurySimulator3 {
-    private static final Logger log = LogManager.getLogger(TreasurySimulator3.class);
+public class SwapPricerDemo {
+    private static final Logger log = LogManager.getLogger(SwapPricerDemo.class);
 
     public static void main(String[] args) throws InterruptedException {
         log.info("════════════════════════════════════════════════");
-        log.info("  Treasury Simulator 3 (Swap Pricer)");
+        log.info("  Swap Pricer Demo (4 Layers, Vector Math)");
         log.info("════════════════════════════════════════════════");
 
         // 1. Build Graph
@@ -90,45 +90,7 @@ public class TreasurySimulator3 {
         // tracking?
         // The builder doesn't let us manually add edges easily if we use this closure.
         // Wait, GraphBuilder DOES NOT have a zero-arg compute that returns a node AND
-        // takes deps.
-
-        // Let's fix this properly. I will implement `SumNode` simply using `mapNode` or
-        // `computeVector` ? No.
-
-        // Let's assume for this simulation: Fixed Leg depends on (Notional, SwapRate,
-        // AnnuityFactor).
-        // AnnuityFactor depends on DiscountCurve.
-
-        // How to implement AnnuityFactor (Vector -> Double)?
-        // Helper: g.compute("Annuity", inputs, (args) -> ...) ?
-        // The `computeN` takes `DoubleValue[]`.
-        // `VectorValue` does NOT extend `DoubleValue`.
-
-        // OK, I will effectively create the node manually and register it if I could.
-        // Or I can add a dedicated method to GraphBuilder? No, can't modify library
-        // code easily.
-
-        // Alternative: Use `vectorElement` to extract all 10 points and sum them?
-        // That's 10 nodes. A bit verbose but works for "Sophie's Choice".
-        // Or better: Implement `CalcDoubleNode` manually and use `g.register` if it was
-        // public. It is private.
-
-        // WAIT. `VectorValue` extends `Node<Vector>`.
-        // I can just fallback to:
-        // `var annuity = new CalcDoubleNode("Annuity", cutoff, () -> ...)`
-        // But I can't register it.
-
-        // Let's inspect `GraphBuilder` again.
-        // It has `nodes` list.
-        // It effectively forces us to use its factory methods.
-
-        // Let's look at `GraphBuilder.java` again to be specific.
-        // It has `mapNode`, `computeVector`.
-        // It does NOT have `computeScalarFromVector`.
-
-        // Okay, I will mock the "Sum" by extracting elements. It creates more nodes =
-        // more complexity = better test!
-        // "Sophisticated at least 10 nodes". This helps!
+        // calculate annuity factor by summing discount factors
         List<DoubleValue> dfs = new ArrayList<>();
         for (int i = 0; i < curvePoints; i++) {
             dfs.add(g.vectorElement("Calc.DF." + (i + 1) + "Y", discountCurve, i));
@@ -156,11 +118,7 @@ public class TreasurySimulator3 {
 
         // --- Layer 4: Valuation & Risk ---
 
-        // NPV = Float - Fixed (Receiver Swap) or Fixed - Float (Payer). Let's do Payer.
-        // NPV = FixedLeg - FloatLeg (wait, usually PV_Fixed - PV_Float if paying fixed?
-        // No, receiving fixed.)
-        // Let's assume Payer Swap: Pay Fixed, Rec Float.
-        // NPV = FloatPV - FixedPV
+        // NPV = FixedLeg - FloatLeg (Payer Swap: Pay Fixed, Rec Float)
         var npv = g.compute("Valuation.NPV", (fl, fx) -> fl - fx, floatLegPVS, fixedLegPVS);
 
         // DV01 = d(PV)/d(Rate) ~ Annuity * Notional * 0.0001
@@ -213,8 +171,8 @@ public class TreasurySimulator3 {
         // --- Export Graph Visualization ---
         try {
             String mermaid = new GraphExplain(engine).toMermaid();
-            java.nio.file.Files.writeString(java.nio.file.Path.of("treasury_graph.md"), mermaid);
-            log.info("Graph visualization saved to treasury_graph.md");
+            java.nio.file.Files.writeString(java.nio.file.Path.of("swap_pricing_graph.md"), mermaid);
+            log.info("Graph visualization saved to swap_pricing_graph.md");
         } catch (java.io.IOException e) {
             e.printStackTrace();
         }

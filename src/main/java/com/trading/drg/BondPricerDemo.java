@@ -26,16 +26,16 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 
-public class TreasurySimulator2 {
-    private static final Logger log = LogManager.getLogger(TreasurySimulator2.class);
+public class BondPricerDemo {
+    private static final Logger log = LogManager.getLogger(BondPricerDemo.class);
 
     public static void main(String[] args) throws InterruptedException {
         log.info("════════════════════════════════════════════════");
-        log.info("  Treasury Simulator 2 (Disruptor + Programmatic)");
+        log.info("  Bond Pricer Demo (Disruptor + Programmatic)");
         log.info("════════════════════════════════════════════════");
 
         // 1. Build Graph Programmatically
-        var g = GraphBuilder.create("treasuries_prog");
+        var g = GraphBuilder.create("bond_pricer");
 
         String[] tenors = { "2Y", "3Y", "5Y", "10Y", "30Y" }; // Expanded set
         String[] venues = { "Btec", "Fenics", "Dweb" };
@@ -66,11 +66,11 @@ public class TreasurySimulator2 {
             // Function: (p1, q1, p2, q2, ...) -> sum(p*q) / sum(q)
             var wBid = g.computeN(prefix + ".wBid",
                     bidInputs.toArray(new DoubleValue[0]),
-                    TreasurySimulator2::weightedAvg);
+                    BondPricerDemo::weightedAvg);
 
             var wAsk = g.computeN(prefix + ".wAsk",
                     askInputs.toArray(new DoubleValue[0]),
-                    TreasurySimulator2::weightedAvg);
+                    BondPricerDemo::weightedAvg);
 
             // Calculate Mid for this instrument
             var mid = g.compute(prefix + ".mid", (b, a) -> (b + a) / 2.0, wBid, wAsk);
@@ -129,8 +129,8 @@ public class TreasurySimulator2 {
         // --- Export Graph Visualization ---
         try {
             String mermaid = new GraphExplain(engine).toMermaid();
-            java.nio.file.Files.writeString(java.nio.file.Path.of("treasury_graph_2.md"), mermaid);
-            log.info("Graph visualization saved to treasury_graph_2.md");
+            java.nio.file.Files.writeString(java.nio.file.Path.of("bond_pricing_graph.md"), mermaid);
+            log.info("Graph visualization saved to bond_pricing_graph.md");
         } catch (java.io.IOException e) {
             e.printStackTrace();
         }
