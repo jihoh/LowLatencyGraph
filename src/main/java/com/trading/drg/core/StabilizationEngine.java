@@ -35,6 +35,9 @@ public final class StabilizationEngine {
     // dirty[i] == true means node i needs to be re-evaluated.
     private final boolean[] dirty;
 
+    // Pre-computed source indices for O(S) cleanup instead of O(N)
+    private final int[] sourceIndices;
+
     private int lastStabilizedCount;
     private long epoch;
     private StabilizationListener listener;
@@ -43,10 +46,22 @@ public final class StabilizationEngine {
         this.topology = topology;
         this.dirty = new boolean[topology.nodeCount()];
 
-        // Fix: Mark all source nodes as dirty initially so their values propagate
-        // on the first stabilize() call.
+        // Count sources first to allocate array
+        int sourceCount = 0;
         for (int i = 0; i < topology.nodeCount(); i++) {
-            if (topology.isSource(i)) {
+            if (topology.isSource(i) && topology.node(i) instanceof SourceNode) {
+                sourceCount++;
+            }
+        }
+
+        // Populate source indices and mark initial dirty state
+        this.sourceIndices = new int[sourceCount];
+        int idx = 0;
+        for (int i = 0; i < topology.nodeCount(); i++) {
+            if (topology.isSource(i) && topology.node(i) instanceof SourceNode) {
+                sourceIndices[idx++] = i;
+                // Fix: Mark all source nodes as dirty initially so their values propagate
+                // on the first stabilize() call.
                 dirty[i] = true;
             }
         }
@@ -124,9 +139,9 @@ public final class StabilizationEngine {
         }
 
         // Cleanup: After stabilization, source nodes are no longer "newly updated".
-        for (int ti = 0; ti < n; ti++) {
-            if (topology.isSource(ti) && topology.node(ti) instanceof SourceNode<?> src)
-                src.clearDirty();
+        // Use pre-computed indices for O(S) efficiency instead of O(N) scan.
+        for (int srcIdx : sourceIndices) {
+            ((SourceNode<?>) topology.node(srcIdx)).clearDirty();
         }
 
         this.lastStabilizedCount = stabilizedCount;
