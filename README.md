@@ -1,10 +1,5 @@
 # CoreGraph Developer Manual
 
-**Version:** 2.2.0
-**Target Audience:** Quantitative Developers, Algo Traders, and System Engineers.
-
----
-
 ## 1. Introduction
 
 **CoreGraph** is a specialized, high-performance graph engine designed for **low-latency electronic trading**. It allows you to model complex pricing, risk, and signal logic as a **Directed Acyclic Graph (DAG)**.
@@ -12,8 +7,8 @@
 Unlike general-purpose streaming frameworks (RxJava, Akka) or standard OOP, CoreGraph is built with one obsession: **Deterministic, Zero-Allocation execution on the Hot Path.**
 
 ### Key Capabilities
-*   **Speed:** < 500 nanosecond stabilization latency for typical subgraphs.
-*   **Throughput:** > 2 million updates/second on a single core.
+*   **Speed:** ~1 microsecond stabilization latency for typical subgraphs.
+*   **Throughput:** ~1 million updates/second
 *   **Predictability:** Zero Garbage Collection (GC) during runtime.
 *   **Safety:** Statically typed, cycle-free topology with explicit ownership.
 
@@ -26,25 +21,25 @@ Understanding the internal data flow is critical for writing efficient graph log
 ### 2.1 Data Flow
 
 ```
-[Network I/O Thread]                [Graph Consumer Thread]
-        │                                     │
-        ▼                                     ▼
-[Disruptor RingBuffer] ───────► [GraphPublisher (EventHandler)]
-   (Stores Events)                            │
-                                              │ (1) Read Event (int nodeId, double val)
-                                              │ (2) Update Primitive Source Array
-                                              │ (3) Mark 'dirty' bit for Node ID
-                                              ▼
-                                    [StabilizationEngine]
-                                              │
-                                              │ (4) Walk Topological Order
-                                              │ (5) If (dirty || parentChanged):
-                                              │         Compute();
-                                              │         Compare vs Previous;
-                                              │         If (Changed) Mark Children Dirty;
-                                              ▼
-                               [Post-Stabilization Callback]
-                               (Safe place to read outputs)
+   [Graph Consumer Thread]
+             │
+             ▼
+[GraphPublisher (EventHandler)]
+             │
+             │ (1) Read Event (int nodeId, double val)
+             │ (2) Update Primitive Source Array
+             │ (3) Mark 'dirty' bit for Node ID
+             ▼
+   [StabilizationEngine]
+             │
+             │ (4) Walk Topological Order
+             │ (5) If (dirty || parentChanged):
+             │         Compute();
+             │         Compare vs Previous;
+             │         If (Changed) Mark Children Dirty;
+             ▼
+[Post-Stabilization Callback]
+ (Safe place to read outputs)
 ```
 
 ### 2.2 Core Components
