@@ -126,7 +126,18 @@ public final class StabilizationEngine {
                 dirty[ti] = false;
 
                 Node<?> node = topology.node(ti);
-                boolean changed = node.stabilize();
+
+                boolean changed = false;
+                try {
+                    changed = node.stabilize();
+                } catch (Exception e) {
+                    log.error("Failed to stabilize node {}: {}", node.name(), e.getMessage(), e);
+                    // Continue to next node.
+                    // If this node failed, 'changed' remains false, so children won't be visited.
+                    // This isolates the failure to this node and its transitive dependents.
+                    continue;
+                }
+
                 stabilizedCount++;
 
                 if (hasListener)
