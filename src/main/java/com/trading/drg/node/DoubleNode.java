@@ -8,15 +8,19 @@ import com.trading.drg.api.DoubleValue;
 /**
  * Abstract base class for nodes that produce a single double value.
  *
- * <p>
- * This class implements the {@link DoubleValue} interface to allow
- * zero-boxing access
+ * This class implements the DoubleValue interface to allow zero-boxing access
  * to its value. It also handles the boilerplate of state management (current vs
- * previous value)
- * and change detection via {@link DoubleCutoff}.
+ * previous value) and change detection via DoubleCutoff.
  *
- * <h3>Subclassing</h3>
- * Subclasses only need to implement the {@link #compute()} method.
+ * Design:
+ * - Template Method: The stabilize() method is final and implements the change,
+ * detection logic. Subclasses only need to implement the compute() method.
+ * - Zero Allocation: Stores state in primitive double fields to avoid object
+ * creation during updates.
+ *
+ * Subclassing:
+ * Implement compute() to define how the node calculates its new value based on
+ * its inputs.
  */
 public abstract class DoubleNode implements DoubleValue {
     private final String name;

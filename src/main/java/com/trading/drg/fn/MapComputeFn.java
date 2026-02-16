@@ -6,10 +6,9 @@ import com.trading.drg.node.MapNode;
 /**
  * Functional interface for Map node computations.
  *
- * <p>
  * Used to generate Key-Value outputs (e.g., risk reports, aggregated stats).
- * The {@link MapNode.MapWriter} acts as a flyweight accessor to write values
- * into the underlying storage.
+ * The MapNode.MapWriter acts as a flyweight accessor to write values into the
+ * underlying storage.
  */
 @FunctionalInterface
 public interface MapComputeFn {

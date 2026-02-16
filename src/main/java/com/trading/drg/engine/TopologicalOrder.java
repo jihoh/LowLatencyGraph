@@ -7,33 +7,38 @@ import java.util.*;
 import lombok.extern.log4j.Log4j2;
 
 /**
- * Topology — CSR-encoded static DAG (Directed Acyclic Graph).
+ * Topology -- CSR-encoded static DAG (Directed Acyclic Graph).
  *
- * <p>
  * This class represents the immutable structure of the graph after it has been
  * built.
  * It is optimized for extremely fast traversal during the stabilization phase.
  *
- * <h3>Optimization Strategy</h3>
- * Instead of using an object-oriented graph where each Node object holds a list
- * of its children,
- * we uses a <b>Compressed Sparse Row (CSR)</b> format (similar to sparse matrix
- * representations).
- * <p>
- * The graph is flattened into structure-of-arrays:
- * <ul>
- * <li><b>topoOrder:</b> All nodes sorted topologically (dependencies before
- * dependents).</li>
- * <li><b>childrenList:</b> A single flattened int array containing the indices
- * of all children for all nodes.</li>
- * <li><b>childrenOffset:</b> An index array pointing to the start of each
- * node's children in {@code childrenList}.</li>
- * </ul>
+ * Optimization Strategy: Compressed Sparse Row (CSR)
+ * Instead of using an object-oriented graph where each Node object holds a
+ * reference to a
+ * List of its children (which suffers from pointer chasing and poor cache
+ * locality),
+ * we use a flattened structure-of-arrays approach.
  *
- * <p>
- * This layout ensures that iterating over valid propagation paths is
- * cache-friendly and involves
- * zero object allocation or pointer chasing.
+ * Data layout:
+ * - topoOrder: An array of Node objects sorted topologically. Iterating this
+ * array 0..N
+ * guarantees we visit dependencies before dependents.
+ * - childrenList: A single flattened int array containing the topological
+ * indices of all
+ * children for all nodes.
+ * - childrenOffset: An index array. childrenOffset[i] points to the start of
+ * node i's
+ * children in the childrenList. The children for node i are stored from
+ * childrenList[childrenOffset[i]] inclusive to
+ * childrenList[childrenOffset[i+1]] exclusive.
+ *
+ * Benefits:
+ * 1. CPU Cache: Iterating children involves reading contiguous memory (ints),
+ * which is
+ * extremely cache-friendly compared to chasing object pointers.
+ * 2. Zero-Overhead: No Iterator objects are created during traversal.
+ * 3. Compactness: High density of useful data per cache line.
  */
 @Log4j2
 public final class TopologicalOrder {

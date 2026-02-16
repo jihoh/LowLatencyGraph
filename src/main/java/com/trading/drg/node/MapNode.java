@@ -10,21 +10,29 @@ import com.trading.drg.fn.MapComputeFn;
 /**
  * A node that produces a Map of key-value pairs (String -> Double).
  *
- * <p>
- * Useful for reporting nodes, such as "Risk Breakdown" or "P&L Attribution",
- * where
- * the set of keys is known at build time but the values change.
+ * Useful for "Reporting Nodes", such as "Risk Breakdown", "P&L Attribution", or
+ * "UI Snapshots", where the set of keys is known at build time but values
+ * change.
  *
- * <h3>Optimization</h3>
- * To avoid creating new {@code HashMap} objects on every cycle:
- * <ul>
- * <li>The keys are fixed at construction time.</li>
- * <li>Values are stored in a parallel `double[]` array.</li>
- * <li>A flyweight {@link MapWriter} is passed to the computation function to
- * update the array.</li>
- * <li>The public {@link #value()} method returns a cached view (only
- * re-allocated if values change).</li>
- * </ul>
+ * Performance Trade-Off: "Over-Invalidation"
+ * This node treats the entire Map as a single unit of state.
+ * - If ONE key's value changes, the WHOLE node is marked dirty.
+ * - All downstream nodes will be recomputed.
+ *
+ * Best Practice:
+ * Use MapNode only at the very edges of the graph (sinks/reports). Do NOT use
+ * it
+ * in the middle of a hot calculation path. For hot paths, keeping values in
+ * separate
+ * DoubleNodes or VectorNodes is better for granular change propagation.
+ *
+ * Optimization:
+ * To avoid creating new HashMap objects on every cycle:
+ * 1. Keys are fixed at construction.
+ * 2. Values are stored in a parallel double[] array.
+ * 3. A lightweight "View" object is returned that implements Map<String,
+ * Double>
+ * referencing the internal array.
  */
 public final class MapNode implements Node<Map<String, Double>> {
     private final String name;

@@ -10,33 +10,37 @@ import com.trading.drg.util.DoubleCutoffs;
 import java.util.*;
 
 /**
- * Graph Builder — primary quant-facing API.
+ * Graph Builder -- primary quant-facing API.
  *
- * <p>
  * This class provides a fluent API for defining the structure (topology) of the
  * dependency graph.
- * It is designed to be used by quants and developers to specify:
- * <ul>
- * <li><b>Source Nodes:</b> External inputs like market data prices,
- * volatilities, or fixings.</li>
- * <li><b>Computation Nodes:</b> Logic blocks that transform inputs into outputs
- * (spreads, pricing models, Greeks).</li>
- * <li><b>Edges:</b> The dependencies between nodes.</li>
- * </ul>
  *
- * <h3>Usage Pattern</h3>
- * 
- * <pre>{@code
- * GraphBuilder g = ClaudeGraph.builder("my_graph");
- * var src = g.doubleSource("src", 100.0);
- * var calc = g.compute("calc", (x) -> x * 2, src);
- * StabilizationEngine engine = g.build();
- * }</pre>
+ * Usage Pattern:
+ * 1. Create a builder: GraphBuilder g = GraphBuilder.create("my_graph");
+ * 2. Define sources: var src = g.doubleSource("src", 100.0);
+ * 3. Define calculations: var calc = g.compute("calc", (x) -> x * 2, src);
+ * 4. Build: StabilizationEngine engine = g.build();
  *
- * <p>
- * The builder is stateful and not thread-safe. Once {@link #build()} is called,
- * the builder
- * is invalidated and cannot be used to add more nodes.
+ * Design:
+ * - Fluent API: Methods return the created Node object, allowing for chaining
+ * or
+ * assignment to variables for downstream use.
+ * - Explicit Wiring: Dependencies are declared explicitly by passing Node
+ * objects
+ * to compute methods. This prevents "magic string" errors.
+ * - Single-Threaded Construction: This builder is NOT thread-safe. It is
+ * intended
+ * to be used by a single thread during the application startup/initialization
+ * phase.
+ *
+ * Compilation:
+ * When build() is called, the builder:
+ * 1. Delegates to TopologicalOrder.Builder to perform a topological sort
+ * (Kahn's Algo).
+ * 2. Detects cycles (throwing an exception if found).
+ * 3. Compiles the object-graph into a high-performance CSR (Compressed Sparse
+ * Row)
+ * array structure for the engine.
  */
 public final class GraphBuilder {
     private final String graphName;
@@ -190,7 +194,12 @@ public final class GraphBuilder {
 
     /**
      * Defines a computation node with N inputs.
+     *
+     * Performance:
      * Uses a pre-allocated scratch buffer to avoid allocation during compute.
+     * The array passed to the function 'fn' is reused across executions.
+     * WARNING: The function 'fn' must NOT store a reference to the passed array,
+     * as its contents will change.
      */
     public DoubleCalcNode computeN(String name, DoubleValue[] inputs, FnN fn) {
         return computeN(name, DoubleCutoffs.EXACT, inputs, fn);

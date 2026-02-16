@@ -15,35 +15,33 @@ import org.apache.logging.log4j.Logger;
 /**
  * Disruptor EventHandler that consumes GraphEvents and drives stabilization.
  *
- * <p>
  * This class acts as the bridge between the LMAX Disruptor ring buffer and the
- * graph's {@link StabilizationEngine}.
- * It is designed to run on a single dedicated thread (the "consumer" thread),
- * ensuring that all graph
- * logic is single-threaded and lock-free.
+ * graph's StabilizationEngine. It is designed to run on a single dedicated
+ * thread
+ * (the "consumer" or "reactor" thread).
  *
- * <h3>Workflow</h3>
- * <ol>
- * <li>The Publisher (external thread) writes a {@link GraphEvent} into the ring
- * buffer.</li>
- * <li>The Disruptor sequences these events.</li>
- * <li>This {@code GraphPublisher} reads the event and updates the corresponding
- * source node in the graph.</li>
- * <li><b>Batching Optimization:</b> If multiple events are available in the
- * ring buffer, the Disruptor
- * will deliver them in a loop before flushing. The {@code GraphPublisher} only
- * triggers
- * {@link StabilizationEngine#stabilize()} at the end of such a batch (or if
- * valid {@code endOfBatch} flag is set).
- * This provides massive throughput improvements by amortizing the cost of graph
- * traversal.</li>
- * </ol>
+ * Key Responsibilities:
+ * 1. Event Translation: Reads raw GraphEvent objects from the ring buffer.
+ * 2. State Update: Locates the target SourceNode using an O(1) array lookup
+ * (pre-computed during construction) and updates its state.
+ * 3. Stabilization Trigger: Decides when to call engine.stabilize().
  *
- * <h3>Sources</h3>
- * <p>
- * During construction, the publisher caches references to all source nodes to
- * enable
- * zero-allocation lookups during event processing.
+ * Batching/Coalescing Optimization:
+ * The Disruptor provides a boolean 'endOfBatch' flag. If false, it means more
+ * events
+ * are immediately available in the ring buffer. In this case, we simply update
+ * the
+ * source node state but DO NOT trigger stabilization.
+ *
+ * We only call stabilize() when:
+ * - endOfBatch is true (the ring buffer is empty or we reached the end of a
+ * chunk).
+ * - OR the event explicitly requests it (event.isBatchEnd()).
+ *
+ * This allows the engine to process thousands of market data ticks in a single
+ * "micro-batch" and then recompute the graph only once, providing massive
+ * throughput
+ * gains (amortized O(1) overhead per tick).
  */
 public final class GraphPublisher {
     private static final Logger log = LogManager.getLogger(GraphPublisher.class);

@@ -5,7 +5,6 @@ import com.trading.drg.api.Node;
 /**
  * Functional interface for vector computations.
  *
- * <p>
  * Calculates an array of doubles based on a set of input nodes.
  * The output array is pre-allocated by the framework and passed in, allowing
  * for zero-allocation results.

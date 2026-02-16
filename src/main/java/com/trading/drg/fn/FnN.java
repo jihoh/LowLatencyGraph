@@ -3,12 +3,10 @@ package com.trading.drg.fn;
 /**
  * Functional interface for a scalar computation with N inputs.
  *
- * <p>
+ * Garbage Collection Note:
  * To avoid garbage collection, the input array is often a pre-allocated scratch
- * buffer
- * that is reused across invocations. Implementations must <b>not</b> capture or
- * store the reference
- * to the {@code inputs} array, as its contents will change.
+ * buffer that is reused across invocations. Implementations must NOT capture or
+ * store the reference to the "inputs" array, as its contents will change.
  */
 @FunctionalInterface
 public interface FnN {

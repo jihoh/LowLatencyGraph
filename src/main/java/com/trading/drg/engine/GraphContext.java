@@ -7,21 +7,26 @@ import java.util.Map;
 /**
  * A container holding the "live" state of a built graph.
  *
- * <p>
- * The {@code GraphContext} is returned by the builder after construction.
- * It provides access to:
- * <ul>
- * <li>The {@link StabilizationEngine} (for driving the graph).</li>
- * <li>A lookup map of nodes by name (for inspection, UI binding, or
- * verification).</li>
- * </ul>
+ * The GraphContext is the primary runtime object returned by the GraphBuilder.
+ * It bridges the gap between the high-performance, index-based internal engine
+ * and the user-facing application code.
  *
- * <p>
- * This separation ensures that the {@link TopologicalOrder} and
- * {@link StabilizationEngine}
- * stay focused on performance (using indices), while the Context provides the
- * human-friendly
- * "User Space" accessors.
+ * Responsibilities:
+ * 1. Engine Access: Holds the reference to the StabilizationEngine, which
+ * allows
+ * the application to drive the graph (e.g., call stabilize()).
+ * 2. Name Resolution: Maintains a map of "String Name" -> "Node Object". This
+ * allows users to look up nodes by name for UI binding, reporting, or
+ * debugging.
+ * 3. ID Resolution: Provides fast lookups for converting a Node Name to its
+ * integer Topological ID, which is required for high-frequency source updates.
+ *
+ * Thread Safety:
+ * The GraphContext itself is immutable after construction. However, the Node
+ * objects
+ * it helps you retrieve are mutable state containers managed by the Engine.
+ * Access
+ * to Node values must be coordinated with the Engine's stabilization cycle.
  */
 public final class GraphContext {
     private final String name;

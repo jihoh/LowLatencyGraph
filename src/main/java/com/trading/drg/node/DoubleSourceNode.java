@@ -10,18 +10,17 @@ import com.trading.drg.util.DoubleCutoffs;
 /**
  * A source node acting as an input for double values.
  *
- * <p>
  * Used for:
- * <ul>
- * <li>Market Data (e.g., "Mkt:AAPL_Price")</li>
- * <li>Model Parameters (e.g., "Param:RiskFreeRate")</li>
- * <li>Scenario Overrides</li>
- * </ul>
+ * - Market Data (e.g., "Mkt:AAPL_Price")
+ * - Model Parameters (e.g., "Param:RiskFreeRate")
+ * - Scenario Overrides
  *
- * <p>
- * This node maintains a "dirty" flag that is set when {@link #update(Double)}
- * is called
- * and cleared after stabilization.
+ * Dirty Flag Contract:
+ * This node maintains a "dirty" flag concept indirectly via the Engine's dirty
+ * array.
+ * When update(value) is called, the caller must ALSO call
+ * engine.markDirty(nodeId)
+ * to ensure the new value is picked up during the next stabilization pass.
  */
 public final class DoubleSourceNode implements SourceNode<Double>, DoubleValue {
     private final String name;

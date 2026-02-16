@@ -7,21 +7,26 @@ import com.trading.drg.engine.*;
  * A mutable data holder for graph updates, used within the LMAX Disruptor
  * RingBuffer.
  *
- * <p>
- * <b>Flyweight Pattern:</b> Instances of this class are pre-allocated during
- * RingBuffer
- * construction and exist for the lifetime of the application. They are never
- * garbage collected.
+ * Pattern: Flyweight / Mutable Event
  *
- * <p>
- * <b>Fields:</b>
- * <ul>
- * <li>{@code nodeName}: The target source node identifier.</li>
- * <li>{@code doubleValue}: The new value to set.</li>
- * <li>{@code vectorIndex}: For vector nodes, the index to update (-1 for
- * scalars).</li>
- * <li>{@code batchEnd}: Forced end-of-batch flag to trigger stabilization.</li>
- * </ul>
+ * Memory Management:
+ * Instances of this class are pre-allocated during RingBuffer construction
+ * (start of app).
+ * They "live forever" and are constantly reused to shuttle data from Producer
+ * threads
+ * to the Consumer thread. This ensures ZERO Garbage Collection (GC) pressure
+ * during
+ * runtime operations.
+ *
+ * Fields:
+ * - nodeId: The integer Topological ID of the target source node. Using int
+ * instead of String
+ * saves lookups and pointer chasing.
+ * - doubleValue: The numeric payload.
+ * - vectorIndex: If >= 0, indicates this is an update for a specific element of
+ * a vector.
+ * - batchEnd: A manual override to force stabilization immediately after this
+ * event.
  */
 public final class GraphEvent {
     private int nodeId = -1;

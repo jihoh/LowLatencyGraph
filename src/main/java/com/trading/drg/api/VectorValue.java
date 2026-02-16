@@ -3,25 +3,37 @@ package com.trading.drg.api;
 /**
  * Interface for nodes that expose an indexed array of double values (vectors).
  *
- * <p>
  * This is used for representing curves (e.g., Yield Curves, Volatility Surfaces
  * slices)
- * or any collection of numeric data that needs to be processed efficiently.
+ * or any collection of numeric data that needs to be processed efficiently
+ * (e.g., a
+ * collection of shock scenarios).
  *
- * <h3>Optimization</h3>
- * Instead of returning a {@code double[]} array which might require copying,
- * this interface
- * allows for random access via {@link #valueAt(int)}. This enables "zero-copy"
- * views
- * where a downstream node can read a specific element without materializing the
- * whole vector.
+ * Performance Optimization:
+ * Instead of forcing the node to return a 'double[]' array object (which might
+ * require
+ * defensive copying to ensure immutability), this interface enables a "View"
+ * pattern.
+ *
+ * 1. Random Access: Downstream nodes can call valueAt(int) to read specific
+ * elements
+ * without materializing the entire vector.
+ * 2. Zero-Copy: If the vector is backed by shared memory or a reusable buffer,
+ * this
+ * interface allows reading directly from that source without object allocation.
+ *
+ * This is essential for handling large vectors in a low-latency environment
+ * where
+ * allocation and copying would be prohibitive.
  */
 public interface VectorValue extends Node<double[]> {
 
     /**
      * Returns the value at the specified index.
      *
-     * @param index 0-based index.
+     * This provides zero-allocation random access to the vector elements.
+     *
+     * @param index 0-based index of the element to retrieve.
      * @return The primitive double value at that index.
      * @throws IndexOutOfBoundsException if index is invalid (implementation
      *                                   dependent).
@@ -31,7 +43,9 @@ public interface VectorValue extends Node<double[]> {
     /**
      * Returns the size of the vector.
      *
-     * @return The number of elements.
+     * Useful for iterating over the vector elements.
+     *
+     * @return The number of elements in the vector.
      */
     int size();
 }

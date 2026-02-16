@@ -7,32 +7,25 @@ import com.trading.drg.api.Node;
 /**
  * Boolean signal node. Propagates only when value flips.
  *
- * <p>
  * This node is designed to act as a gate or trigger mechanism within the
  * dependency graph.
- * Unlike standard {@link DoubleNode} or {@link VectorNode} which may propagate
- * updates even for small changes
- * (depending on tolerance), the {@code BooleanNode} enforces a strict "change
- * of state" contract.
+ * Unlike standard DoubleNode which might propagate updates for small changes
+ * (depending
+ * on tolerance), the BooleanNode enforces a strict "change of state" contract.
  *
- * <h3>Propagation Logic</h3>
- * <ul>
- * <li>The node only returns {@code true} from {@link #stabilize()} when its
- * boolean state changes (flip-flop).</li>
- * <li>This behavior is essential for implementing "event-driven" logic within
- * the graph, such as
- * triggering a barrier breach, signal activation, or regime switch.</li>
- * <li>Downstream nodes will only be marked dirty if the boolean condition
- * actually toggles.</li>
- * </ul>
+ * Propagation Logic:
+ * - The node only returns true from stabilize() when its boolean state changes
+ * (e.g., false -> true or true -> false).
+ * - This behavior is essential for implementing "event-driven" logic within the
+ * graph,
+ * such as triggering a barrier breach, signal activation, or regime switch.
+ * - Downstream nodes will only be marked dirty if the boolean condition
+ * actually toggles.
  *
- * <h3>Initialization</h3>
- * <p>
- * The node handles its first stabilization specially: it always returns
- * {@code true} (changed)
- * on the very first pass to ensure downstream consumers are initialized with
- * the correct starting state,
- * regardless of what the default {@code false} state might suggest.
+ * Initialization:
+ * The node handles its first stabilization logic to ensure that even if the
+ * initial
+ * state matches the default (false), it propagates if it is the first run.
  */
 public final class BooleanNode implements Node<Boolean> {
     private final String name;

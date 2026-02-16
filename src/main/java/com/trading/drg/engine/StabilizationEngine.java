@@ -8,30 +8,44 @@ import org.apache.logging.log4j.Logger;
 /**
  * The core engine that drives the graph stabilization process.
  *
- * <p>
  * This engine is responsible for efficiently propagating updates from source
  * nodes
- * to all affected dependent nodes. It uses the {@link TopologicalOrder} to
- * visit nodes
- * in the correct order (parents before children).
+ * to all affected dependent nodes. It uses the TopologicalOrder to visit nodes
+ * in the correct order (parents before children), ensuring that every node is
+ * recomputed at most once per stabilization cycle.
  *
- * <h3>Algorithm</h3>
- * <ol>
- * <li><b>Mark Dirty:</b> When a source changes, it (or its dependents) are
- * marked "dirty" in a boolean array.</li>
- * <li><b>Iterate:</b> The engine iterates through the nodes in topological
- * order (0 to N-1).</li>
- * <li><b>Skip Clean:</b> If a node is not dirty, it is skipped entirely.</li>
- * <li><b>Recompute:</b> If dirty, {@link Node#stabilize()} is called.</li>
- * <li><b>Propagate:</b> If {@code stabilize()} returns {@code true} (meaning
- * the value changed),
- * all direct children of the node are marked dirty.</li>
- * </ol>
+ * Algorithm Details:
+ * The engine uses a "Push-based, Topologically Ordered" propagation strategy:
  *
- * <p>
- * This process guarantees that every node is recomputed at most once per
- * stabilization cycle,
- * and only if necessary.
+ * 1. Mark Dirty: When a source node is updated, it is marked as "dirty" in a
+ * boolean array.
+ * This is an O(1) operation using the node's integer ID.
+ *
+ * 2. Iterate: The engine iterates through the nodes in strict topological order
+ * (0 to N-1).
+ * This linear scan is cache-friendly (spatial locality).
+ *
+ * 3. Skip Clean: If a node is not marked dirty in the array, it is skipped
+ * entirely.
+ * This ensures work is proportional to the size of the update, not the size of
+ * the graph.
+ *
+ * 4. Recompute: If dirty, the node's stabilize() method is called.
+ *
+ * 5. Propagate: If stabilize() returns true (meaning the output value changed
+ * significantly),
+ * the engine looks up the node's children in the TopologicalOrder (CSR
+ * structure) and
+ * marks them all as dirty for future visitation in the same pass.
+ *
+ * Circuit Breaker / Fail Fast:
+ * If a node throws an exception during stabilization, the engine captures it,
+ * notifies
+ * listeners, and eventually marks the graph as "unhealthy". This prevents a
+ * broken graph
+ * from continuing to process financial data, which could lead to substantial
+ * losses.
+ * The graph must be potentially reset or discarded after a critical failure.
  */
 public final class StabilizationEngine {
     private static final Logger log = LogManager.getLogger(StabilizationEngine.class);
@@ -85,19 +99,29 @@ public final class StabilizationEngine {
     /**
      * Run one deterministic stabilization pass.
      *
-     * <p>
-     * This method will:
-     * 1. Check if the engine is healthy (Circuit Breaker).
-     * 2. Increment the epoch.
-     * 3. Traverse the graph in topological order.
-     * 4. Recompute dirty nodes.
-     * 5. Propagate changes to children.
-     * 6. Clear source node dirty flags.
-     * 7. If errors occurred, mark unhealthy and throw (Fail Fast).
+     * This method executes the core graph propagation logic. It is single-threaded
+     * and non-reentrant.
      *
-     * @return The number of nodes that were actually recomputed.
+     * Steps:
+     * 1. Check Circuit Breaker: Throws immediately if the engine is already
+     * unhealthy.
+     * 2. Increment Epoch: Advances the logical time of the graph.
+     * 3. Traverse: Scans the boolean dirty array in topological order.
+     * 4. Recompute: Calls stabilize() on dirty nodes.
+     * 5. Propagate: Marks children dirty if parents change.
+     * 6. Cleanup: Resets dirty flags for the next pass.
+     *
+     * Performance:
+     * This method is designed to be "Zero Alloc" on the happy path. It does not
+     * create
+     * iterators, list nodes, or other temporary objects. All structures (dirty
+     * array,
+     * topology arrays) are pre-allocated.
+     *
+     * @return The number of nodes that were actually recomputed (stabilized).
      * @throws IllegalStateException if the engine is already unhealthy.
-     * @throws RuntimeException      if the stabilization failed (wrapped cause).
+     * @throws RuntimeException      if the stabilization failed to complete (e.g.,
+     *                               node exception).
      */
     public int stabilize() {
         if (!healthy) {

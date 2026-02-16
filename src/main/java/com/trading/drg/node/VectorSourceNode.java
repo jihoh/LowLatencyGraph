@@ -8,9 +8,17 @@ import com.trading.drg.api.VectorValue;
 /**
  * A source node for array-based data.
  *
- * <p>
  * Allows feeding entire curves or vectors into the graph efficiently.
- * Supports partial updates via {@link #updateAt(int, double)}.
+ *
+ * Usage:
+ * - Full Update: update(double[]) replaces the entire vector.
+ * - Partial Update: updateAt(index, value) updates a single element.
+ *
+ * Change Detection:
+ * If ANY element in the vector changes significantly (exceeding tolerance), the
+ * ENTIRE node is marked as changed. This means all downstream dependents will
+ * be
+ * recomputed.
  */
 public final class VectorSourceNode implements SourceNode<double[]>, VectorValue {
     private final String name;
