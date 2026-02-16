@@ -63,6 +63,9 @@ public final class DoubleSourceNode implements SourceNode<Double>, DoubleReadabl
      * Sets the dirty flag to ensure propagation during next stabilization.
      */
     public void updateDouble(double value) {
+        if (!Double.isFinite(value)) {
+            throw new IllegalArgumentException("Invalid value: " + value + " for node: " + name);
+        }
         this.currentValue = value;
         this.dirty = true;
     }
