@@ -41,9 +41,6 @@ public final class StabilizationEngine {
     // Circuit Breaker state
     private boolean healthy = true;
 
-    // Pre-computed source indices for O(S) cleanup instead of O(N)
-    private final int[] sourceIndices;
-
     private int lastStabilizedCount;
     private long epoch;
     private StabilizationListener listener;
@@ -52,22 +49,10 @@ public final class StabilizationEngine {
         this.topology = topology;
         this.dirty = new boolean[topology.nodeCount()];
 
-        // Count sources first to allocate array
-        int sourceCount = 0;
+        // Mark all source nodes as dirty initially so their values propagate
+        // on the first stabilize() call.
         for (int i = 0; i < topology.nodeCount(); i++) {
             if (topology.isSource(i) && topology.node(i) instanceof SourceNode) {
-                sourceCount++;
-            }
-        }
-
-        // Populate source indices and mark initial dirty state
-        this.sourceIndices = new int[sourceCount];
-        int idx = 0;
-        for (int i = 0; i < topology.nodeCount(); i++) {
-            if (topology.isSource(i) && topology.node(i) instanceof SourceNode) {
-                sourceIndices[idx++] = i;
-                // Fix: Mark all source nodes as dirty initially so their values propagate
-                // on the first stabilize() call.
                 dirty[i] = true;
             }
         }
@@ -180,11 +165,6 @@ public final class StabilizationEngine {
             }
         } finally {
             // Cleanup: After stabilization, source nodes are no longer "newly updated".
-            // Use pre-computed indices for O(S) efficiency instead of O(N) scan.
-            for (int srcIdx : sourceIndices) {
-                ((SourceNode<?>) topology.node(srcIdx)).clearDirty();
-            }
-
             this.lastStabilizedCount = stabilizedCount;
             if (hasListener)
                 l.onStabilizationEnd(epoch, stabilizedCount);

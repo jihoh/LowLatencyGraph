@@ -17,7 +17,6 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorReada
     private final double[] currentValues;
     private final double[] previousValues;
     private boolean initialized = false;
-    private boolean dirty;
 
     public VectorSourceNode(String name, int size, double tolerance) {
         this.name = name;
@@ -59,7 +58,6 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorReada
         }
         // Only update current values. Do NOT touch previousValues until stabilize()
         System.arraycopy(values, 0, currentValues, 0, size);
-        dirty = true;
     }
 
     /**
@@ -76,7 +74,6 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorReada
                     "Invalid value: " + value + " for node: " + name + " at index: " + index);
         }
         currentValues[index] = value;
-        dirty = true;
     }
 
     @Override
@@ -112,15 +109,5 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorReada
     @Override
     public double valueAt(int index) {
         return currentValues[index];
-    }
-
-    @Override
-    public boolean isDirty() {
-        return dirty;
-    }
-
-    @Override
-    public void clearDirty() {
-        dirty = false;
     }
 }

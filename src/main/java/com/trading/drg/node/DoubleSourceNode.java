@@ -26,7 +26,6 @@ public final class DoubleSourceNode implements SourceNode<Double>, DoubleReadabl
     private final DoubleCutoff cutoff;
     private double currentValue;
     private double previousValue = Double.NaN;
-    private boolean dirty;
 
     /**
      * Creates a named source node with a custom cutoff strategy.
@@ -67,7 +66,6 @@ public final class DoubleSourceNode implements SourceNode<Double>, DoubleReadabl
             throw new IllegalArgumentException("Invalid value: " + value + " for node: " + name);
         }
         this.currentValue = value;
-        this.dirty = true;
     }
 
     @Override
@@ -102,15 +100,5 @@ public final class DoubleSourceNode implements SourceNode<Double>, DoubleReadabl
 
     public double previousDoubleValue() {
         return previousValue;
-    }
-
-    @Override
-    public boolean isDirty() {
-        return dirty;
-    }
-
-    @Override
-    public void clearDirty() {
-        dirty = false;
     }
 }
