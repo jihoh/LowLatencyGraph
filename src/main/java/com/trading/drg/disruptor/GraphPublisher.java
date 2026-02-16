@@ -92,20 +92,33 @@ public final class GraphPublisher {
         final int nodeId = event.nodeId();
 
         // 1. Apply the update to the source node
-        if (nodeId >= 0 && nodeId < sourceNodes.length) {
-            Node<?> node = sourceNodes[nodeId];
-            if (node != null) {
-                if (event.isVectorUpdate()) {
-                    if (node instanceof VectorSourceNode vsn) {
-                        vsn.updateAt(event.vectorIndex(), event.doubleValue());
-                        engine.markDirty(nodeId);
-                    }
-                } else {
-                    if (node instanceof DoubleSourceNode dsn) {
-                        dsn.updateDouble(event.doubleValue());
-                        engine.markDirty(nodeId);
-                    }
-                }
+        // 1. Apply the update to the source node
+        if (nodeId < 0 || nodeId >= sourceNodes.length) {
+            log.error("Received event for invalid nodeId: {} (max={})", nodeId, sourceNodes.length - 1);
+            return;
+        }
+
+        Node<?> node = sourceNodes[nodeId];
+        if (node == null) {
+            log.error("Received event for non-source node: nodeId={} (type unknown or computed)", nodeId);
+            return;
+        }
+
+        if (event.isVectorUpdate()) {
+            if (node instanceof VectorSourceNode vsn) {
+                vsn.updateAt(event.vectorIndex(), event.doubleValue());
+                engine.markDirty(nodeId);
+            } else {
+                log.error("Received vector update for non-VectorSourceNode: nodeId={} type={}",
+                        nodeId, node.getClass().getSimpleName());
+            }
+        } else {
+            if (node instanceof DoubleSourceNode dsn) {
+                dsn.updateDouble(event.doubleValue());
+                engine.markDirty(nodeId);
+            } else {
+                log.error("Received double update for non-DoubleSourceNode: nodeId={} type={}",
+                        nodeId, node.getClass().getSimpleName());
             }
         }
 
