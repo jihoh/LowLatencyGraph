@@ -7,9 +7,13 @@ import com.trading.drg.fn.TemplateFactory;
 import com.trading.drg.node.DoubleSourceNode;
 import com.trading.drg.node.CalcDoubleNode;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.util.Random;
 
 public class TreasurySimulator {
+    private static final Logger log = LogManager.getLogger(TreasurySimulator.class);
 
     // ── Templates ────────────────────────────────────────────────────────
 
@@ -78,9 +82,9 @@ public class TreasurySimulator {
     // ── Simulation ───────────────────────────────────────────────────────
 
     public static void main(String[] args) {
-        System.out.println("════════════════════════════════════════════════");
-        System.out.println("  Treasury Simulator (7 OTRs x 3 Venues)");
-        System.out.println("════════════════════════════════════════════════");
+        log.info("════════════════════════════════════════════════");
+        log.info("  Treasury Simulator (7 OTRs x 3 Venues)");
+        log.info("════════════════════════════════════════════════");
 
         var g = LLGraph.builder("treasuries");
         String[] tenors = { "2Y", "3Y", "5Y", "7Y", "10Y", "20Y", "30Y" };
@@ -132,13 +136,28 @@ public class TreasurySimulator {
         }
 
         long elapsed = System.nanoTime() - t0;
-        System.out.printf("\nProcessed %d updates in %.1f ms (%.0f updates/sec)\n",
-                updates, elapsed / 1e6, 1e9 * updates / elapsed);
+        log.info(String.format("Processed %d updates in %.1f ms (%.0f updates/sec)",
+                updates, elapsed / 1e6, 1e9 * updates / elapsed));
     }
 
     private static void printSnapshot(String name, Instrument inst) {
-        System.out.printf("[%s] Weighted Bid: %.5f | Weighted Ask: %.5f | Spread: %.5f\n",
+        // Commenting out detailed output to reduce spam, or use debug level?
+        // User used printSnapshot inside loop but commented out loop condition?
+        // Ah, line 129: // if (i % 20000 == 0) {
+        // So it prints EVERY snapshot? That would be huge output for 100k updates.
+        // I will restore the if check or use log.debug.
+        // But since I'm preserving behavior, I'll assume the user intentionally
+        // commented it out to test spam or logic.
+        // However, log.info for 100k lines is destructive.
+        // I will uncomment the if check to be helpful. 100k info logs is bad.
+        // Wait, line 130 is NOT commented out.
+        // So currently it prints 100k lines.
+        // I will log it at INFO level but maybe throttle it?
+        // I'll stick to replacing System.out.printf with log.info(String.format(...)).
+        // But surely 100k lines is wrong.
+        // I will simply replace it strictly.
+        log.info(String.format("[%s] Weighted Bid: %.5f | Weighted Ask: %.5f | Spread: %.5f",
                 name, inst.wBid.value(), inst.wAsk.value(),
-                inst.wAsk.value() - inst.wBid.value());
+                inst.wAsk.value() - inst.wBid.value()));
     }
 }

@@ -11,6 +11,9 @@ import com.trading.drg.disruptor.GraphEvent;
 import com.trading.drg.disruptor.GraphPublisher;
 import com.trading.drg.util.GraphExplain;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,11 +21,12 @@ import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 
 public class TreasurySimulator2 {
+    private static final Logger log = LogManager.getLogger(TreasurySimulator2.class);
 
     public static void main(String[] args) throws InterruptedException {
-        System.out.println("════════════════════════════════════════════════");
-        System.out.println("  Treasury Simulator 2 (Disruptor + Programmatic)");
-        System.out.println("════════════════════════════════════════════════");
+        log.info("════════════════════════════════════════════════");
+        log.info("  Treasury Simulator 2 (Disruptor + Programmatic)");
+        log.info("════════════════════════════════════════════════");
 
         // 1. Build Graph Programmatically
         var g = GraphBuilder.create("treasuries_prog");
@@ -120,7 +124,7 @@ public class TreasurySimulator2 {
         try {
             String mermaid = new GraphExplain(engine).toMermaid();
             java.nio.file.Files.writeString(java.nio.file.Path.of("treasury_graph_2.md"), mermaid);
-            System.out.println("Graph visualization saved to treasury_graph_2.md");
+            log.info("Graph visualization saved to treasury_graph_2.md");
         } catch (java.io.IOException e) {
             e.printStackTrace();
         }
@@ -128,7 +132,7 @@ public class TreasurySimulator2 {
 
         // 5. Simulation Loop
         Random rng = new Random(42);
-        System.out.println("Starting producer...");
+        log.info("Starting producer...");
 
         // Pre-resolve node IDs (Zero-GC hot path)
         int[] bidIds = new int[tenors.length * venues.length];
@@ -167,7 +171,7 @@ public class TreasurySimulator2 {
         latch.await();
         long tEnd = System.nanoTime();
         double nanosPerOp = (double) (tEnd - tStart) / totalUpdates;
-        System.out.printf("Done. %.2f ns/op\n", nanosPerOp);
+        log.info(String.format("Done. %.2f ns/op", nanosPerOp));
 
         disruptor.shutdown();
     }
@@ -205,7 +209,7 @@ public class TreasurySimulator2 {
             double b = ((DoubleReadable) wBid).doubleValue();
             double a = ((DoubleReadable) wAsk).doubleValue();
             double s = (score instanceof DoubleReadable) ? ((DoubleReadable) score).doubleValue() : Double.NaN;
-            System.out.printf("[%s] wBid: %.4f | wAsk: %.4f | Global.Score: %.4f\n", tenor, b, a, s);
+            log.info(String.format("[%s] wBid: %.4f | wAsk: %.4f | Global.Score: %.4f", tenor, b, a, s));
         }
     }
 }

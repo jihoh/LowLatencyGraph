@@ -2,6 +2,8 @@ package com.trading.drg.core;
 
 import java.util.*;
 
+import lombok.extern.log4j.Log4j2;
+
 /**
  * Topology — CSR-encoded static DAG (Directed Acyclic Graph).
  *
@@ -31,6 +33,7 @@ import java.util.*;
  * cache-friendly and involves
  * zero object allocation or pointer chasing.
  */
+@Log4j2
 public final class TopologicalOrder {
     // The nodes in topological execution order.
     private final Node<?>[] topoOrder;

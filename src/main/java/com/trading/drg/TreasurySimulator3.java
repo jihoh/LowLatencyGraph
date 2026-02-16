@@ -18,6 +18,9 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 /**
  * TreasurySimulator3: Swap Outright Pricer
  * 
@@ -26,11 +29,12 @@ import java.util.concurrent.CountDownLatch;
  * Logic: Fixed-Float Swap Valuation
  */
 public class TreasurySimulator3 {
+    private static final Logger log = LogManager.getLogger(TreasurySimulator3.class);
 
     public static void main(String[] args) throws InterruptedException {
-        System.out.println("════════════════════════════════════════════════");
-        System.out.println("  Treasury Simulator 3 (Swap Pricer)");
-        System.out.println("════════════════════════════════════════════════");
+        log.info("════════════════════════════════════════════════");
+        log.info("  Treasury Simulator 3 (Swap Pricer)");
+        log.info("════════════════════════════════════════════════");
 
         // 1. Build Graph
         var g = GraphBuilder.create("swap_pricer");
@@ -204,7 +208,7 @@ public class TreasurySimulator3 {
         try {
             String mermaid = new GraphExplain(engine).toMermaid();
             java.nio.file.Files.writeString(java.nio.file.Path.of("treasury_graph.md"), mermaid);
-            System.out.println("Graph visualization saved to treasury_graph.md");
+            log.info("Graph visualization saved to treasury_graph.md");
         } catch (java.io.IOException e) {
             e.printStackTrace();
         }
@@ -212,7 +216,7 @@ public class TreasurySimulator3 {
 
         // 4. Simulation Loop
         Random rng = new Random(42);
-        System.out.println("Starting producer...");
+        log.info("Starting producer...");
 
         // Pre-resolve node IDs (Zero-GC hot path)
         int yieldId = context.getNodeId("Mkt.UST_5Y.Yield");
@@ -238,8 +242,8 @@ public class TreasurySimulator3 {
         latch.await();
 
         long elapsed = System.nanoTime() - tStart;
-        System.out.printf("\nProcessed %d updates (batches) in %.1f ms (%.0f batches/sec)\n",
-                totalUpdates, elapsed / 1e6, 1e9 * totalUpdates / elapsed);
+        log.info(String.format("Processed %d updates (batches) in %.1f ms (%.0f batches/sec)",
+                totalUpdates, elapsed / 1e6, 1e9 * totalUpdates / elapsed));
 
         disruptor.shutdown();
     }
@@ -256,12 +260,7 @@ public class TreasurySimulator3 {
 
     private static void printReport(MapNode node) {
         Map<String, Double> val = node.value();
-        System.out.printf("[Report] NPV: $%,.2f | DV01: $%,.2f | Rate: %.3f%% | Spread: %.2f bps\n",
-                val.get("NPV"), val.get("DV01"), val.get("Rate"), val.get("Spread") * 10000); // 10000? No, 0.15 is 15%.
-                                                                                              // Wait. 0.15 = 15%? or
-                                                                                              // 15bps?
-        // Input was 0.15. Usually means 15%. 15bps = 0.0015.
-        // Correcting input to realistic levels: 0.15 (15%) is too high for spread.
-        // 4.50 (4.5%).
+        log.info(String.format("[Report] NPV: $%,.2f | DV01: $%,.2f | Rate: %.3f%% | Spread: %.2f bps",
+                val.get("NPV"), val.get("DV01"), val.get("Rate"), val.get("Spread") * 10000));
     }
 }

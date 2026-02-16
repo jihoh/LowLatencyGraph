@@ -1,5 +1,7 @@
 package com.trading.drg.core;
 
+import lombok.extern.log4j.Log4j2;
+
 /**
  * The core engine that drives the graph stabilization process.
  *
@@ -28,6 +30,7 @@ package com.trading.drg.core;
  * stabilization cycle,
  * and only if necessary.
  */
+@Log4j2
 public final class StabilizationEngine {
     private final TopologicalOrder topology;
 
