@@ -16,6 +16,7 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorReada
     private final int size;
     private final double[] currentValues;
     private final double[] previousValues;
+    private boolean initialized = false;
     private boolean dirty;
 
     public VectorSourceNode(String name, int size, double tolerance) {
@@ -24,7 +25,8 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorReada
         this.size = size;
         this.currentValues = new double[size];
         this.previousValues = new double[size];
-        java.util.Arrays.fill(previousValues, Double.NaN);
+        // previousValues initialized to 0.0 by default, strict initialization handled
+        // by flag
     }
 
     /**
@@ -72,8 +74,9 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorReada
     @Override
     public boolean stabilize() {
         // Check for initialization (first run)
-        if (Double.isNaN(previousValues[0])) {
+        if (!initialized) {
             System.arraycopy(currentValues, 0, previousValues, 0, size);
+            initialized = true;
             return true;
         }
 
