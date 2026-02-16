@@ -193,6 +193,32 @@ For collections of related values (e.g., 2Y venues bids/asks), prefers **multipl
 *   **Hot Path (Calculation):** Use granular `DoubleNode`s (e.g., `VenueA.Bid`, `VenueB.Bid`). This ensures that an update to Venue A *only* triggers the logic for the best bid calculation, leaving Venue B's logic untouched.
 *   **Reporting / UI:** Use `MapNode` only at the very **end** of the graph (like `Report.SwapDetails`). It is excellent for bundling data for a "Snapshot" to send to a GUI or logger, where a consistent view of the world is required.
 
+#### 2.6.3 Best Practices: VectorNode vs. Multiple DoubleNodes
+
+**Question:** "Why do I need `VectorNode`? Why not just use 100 `DoubleNode`s for a Yield Curve?"
+
+**Answer: CPU Cache & Throughput.**
+
+1.  **Pointer Chasing vs. Contiguous Memory (The Critical Factor)**
+    *   **Multiple DoubleNodes**: 100 separate Java objects scattered in heap memory. The CPU must "chase pointers" to fetch each one, causing massive L1/L2 cache misses.
+    *   **VectorNode**: A single `double[]` array is a contiguous block of memory. The CPU fetches entire cache lines (e.g., 4-8 doubles) in a single cycle. Iterating `array[i]` is orders of magnitude faster than `nodeList.get(i).value()`.
+
+2.  **Graph Traversal Overhead**
+    *   **Split**: 100 nodes = 100x engine overhead (dirty checks, virtual method calls, recursion).
+    *   **Vector**: 1 node = 1x overhead. You pay the administration cost once to process 100 data points.
+
+3.  **Atomic Consistency ("Tearing")**
+    *   **Split**: Updates to a curve might process partially, leaving downstream nodes seeing a "teared" state (half old curve, half new) if batching isn't perfect.
+    *   **Vector**: The array updates atomically. Downstream nodes see either the *entire* old curve or the *entire* new curve.
+
+4.  **Memory Footprint**
+    *   **DoubleNode**: ~48 bytes per point (Header + value + references).
+    *   **VectorNode**: ~8 bytes per point. For large volatility surfaces, this saves Gigabytes.
+
+**Rule of Thumb:**
+*   Use **DoubleNode** for distinct, semantic values (`SpotPrice`, `RiskLimit`).
+*   Use **VectorNode** for homogeneous collections (`YieldCurve`, `VolSurface`, `PnL_Buckets`).
+
 ### 2.7 Boolean Logic & Conditionals
 The graph supports boolean logic for implementing payoff structures, barriers, and regime switching. Use `condition` to create a boolean signal and `select` to switch between values.
 
