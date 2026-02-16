@@ -5,7 +5,7 @@ import com.trading.drg.core.DoubleReadable;
 import com.trading.drg.core.StabilizationEngine;
 import com.trading.drg.fn.TemplateFactory;
 import com.trading.drg.node.DoubleSourceNode;
-import com.trading.drg.node.CalcDoubleNode;
+import com.trading.drg.node.DoubleCalcNode;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -40,7 +40,7 @@ public class TreasurySimulator {
     }
 
     record Instrument(VenueBook btec, VenueBook fenics, VenueBook dweb,
-            CalcDoubleNode wBid, CalcDoubleNode wAsk) {
+            DoubleCalcNode wBid, DoubleCalcNode wAsk) {
     }
 
     static final TemplateFactory<InstConfig, Instrument> INST_TEMPLATE = (g, pfx, c) -> {

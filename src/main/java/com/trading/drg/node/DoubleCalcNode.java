@@ -18,10 +18,10 @@ import com.trading.drg.core.DoubleCutoff;
  * new CalcDoubleNode("Sum", DoubleCutoffs.EXACT, () -> inputA.doubleValue() + inputB.doubleValue());
  * }</pre>
  */
-public final class CalcDoubleNode extends DoubleNode {
+public final class DoubleCalcNode extends DoubleNode {
     private final CalcFn fn;
 
-    public CalcDoubleNode(String name, DoubleCutoff cutoff, CalcFn fn) {
+    public DoubleCalcNode(String name, DoubleCutoff cutoff, CalcFn fn) {
         super(name, cutoff);
         this.fn = fn;
     }

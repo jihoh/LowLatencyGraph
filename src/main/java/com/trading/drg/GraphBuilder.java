@@ -130,17 +130,17 @@ public final class GraphBuilder {
      * @param in   Input node (must implement DoubleReadable).
      * @return The created computation node.
      */
-    public CalcDoubleNode compute(String name, Fn1 fn, DoubleReadable in) {
+    public DoubleCalcNode compute(String name, Fn1 fn, DoubleReadable in) {
         return compute(name, DoubleCutoffs.EXACT, fn, in);
     }
 
     /**
      * Defines a computation node with 1 input and custom cutoff.
      */
-    public CalcDoubleNode compute(String name, DoubleCutoff cutoff, Fn1 fn, DoubleReadable in) {
+    public DoubleCalcNode compute(String name, DoubleCutoff cutoff, Fn1 fn, DoubleReadable in) {
         checkNotBuilt();
         // Create the node with a lambda that pulls from the input interface
-        var node = new CalcDoubleNode(name, cutoff, () -> fn.apply(in.doubleValue()));
+        var node = new DoubleCalcNode(name, cutoff, () -> fn.apply(in.doubleValue()));
         register(node);
         // Explicitly record dependency
         addEdge(in.name(), name);
@@ -150,17 +150,17 @@ public final class GraphBuilder {
     /**
      * Defines a computation node with 2 inputs.
      */
-    public CalcDoubleNode compute(String name, Fn2 fn, DoubleReadable in1, DoubleReadable in2) {
+    public DoubleCalcNode compute(String name, Fn2 fn, DoubleReadable in1, DoubleReadable in2) {
         return compute(name, DoubleCutoffs.EXACT, fn, in1, in2);
     }
 
     /**
      * Defines a computation node with 2 inputs and custom cutoff.
      */
-    public CalcDoubleNode compute(String name, DoubleCutoff cutoff, Fn2 fn,
+    public DoubleCalcNode compute(String name, DoubleCutoff cutoff, Fn2 fn,
             DoubleReadable in1, DoubleReadable in2) {
         checkNotBuilt();
-        var node = new CalcDoubleNode(name, cutoff,
+        var node = new DoubleCalcNode(name, cutoff,
                 () -> fn.apply(in1.doubleValue(), in2.doubleValue()));
         register(node);
         addEdge(in1.name(), name);
@@ -168,15 +168,15 @@ public final class GraphBuilder {
         return node;
     }
 
-    public CalcDoubleNode compute(String name, Fn3 fn,
+    public DoubleCalcNode compute(String name, Fn3 fn,
             DoubleReadable in1, DoubleReadable in2, DoubleReadable in3) {
         return compute(name, DoubleCutoffs.EXACT, fn, in1, in2, in3);
     }
 
-    public CalcDoubleNode compute(String name, DoubleCutoff cutoff, Fn3 fn,
+    public DoubleCalcNode compute(String name, DoubleCutoff cutoff, Fn3 fn,
             DoubleReadable in1, DoubleReadable in2, DoubleReadable in3) {
         checkNotBuilt();
-        var node = new CalcDoubleNode(name, cutoff,
+        var node = new DoubleCalcNode(name, cutoff,
                 () -> fn.apply(in1.doubleValue(), in2.doubleValue(), in3.doubleValue()));
         register(node);
         addEdge(in1.name(), name);
@@ -189,17 +189,17 @@ public final class GraphBuilder {
      * Defines a computation node with N inputs.
      * Uses a pre-allocated scratch buffer to avoid allocation during compute.
      */
-    public CalcDoubleNode computeN(String name, DoubleReadable[] inputs, FnN fn) {
+    public DoubleCalcNode computeN(String name, DoubleReadable[] inputs, FnN fn) {
         return computeN(name, DoubleCutoffs.EXACT, inputs, fn);
     }
 
-    public CalcDoubleNode computeN(String name, DoubleCutoff cutoff,
+    public DoubleCalcNode computeN(String name, DoubleCutoff cutoff,
             DoubleReadable[] inputs, FnN fn) {
         checkNotBuilt();
         // Allocate scratch buffer once at build time.
         // NOTE: This scratch buffer is captured by the lambda.
         final double[] scratch = new double[inputs.length];
-        var node = new CalcDoubleNode(name, cutoff, () -> {
+        var node = new DoubleCalcNode(name, cutoff, () -> {
             // Gather inputs into scratch buffer
             for (int i = 0; i < inputs.length; i++)
                 scratch[i] = inputs[i].doubleValue();
@@ -224,10 +224,10 @@ public final class GraphBuilder {
      * @param fn        Vector function logic.
      * @return The new vector node.
      */
-    public CalcVectorNode computeVector(String name, int size, double tolerance,
+    public VectorCalcNode computeVector(String name, int size, double tolerance,
             Node<?>[] inputs, VectorFn fn) {
         checkNotBuilt();
-        var node = new CalcVectorNode(name, size, tolerance, inputs, fn);
+        var node = new VectorCalcNode(name, size, tolerance, inputs, fn);
         register(node);
         for (Node<?> input : inputs)
             addEdge(input.name(), name);
@@ -238,9 +238,9 @@ public final class GraphBuilder {
      * Extract a single element from a vector node.
      * This creates a virtual edge that reads a specific index. Zero-cost accessor.
      */
-    public CalcDoubleNode vectorElement(String name, VectorReadable vec, int index) {
+    public DoubleCalcNode vectorElement(String name, VectorReadable vec, int index) {
         checkNotBuilt();
-        var node = new CalcDoubleNode(name, DoubleCutoffs.EXACT, () -> vec.valueAt(index));
+        var node = new DoubleCalcNode(name, DoubleCutoffs.EXACT, () -> vec.valueAt(index));
         register(node);
         addEdge(vec.name(), name);
         return node;
@@ -282,10 +282,10 @@ public final class GraphBuilder {
      * Selects between two inputs based on a boolean condition.
      * Acts like an electrical multiplexer.
      */
-    public CalcDoubleNode select(String name, BooleanNode cond,
+    public DoubleCalcNode select(String name, BooleanNode cond,
             DoubleReadable ifTrue, DoubleReadable ifFalse) {
         checkNotBuilt();
-        var node = new CalcDoubleNode(name, DoubleCutoffs.EXACT,
+        var node = new DoubleCalcNode(name, DoubleCutoffs.EXACT,
                 () -> cond.booleanValue() ? ifTrue.doubleValue() : ifFalse.doubleValue());
         register(node);
         addEdge(cond.name(), name);

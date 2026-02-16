@@ -7,11 +7,11 @@ import com.trading.drg.fn.VectorFn;
  * A general-purpose vector node that delegates computation to a functional
  * interface.
  */
-public final class CalcVectorNode extends VectorNode {
+public final class VectorCalcNode extends VectorNode {
     private final Node<?>[] inputs;
     private final VectorFn fn;
 
-    public CalcVectorNode(String name, int size, double tolerance,
+    public VectorCalcNode(String name, int size, double tolerance,
             Node<?>[] inputs, VectorFn fn) {
         super(name, size, tolerance);
         this.inputs = inputs;

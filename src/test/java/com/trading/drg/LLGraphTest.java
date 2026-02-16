@@ -8,7 +8,7 @@ import com.trading.drg.disruptor.GraphPublisher;
 import com.trading.drg.fn.TemplateFactory;
 import com.trading.drg.io.JsonGraphCompiler;
 import com.trading.drg.io.JsonParser;
-import com.trading.drg.node.CalcDoubleNode;
+import com.trading.drg.node.DoubleCalcNode;
 import com.trading.drg.node.DoubleSourceNode;
 import com.trading.drg.node.VectorSourceNode;
 
@@ -165,7 +165,7 @@ public class LLGraphTest {
         var rate = g.doubleSource("rate", 0.05);
         record Cfg(double notional, double fixedRate) {
         }
-        record Out(CalcDoubleNode npv) {
+        record Out(DoubleCalcNode npv) {
         }
 
         TemplateFactory<Cfg, Out> tmpl = (b, pfx, c) -> {
