@@ -110,43 +110,45 @@ public final class StabilizationEngine {
         if (hasListener)
             l.onStabilizationStart(epoch);
 
-        // Linear scan through topological order.
-        // This is efficient because 'dirty' is visited sequentially (spatial locality).
-        for (int ti = 0; ti < n; ti++) {
-            if (!dirty[ti])
-                continue;
+        try {
+            // Linear scan through topological order.
+            // This is efficient because 'dirty' is visited sequentially (spatial locality).
+            for (int ti = 0; ti < n; ti++) {
+                if (!dirty[ti])
+                    continue;
 
-            // Clear dirty flag *before* processing.
-            // Note: A node can be marked dirty again if it has a self-loop (illegal in DAG)
-            // or if we were doing iterative solving (not supported here).
-            dirty[ti] = false;
+                // Clear dirty flag *before* processing.
+                // Note: A node can be marked dirty again if it has a self-loop (illegal in DAG)
+                // or if we were doing iterative solving (not supported here).
+                dirty[ti] = false;
 
-            Node<?> node = topology.node(ti);
-            boolean changed = node.stabilize();
-            stabilizedCount++;
+                Node<?> node = topology.node(ti);
+                boolean changed = node.stabilize();
+                stabilizedCount++;
 
-            if (hasListener)
-                l.onNodeStabilized(epoch, ti, node.name(), changed);
+                if (hasListener)
+                    l.onNodeStabilized(epoch, ti, node.name(), changed);
 
-            // If the value changed, we must visit all children.
-            if (changed) {
-                // Use CSR structure to iterate children efficiently
-                final int start = topology.childrenStart(ti);
-                final int end = topology.childrenEnd(ti);
-                for (int ci = start; ci < end; ci++)
-                    dirty[topology.childAt(ci)] = true;
+                // If the value changed, we must visit all children.
+                if (changed) {
+                    // Use CSR structure to iterate children efficiently
+                    final int start = topology.childrenStart(ti);
+                    final int end = topology.childrenEnd(ti);
+                    for (int ci = start; ci < end; ci++)
+                        dirty[topology.childAt(ci)] = true;
+                }
             }
-        }
+        } finally {
+            // Cleanup: After stabilization, source nodes are no longer "newly updated".
+            // Use pre-computed indices for O(S) efficiency instead of O(N) scan.
+            for (int srcIdx : sourceIndices) {
+                ((SourceNode<?>) topology.node(srcIdx)).clearDirty();
+            }
 
-        // Cleanup: After stabilization, source nodes are no longer "newly updated".
-        // Use pre-computed indices for O(S) efficiency instead of O(N) scan.
-        for (int srcIdx : sourceIndices) {
-            ((SourceNode<?>) topology.node(srcIdx)).clearDirty();
+            this.lastStabilizedCount = stabilizedCount;
+            if (hasListener)
+                l.onStabilizationEnd(epoch, stabilizedCount);
         }
-
-        this.lastStabilizedCount = stabilizedCount;
-        if (hasListener)
-            l.onStabilizationEnd(epoch, stabilizedCount);
         return stabilizedCount;
     }
 

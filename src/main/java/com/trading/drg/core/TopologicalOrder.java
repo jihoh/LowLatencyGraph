@@ -108,7 +108,7 @@ public final class TopologicalOrder {
     }
 
     public Node<?>[] topoOrder() {
-        return topoOrder;
+        return topoOrder.clone();
     }
 
     public static Builder builder() {
