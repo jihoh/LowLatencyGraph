@@ -48,6 +48,10 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorReada
 
     @Override
     public void update(double[] values) {
+        if (values.length != size) {
+            throw new IllegalArgumentException(
+                    "Vector length mismatch: expected " + size + ", got " + values.length + " for node: " + name);
+        }
         for (double v : values) {
             if (!Double.isFinite(v)) {
                 throw new IllegalArgumentException("Invalid value in vector update: " + v + " for node: " + name);
@@ -63,6 +67,10 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorReada
      * Useful for spot shocks to a curve point.
      */
     public void updateAt(int index, double value) {
+        if (index < 0 || index >= size) {
+            throw new IndexOutOfBoundsException(
+                    "Index out of bounds: " + index + " (size=" + size + ") for node: " + name);
+        }
         if (!Double.isFinite(value)) {
             throw new IllegalArgumentException(
                     "Invalid value: " + value + " for node: " + name + " at index: " + index);

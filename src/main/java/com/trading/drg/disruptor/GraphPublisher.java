@@ -104,22 +104,31 @@ public final class GraphPublisher {
             return;
         }
 
-        if (event.isVectorUpdate()) {
-            if (node instanceof VectorSourceNode vsn) {
-                vsn.updateAt(event.vectorIndex(), event.doubleValue());
-                engine.markDirty(nodeId);
+        try {
+            if (event.isVectorUpdate()) {
+                if (node instanceof VectorSourceNode vsn) {
+                    vsn.updateAt(event.vectorIndex(), event.doubleValue());
+                    engine.markDirty(nodeId);
+                } else {
+                    log.error("Received vector update for non-VectorSourceNode: nodeId={} type={}",
+                            nodeId, node.getClass().getSimpleName());
+                }
             } else {
-                log.error("Received vector update for non-VectorSourceNode: nodeId={} type={}",
-                        nodeId, node.getClass().getSimpleName());
+                if (node instanceof DoubleSourceNode dsn) {
+                    dsn.updateDouble(event.doubleValue());
+                    engine.markDirty(nodeId);
+                } else {
+                    log.error("Received double update for non-DoubleSourceNode: nodeId={} type={}",
+                            nodeId, node.getClass().getSimpleName());
+                }
             }
-        } else {
-            if (node instanceof DoubleSourceNode dsn) {
-                dsn.updateDouble(event.doubleValue());
-                engine.markDirty(nodeId);
-            } else {
-                log.error("Received double update for non-DoubleSourceNode: nodeId={} type={}",
-                        nodeId, node.getClass().getSimpleName());
-            }
+        } catch (Exception e) {
+            log.error("Error processing event for node {}: {}", nodeId, e.getMessage(), e);
+            // Do not rethrow, to keep consumer thread alive.
+            // We return here to avoid stabilizing a potentially inconsistent state,
+            // though depending on the specific error, partial update might be desired.
+            // For bad inputs (bounds check), returning is safe.
+            return;
         }
 
         // 2. Drive stabilization if this is the end of a batch
