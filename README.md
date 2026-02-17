@@ -554,3 +554,63 @@ var stdDev = g.compute("bb.stdev", new HistVol(20), price);
 var upper = g.compute("bb.upper", (m, s) -> m + 2*s, ma, stdDev);
 var lower = g.compute("bb.lower", (m, s) -> m - 2*s, ma, stdDev);
 ```
+
+### 7.4 How to Implement Custom Class-Based Nodes
+
+You can implement `Fn1`, `Fn2`, `Fn3`, or `FnN` as a class.
+This is especially useful when:
+1.  **Complex Logic**: The calculation is too long for a lambda.
+2.  **Stateful Logic**: You need to maintain internal state (like an EWMA, PID Controller, or Rate Limiter).
+3.  **Reusability**: You use the same logic in multiple places.
+
+#### Example: Stateful EWMA as a Class
+
+Here is how you can encapsulate the "Exponential Moving Average" logic into a clean `Fn1` implementation.
+
+```java
+import com.trading.drg.fn.Fn1;
+
+/**
+ * Stateful Exponential Moving Average.
+ * Implements Fn1 so it can be used in g.compute(name, new Ewma(0.1), input).
+ */
+public class Ewma implements Fn1 {
+    private final double alpha;
+    private double state;
+    private boolean initialized = false;
+
+    public Ewma(double alpha) {
+        this.alpha = alpha;
+    }
+
+    @Override
+    public double apply(double input) {
+        if (!initialized) {
+            state = input;
+            initialized = true;
+            return state;
+        }
+        
+        // Classic EWMA: New = Alpha * Input + (1 - Alpha) * Old
+        state = alpha * input + (1.0 - alpha) * state;
+        return state;
+    }
+}
+```
+
+#### Usage in GraphBuilder
+
+Since `Ewma` implements `Fn1`, you can pass an instance directly to `g.compute`:
+
+```java
+var price = g.scalarSource("mkt.px", 100.0);
+
+// Use the class instance instead of a lambda
+var fastEwma = g.compute("sig.ewma_fast", new Ewma(0.5), price);
+var slowEwma = g.compute("sig.ewma_slow", new Ewma(0.05), price);
+```
+
+#### Why this is better than closure-based state
+*   **Cleaner**: No `final double[] state = new double[1]` hacks.
+*   **Encapsulated**: The state is private to the class instance.
+*   **Testable**: You can unit test `Ewma` in isolation without the graph engine.
