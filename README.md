@@ -4,8 +4,6 @@
 
 **CoreGraph** is a specialized, high-performance graph engine designed for **low-latency electronic trading**. It allows you to model complex pricing, risk, and signal logic as a **Directed Acyclic Graph (DAG)**.
 
-Unlike general-purpose streaming frameworks (RxJava, Akka) or standard OOP, CoreGraph is built with one obsession: **Deterministic, Zero-Allocation execution on the Hot Path.**
-
 ### Key Capabilities
 *   **Speed:** ~1 microsecond stabilization latency for typical subgraphs.
 *   **Throughput:** ~1 million updates/second

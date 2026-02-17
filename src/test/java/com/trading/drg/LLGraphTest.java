@@ -5,10 +5,6 @@ import com.trading.drg.engine.*;
 import com.trading.drg.dsl.*;
 import com.trading.drg.wiring.*;
 import com.trading.drg.node.*;
-
-import com.trading.drg.api.ScalarValue;
-import com.trading.drg.api.Node;
-import com.trading.drg.engine.TopologicalOrder;
 import com.trading.drg.wiring.GraphEvent;
 import com.trading.drg.wiring.GraphPublisher;
 import com.trading.drg.fn.TemplateFactory;

@@ -101,6 +101,7 @@ public class TemplateDemo {
         }
 
         var engine = g.build();
+        engine.setListener(new com.trading.drg.util.LatencyTrackingListener());
         engine.stabilize(); // Initial state (Prices ~100.0)
 
         // 2. Simulation Loop

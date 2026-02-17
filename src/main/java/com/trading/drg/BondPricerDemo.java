@@ -92,6 +92,7 @@ public class BondPricerDemo {
         // 2. Build Engine
         var context = g.buildWithContext();
         var engine = context.engine();
+        engine.setListener(new com.trading.drg.util.LatencyTrackingListener());
         var nodes = context.nodesByName();
 
         // 3. Setup Disruptor

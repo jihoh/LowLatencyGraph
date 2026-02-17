@@ -139,6 +139,7 @@ public class SwapPricerDemo {
         // 2. Build Engine
         var context = g.buildWithContext();
         var engine = context.engine();
+        engine.setListener(new com.trading.drg.util.LatencyTrackingListener());
 
         // 3. Disruptor Setup
         Disruptor<GraphEvent> disruptor = new Disruptor<>(
