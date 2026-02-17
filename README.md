@@ -504,3 +504,53 @@ Run JFR in production.
 *   **Target:** `StabilizationEngine.stabilize()`.
 *   **Success Criteria:** Zero allocation samples inside this method.
 *   **Warning Signs:** `Double.valueOf`, `Iterator.next`, `String.format` appearing in the hot path.
+
+## 7. Finance Library (Class-Based Nodes)
+
+CoreGraph provides a library of zero-allocation, stateful financial functions in `com.trading.drg.fn.finance`.
+These classes implement `Fn1` (scalar -> scalar) or `Fn2` (scalar, scalar -> scalar) and can be used directly in `compute` nodes.
+
+### 7.1 Key Benefits
+1.  **Zero GC:** State is pre-allocated (arrays) and reused.
+2.  **Encapsulation:** No need to manage `double[]` arrays in lambdas manually.
+3.  **Composability:** Easy to chain.
+
+### 7.2 Available Functions
+
+| Class | Description | Usage |
+|-------|-------------|-------|
+| `Ewma` | Exponential Moving Average | `new Ewma(alpha)` |
+| `Sma` | Simple Moving Average (Ring Buffer) | `new Sma(windowSize)` |
+| `Diff` | First Difference (`x[t] - x[t-1]`) | `new Diff()` |
+| `LogReturn` | Log Return (`ln(x[t] / x[t-1])`) | `new LogReturn()` |
+| `HistVol` | Historic Volatility (StdDev) | `new HistVol(windowSize)` |
+| `ZScore` | Z-Score (`(x - mean) / stdDev`) | `new ZScore(windowSize)` |
+| `Rsi` | Relative Strength Index (Wilder's) | `new Rsi(period)` |
+| `Macd` | MACD Line (`FastEWMA - SlowEWMA`) | `new Macd(fast, slow)` |
+| `RollingMax` | Rolling Maximum (Linear Scan) | `new RollingMax(windowSize)` |
+| `RollingMin` | Rolling Minimum (Linear Scan) | `new RollingMin(windowSize)` |
+| `Beta` | Rolling Beta (`Cov(X,Y)/Var(X)`) | `new Beta(windowSize)` |
+| `Correlation` | Rolling Correlation | `new Correlation(windowSize)` |
+
+### 7.3 Usage Example
+
+```java
+import com.trading.drg.fn.finance.*;
+
+// 1. Define Sources
+var price = g.scalarSource("mkt.mid", 100.0);
+
+// 2. Use Class-Based Nodes
+// RSI 14
+var rsi = g.compute("sig.rsi", new Rsi(14), price);
+
+// MACD (12, 26)
+var macdLine = g.compute("sig.macd", new Macd(12, 26), price);
+
+// Bollinger Bands (SMA + 2 * StdDev)
+var ma     = g.compute("bb.ma",    new Sma(20), price);
+var stdDev = g.compute("bb.stdev", new HistVol(20), price);
+
+var upper = g.compute("bb.upper", (m, s) -> m + 2*s, ma, stdDev);
+var lower = g.compute("bb.lower", (m, s) -> m - 2*s, ma, stdDev);
+```
