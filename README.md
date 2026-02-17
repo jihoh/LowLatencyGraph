@@ -160,14 +160,14 @@ var rates = g.vectorSource("mkt.rates", POINTS); // Input: [0.045, 0.046...]
 double[] times = {1,2,3,4,5,6,7,8,9,10};
 
 var dfs = g.computeVector("calc.dfs", POINTS, 1e-9,
-    new Node[]{ rates },
     (inputs, output) -> {
         VectorSourceNode rNode = (VectorSourceNode)inputs[0];
         for(int i=0; i<POINTS; i++) {
             double r = rNode.valueAt(i);
             output[i] = 1.0 / Math.pow(1.0 + r, times[i]);
         }
-    }
+    },
+    rates
 );
 ```
 
@@ -179,7 +179,6 @@ var baseCurve = g.vectorSource("base_curve", 10);
 var shift = g.scalarSource("scenario.shift", 0.0050); // +50bps
 
 var shockedCurve = g.computeVector("scen.up50", 10, 1e-9,
-    new Node[]{ baseCurve, shift },
     (inputs, output) -> {
         VectorSourceNode curve = (VectorSourceNode)inputs[0];
         double s = ((ScalarValue)inputs[1]).doubleValue();
@@ -187,7 +186,8 @@ var shockedCurve = g.computeVector("scen.up50", 10, 1e-9,
         for(int i=0; i<10; i++) {
             output[i] = curve.valueAt(i) + s;
         }
-    }
+    },
+    baseCurve, shift
 );
 ```
 
@@ -200,14 +200,14 @@ var surface = g.vectorSource("mkt.vol_surface", 100);
 
 // We want the slice at Index 20-29 (The 1Y tenor)
 var slice1Y = g.computeVector("vol.1y_slice", 10, 1e-6,
-    new Node[]{ surface },
     (inputs, output) -> {
         VectorSourceNode surf = (VectorSourceNode)inputs[0];
         // Efficient array copy (Zero-GC, effectively System.arraycopy)
         for(int i=0; i<10; i++) {
             output[i] = surf.valueAt(20 + i);
         }
-    }
+    },
+    surface
 );
 ```
 
@@ -257,14 +257,14 @@ var gamma = g.scalarSource("risk.gamma", 2);
 
 // Map keys defined at build time
 var report = g.mapNode("report.pnl",
-    new String[]{ "NPV", "Delta", "Gamma" },
-    new Node[]{ npv, delta, gamma },
     (inputs, writer) -> {
         // Fast writer (flyweight)
         writer.put("NPV",   inputs[0].doubleValue());
         writer.put("Delta", inputs[1].doubleValue());
         writer.put("Gamma", inputs[2].doubleValue());
-    }
+    },
+    new String[]{ "NPV", "Delta", "Gamma" },
+    npv, delta, gamma
 );
 ```
 

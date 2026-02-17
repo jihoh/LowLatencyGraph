@@ -102,12 +102,12 @@ public class LLGraphTest {
         double[] tenors = { 0.25, 0.5, 1.0, 2.0 };
 
         var curve = g.computeVector("disc_curve", 4, 1e-12,
-                new Node<?>[] { rates },
                 (inputs, output) -> {
                     var r = (VectorSourceNode) inputs[0];
                     for (int i = 0; i < 4; i++)
                         output[i] = 1.0 / (1.0 + r.valueAt(i) * tenors[i]);
-                });
+                },
+                rates);
         var df0 = g.vectorElement("df_3m", curve, 0);
 
         var engine = g.build();
@@ -122,15 +122,16 @@ public class LLGraphTest {
         var g = GraphBuilder.create("greeks");
         var price = g.scalarSource("price", 100.0);
         var vol = g.scalarSource("vol", 0.20);
-        var greeks = g.mapNode("greeks", new String[] { "delta", "gamma", "vega" },
-                new Node<?>[] { price, vol },
+        var greeks = g.mapNode("greeks",
                 (inputs, out) -> {
                     double p = ((ScalarSourceNode) inputs[0]).doubleValue();
                     double v = ((ScalarSourceNode) inputs[1]).doubleValue();
                     out.put("delta", 0.55);
                     out.put("gamma", 0.02);
                     out.put("vega", v * 0.5);
-                });
+                },
+                new String[] { "delta", "gamma", "vega" },
+                price, vol);
         var engine = g.build();
         engine.markDirty("price");
         engine.markDirty("vol");

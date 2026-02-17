@@ -189,10 +189,9 @@ public final class GraphBuilder {
     /**
      * computeVector: Creates a vector computation node.
      */
-    public VectorCalcNode computeVector(String name, int size, double tolerance,
-            Node<?>[] inputs, VectorFn fn) {
+    public VectorCalcNode computeVector(String name, int size, double tolerance, VectorFn fn, Node<?>... inputs) {
         checkNotBuilt();
-        var node = new VectorCalcNode(name, size, tolerance, inputs, fn);
+        var node = new VectorCalcNode(name, size, tolerance, fn, inputs);
         register(node);
         for (Node<?> in : inputs)
             addEdge(in.name(), name);
@@ -216,11 +215,11 @@ public final class GraphBuilder {
      * Creates a MapNode for reporting/debugging.
      * Uses default tolerance of 1e-9.
      */
-    public MapNode mapNode(String name, String[] keys, Node<?>[] inputs, MapComputeFn fn) {
-        return mapNode(name, keys, inputs, fn, 1e-9);
+    public MapNode mapNode(String name, MapComputeFn fn, String[] keys, Node<?>... inputs) {
+        return mapNode(name, 1e-9, fn, keys, inputs);
     }
 
-    public MapNode mapNode(String name, String[] keys, Node<?>[] inputs, MapComputeFn fn, double tolerance) {
+    public MapNode mapNode(String name, double tolerance, MapComputeFn fn, String[] keys, Node<?>... inputs) {
         checkNotBuilt();
         var node = new MapNode(name, keys, inputs, fn, tolerance);
         register(node);

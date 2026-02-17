@@ -18,8 +18,7 @@ public final class VectorCalcNode extends VectorNode {
     private final Node<?>[] inputs;
     private final VectorFn fn;
 
-    public VectorCalcNode(String name, int size, double tolerance,
-            Node<?>[] inputs, VectorFn fn) {
+    public VectorCalcNode(String name, int size, double tolerance, VectorFn fn, Node<?>... inputs) {
         super(name, size, tolerance);
         this.inputs = inputs;
         this.fn = fn;

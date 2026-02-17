@@ -65,31 +65,16 @@ public class SwapPricerDemo {
         // D(t) = 1 / (1 + r)^t
         int curvePoints = 10; // 1Y to 10Y
         var discountCurve = g.computeVector("Calc.DiscountCurve", curvePoints, 1e-15,
-                new Node[] { sofrRate },
                 (inputs, output) -> {
                     double r = ((ScalarValue) inputs[0]).doubleValue() / 100.0;
                     for (int i = 0; i < output.length; i++) {
                         double t = i + 1.0;
                         output[i] = 1.0 / Math.pow(1.0 + r, t);
                     }
-                });
+                },
+                sofrRate); // varargs
 
-        // --- Layer 3: Pricing Models (Legs) ---
-
-        // derived from discountCurve (Vector).
-        // We accumulate vector elements using a loop over vectorElement nodes below.
-
-        // Layer 2.5: Sum of Discount Factors (Annuity Factor)
-        // We want to sum the vector. Since GraphBuilder doesn't support Vector->Scalar
-        // directly,
-        // we'll use a dummy dependency to satisfy the API and capture the vector in the
-        // closure.
-
-        // We must manually add edge since we bypassed the builder's dependency
-        // tracking?
-        // The builder doesn't let us manually add edges easily if we use this closure.
-        // Wait, GraphBuilder DOES NOT have a zero-arg compute that returns a node AND
-        // calculate annuity factor by summing discount factors
+        // Layer 2.5: Sum of Discount Factors
         List<ScalarValue> dfs = new ArrayList<>();
         for (int i = 0; i < curvePoints; i++) {
             dfs.add(g.vectorElement("Calc.DF." + (i + 1) + "Y", discountCurve, i));
@@ -100,7 +85,7 @@ public class SwapPricerDemo {
                     double sum = 0;
                     for (double d : inputs)
                         sum += d;
-                    return sum;
+                    return sum * 0.5;
                 },
                 dfs.toArray(new ScalarValue[0]));
 
@@ -109,7 +94,7 @@ public class SwapPricerDemo {
                 (n, r, a) -> n * (r / 100.0) * a,
                 notional, swapRate, annuityFactorS);
 
-        // Float Leg PV (Simplified) = Notional * (1 - DF_last)
+        // Float Leg PV
         var lastDF = dfs.get(curvePoints - 1);
         var floatLegPVS = g.compute("Pricer.FloatLeg.PV",
                 (n, df) -> n * (1.0 - df),
@@ -117,24 +102,24 @@ public class SwapPricerDemo {
 
         // --- Layer 4: Valuation & Risk ---
 
-        // NPV = FixedLeg - FloatLeg (Payer Swap: Pay Fixed, Rec Float)
+        // NPV
         var npv = g.compute("Valuation.NPV", (fl, fx) -> fl - fx, floatLegPVS, fixedLegPVS);
 
-        // DV01 = d(PV)/d(Rate) ~ Annuity * Notional * 0.0001
+        // DV01
         var dv01 = g.compute("Valuation.DV01", (a, n) -> a * n * 0.0001, annuityFactorS, notional);
 
-        // Reporting Node (Map)
-        // Inputs: [NPV, DV01, SwapRate, Spread]
+        // Reporting Node
         String[] reportKeys = { "NPV", "DV01", "Rate", "Spread" };
-        Node<?>[] reportInputs = { npv, dv01, swapRate, spread5Y };
 
-        var report = g.mapNode("Report.SwapDetails", reportKeys, reportInputs,
+        var report = g.mapNode("Report.SwapDetails",
                 (inputs, writer) -> {
                     writer.put("NPV", ((ScalarValue) inputs[0]).doubleValue());
                     writer.put("DV01", ((ScalarValue) inputs[1]).doubleValue());
                     writer.put("Rate", ((ScalarValue) inputs[2]).doubleValue());
                     writer.put("Spread", ((ScalarValue) inputs[3]).doubleValue());
-                });
+                },
+                reportKeys,
+                npv, dv01, swapRate, spread5Y);
 
         // 2. Build Engine
         var context = g.buildWithContext();
