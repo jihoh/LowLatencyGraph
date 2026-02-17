@@ -6,6 +6,9 @@ import com.trading.drg.fn.Fn2;
  * Rolling Correlation of X and Y.
  * 
  * Corr = Cov(X, Y) / (StdDev(X) * StdDev(Y))
+ * 
+ * Implements Fn2 so it can be used in g.compute(name, new Correlation(20), x,
+ * y).
  */
 public class Correlation implements Fn2 {
     private final double[] xWindow;

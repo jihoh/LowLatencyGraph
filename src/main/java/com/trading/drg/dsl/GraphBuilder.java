@@ -163,12 +163,12 @@ public final class GraphBuilder {
      * Defines a computation node with N inputs.
      * ...
      */
-    public ScalarCalcNode computeN(String name, ScalarValue[] inputs, FnN fn) {
-        return computeN(name, ScalarCutoffs.EXACT, inputs, fn);
+    public ScalarCalcNode computeN(String name, FnN fn, ScalarValue... inputs) {
+        return computeN(name, ScalarCutoffs.EXACT, fn, inputs);
     }
 
     public ScalarCalcNode computeN(String name, ScalarCutoff cutoff,
-            ScalarValue[] inputs, FnN fn) {
+            FnN fn, ScalarValue... inputs) {
         checkNotBuilt();
         // Allocate scratch buffer once at build time.
         // NOTE: This scratch buffer is captured by the lambda.

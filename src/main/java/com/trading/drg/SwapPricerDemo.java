@@ -96,13 +96,13 @@ public class SwapPricerDemo {
         }
 
         var annuityFactorS = g.computeN("Risk.AnnuityFactor",
-                dfs.toArray(new ScalarValue[0]),
                 (inputs) -> {
                     double sum = 0;
                     for (double d : inputs)
                         sum += d;
                     return sum;
-                });
+                },
+                dfs.toArray(new ScalarValue[0]));
 
         // Fixed Leg PV
         var fixedLegPVS = g.compute("Pricer.FixedLeg.PV",

@@ -176,7 +176,7 @@ public class LLGraphTest {
         };
         var s1 = g.template("swap1", tmpl, new Cfg(10_000_000, 0.04));
         var s2 = g.template("swap2", tmpl, new Cfg(5_000_000, 0.06));
-        var total = g.computeN("total", new ScalarValue[] { s1.npv(), s2.npv() }, d -> d[0] + d[1]);
+        var total = g.computeN("total", d -> d[0] + d[1], s1.npv(), s2.npv());
 
         var engine = g.build();
         engine.markDirty("rate");

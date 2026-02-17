@@ -65,12 +65,12 @@ public class BondPricerDemo {
             // Aggregation Logic (Weighted Average)
             // Function: (p1, q1, p2, q2, ...) -> sum(p*q) / sum(q)
             var wBid = g.computeN(prefix + ".wBid",
-                    bidInputs.toArray(new ScalarValue[0]),
-                    BondPricerDemo::weightedAvg);
+                    BondPricerDemo::weightedAvg,
+                    bidInputs.toArray(new ScalarValue[0]));
 
             var wAsk = g.computeN(prefix + ".wAsk",
-                    askInputs.toArray(new ScalarValue[0]),
-                    BondPricerDemo::weightedAvg);
+                    BondPricerDemo::weightedAvg,
+                    askInputs.toArray(new ScalarValue[0]));
 
             // Calculate Mid for this instrument
             var mid = g.compute(prefix + ".mid", (b, a) -> (b + a) / 2.0, wBid, wAsk);
@@ -80,14 +80,14 @@ public class BondPricerDemo {
         // Global Score Aggregation (Average of all Mids)
         // Function: (m1, m2, ...) -> sum(m) / count(m)
         g.computeN("Global.Score",
-                allMids.toArray(new ScalarValue[0]),
                 inputs -> {
                     double sum = 0;
                     for (double v : inputs) {
                         sum += v;
                     }
                     return inputs.length == 0 ? 0 : sum / inputs.length;
-                });
+                },
+                allMids.toArray(new ScalarValue[0]));
 
         // 2. Build Engine
         var context = g.buildWithContext();

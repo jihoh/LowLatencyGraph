@@ -57,29 +57,25 @@ public class TemplateDemo {
         // Weighted Bid = Sum(Px * Qty) / Sum(Qty)
         // Inputs: 6 nodes (3 px, 3 qty)
         var wBid = g.computeN(pfx + ".wBid",
-                new ScalarValue[] {
-                        btec.bidPx(), btec.bidQty(),
-                        fenics.bidPx(), fenics.bidQty(),
-                        dweb.bidPx(), dweb.bidQty()
-                },
                 (inputs) -> {
                     double num = inputs[0] * inputs[1] + inputs[2] * inputs[3] + inputs[4] * inputs[5];
                     double den = inputs[1] + inputs[3] + inputs[5];
                     return den == 0 ? 0 : num / den;
-                });
+                },
+                btec.bidPx(), btec.bidQty(),
+                fenics.bidPx(), fenics.bidQty(),
+                dweb.bidPx(), dweb.bidQty());
 
         // Weighted Ask
         var wAsk = g.computeN(pfx + ".wAsk",
-                new ScalarValue[] {
-                        btec.askPx(), btec.askQty(),
-                        fenics.askPx(), fenics.askQty(),
-                        dweb.askPx(), dweb.askQty()
-                },
                 (inputs) -> {
                     double num = inputs[0] * inputs[1] + inputs[2] * inputs[3] + inputs[4] * inputs[5];
                     double den = inputs[1] + inputs[3] + inputs[5];
                     return den == 0 ? 0 : num / den;
-                });
+                },
+                btec.askPx(), btec.askQty(),
+                fenics.askPx(), fenics.askQty(),
+                dweb.askPx(), dweb.askQty());
 
         return new Instrument(btec, fenics, dweb, wBid, wAsk);
     };

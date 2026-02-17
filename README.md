@@ -134,7 +134,6 @@ var p2 = g.scalarSource("trade.p2", 100.55); var v2 = g.scalarSource("trade.v2",
 // VWAP = Sum(P*V) / Sum(V)
 // Use computeN for array inputs
 var vwap = g.computeN("calc.vwap",
-    new Node[]{ p1, v1, p2, v2 },
     (inputs) -> {
         double sumPv = 0, sumV = 0;
         for(int i=0; i<inputs.length; i+=2) {
@@ -144,7 +143,8 @@ var vwap = g.computeN("calc.vwap",
             sumV += v;
         }
         return (sumV == 0) ? 0 : sumPv / sumV;
-    }
+    },
+    p1, v1, p2, v2
 );
 ```
 
@@ -613,4 +613,69 @@ var slowEwma = g.compute("sig.ewma_slow", new Ewma(0.05), price);
 #### Why this is better than closure-based state
 *   **Cleaner**: No `final double[] state = new double[1]` hacks.
 *   **Encapsulated**: The state is private to the class instance.
-*   **Testable**: You can unit test `Ewma` in isolation without the graph engine.
+
+#### Example: Triangular Arbitrage (Fn3)
+
+This class calculates the difference (spread) between a direct currency pair and a synthetic cross rate.
+
+```java
+import com.trading.drg.fn.Fn3;
+
+public class TriangularArbSpread implements Fn3 {
+    @Override
+    public double apply(double leg1, double leg2, double direct) {
+        // Spread = Direct - (Leg1 * Leg2)
+        return direct - (leg1 * leg2);
+    }
+}
+```
+
+**Usage:**
+
+```java
+var eurUsd = g.scalarSource("mkt.eur_usd", 1.05);
+var usdJpy = g.scalarSource("mkt.usd_jpy", 150.0);
+var eurJpy = g.scalarSource("mkt.eur_jpy", 157.5);
+
+var arbSpread = g.compute("sig.arb_spread", 
+    new TriangularArbSpread(), 
+    eurUsd, usdJpy, eurJpy
+);
+```
+
+#### Example: Harmonic Mean (FnN)
+
+This class calculates the Harmonic Mean of N inputs (e.g., averaging P/E ratios).
+All inputs are of the same type.
+
+```java
+import com.trading.drg.fn.FnN;
+
+public class HarmonicMean implements FnN {
+    @Override
+    public double apply(double[] inputs) {
+        if (inputs.length == 0) return 0.0;
+        
+        double sumInverse = 0;
+        for (double val : inputs) {
+            sumInverse += 1.0 / val;
+        }
+        return inputs.length / sumInverse;
+    }
+}
+```
+
+**Usage:**
+
+```java
+var pe1 = g.scalarSource("pe.google", 25.0);
+var pe2 = g.scalarSource("pe.amazon", 40.0);
+var pe3 = g.scalarSource("pe.meta",   30.0);
+
+// Calculate average P/E of the sector
+var sectorPE = g.computeN("calc.sector_pe", 
+    new HarmonicMean(),
+    pe1, pe2, pe3
+);
+```
+
