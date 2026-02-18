@@ -1,8 +1,5 @@
 package com.trading.drg.io;
 
-import com.trading.drg.api.*;
-import com.trading.drg.engine.*;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -52,35 +49,60 @@ public final class JsonParser {
         info.setVersion((String) graphObj.get("version"));
 
         @SuppressWarnings("unchecked")
+        var templatesList = (List<Object>) graphObj.get("templates");
+        List<GraphDefinition.TemplateDef> templateDefs = new ArrayList<>();
+        if (templatesList != null) {
+            for (Object tmplObj : templatesList) {
+                @SuppressWarnings("unchecked")
+                var tm = (Map<String, Object>) tmplObj;
+                GraphDefinition.TemplateDef td = new GraphDefinition.TemplateDef();
+                td.setName((String) tm.get("name"));
+
+                @SuppressWarnings("unchecked")
+                var tNodesList = (List<Object>) tm.get("nodes");
+                List<GraphDefinition.NodeDef> tNodeDefs = new ArrayList<>();
+                if (tNodesList != null) {
+                    for (Object nodeObj : tNodesList) {
+                        tNodeDefs.add(parseNodeDef((Map<String, Object>) nodeObj));
+                    }
+                }
+                td.setNodes(tNodeDefs);
+                templateDefs.add(td);
+            }
+        }
+        info.setTemplates(templateDefs);
+
+        @SuppressWarnings("unchecked")
         var nodesList = (List<Object>) graphObj.get("nodes");
         List<GraphDefinition.NodeDef> nodeDefs = new ArrayList<>();
-
         if (nodesList != null) {
             for (Object nodeObj : nodesList) {
-                @SuppressWarnings("unchecked")
-                var nm = (Map<String, Object>) nodeObj;
-                GraphDefinition.NodeDef nd = new GraphDefinition.NodeDef();
-                nd.setName((String) nm.get("name"));
-                nd.setType((String) nm.get("type"));
-                if (nm.get("source") instanceof Boolean b)
-                    nd.setSource(b);
-                @SuppressWarnings("unchecked")
-                var deps = (List<Object>) nm.get("dependencies");
-                if (deps != null) {
-                    List<String> ds = new ArrayList<>();
-                    for (Object d : deps)
-                        ds.add((String) d);
-                    nd.setDependencies(ds);
-                }
-                @SuppressWarnings("unchecked")
-                var props = (Map<String, Object>) nm.get("properties");
-                nd.setProperties(props != null ? props : Collections.emptyMap());
-                nodeDefs.add(nd);
+                nodeDefs.add(parseNodeDef((Map<String, Object>) nodeObj));
             }
         }
         info.setNodes(nodeDefs);
         def.setGraph(info);
         return def;
+    }
+
+    private static GraphDefinition.NodeDef parseNodeDef(Map<String, Object> nm) {
+        GraphDefinition.NodeDef nd = new GraphDefinition.NodeDef();
+        nd.setName((String) nm.get("name"));
+        nd.setType((String) nm.get("type"));
+        if (nm.get("source") instanceof Boolean b)
+            nd.setSource(b);
+        @SuppressWarnings("unchecked")
+        var deps = (List<Object>) nm.get("dependencies");
+        if (deps != null) {
+            List<String> ds = new ArrayList<>();
+            for (Object d : deps)
+                ds.add((String) d);
+            nd.setDependencies(ds);
+        }
+        @SuppressWarnings("unchecked")
+        var props = (Map<String, Object>) nm.get("properties");
+        nd.setProperties(props != null ? props : Collections.emptyMap());
+        return nd;
     }
 
     /** Use a recursive descent parser for simplicity. */
@@ -101,7 +123,8 @@ public final class JsonParser {
                 case '"' -> parseString();
                 case '{' -> parseObject();
                 case '[' -> parseArray();
-                case 't', 'f' -> parseBool();
+                case 't' -> parseBool(); // true
+                case 'f' -> parseBool(); // false
                 case 'n' -> parseNull();
                 default -> {
                     if (c == '-' || (c >= '0' && c <= '9'))

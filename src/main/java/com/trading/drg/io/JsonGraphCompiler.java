@@ -90,6 +90,12 @@ public final class JsonGraphCompiler {
         registerFactory("harmonic_mean", (name, props) -> new GenericFnNNode(name,
                 new com.trading.drg.fn.finance.HarmonicMean(), parseCutoff(props)));
 
+        registerFactory("weighted_avg", (name, props) -> new GenericFnNNode(name,
+                new com.trading.drg.fn.finance.WeightedAverage(), parseCutoff(props)));
+
+        registerFactory("average", (name, props) -> new GenericFnNNode(name,
+                new com.trading.drg.fn.finance.Average(), parseCutoff(props)));
+
         registerFactory("scalar_source", (name, props) -> {
             double init = getDouble(props, "initial_value", 0.0);
             ScalarCutoff cutoff = parseCutoff(props);
@@ -117,7 +123,16 @@ public final class JsonGraphCompiler {
      */
     public CompiledGraph compile(GraphDefinition def) {
         var graphInfo = def.getGraph();
-        var nodeDefs = graphInfo.getNodes();
+
+        // 0. Pre-process templates
+        Map<String, GraphDefinition.TemplateDef> templateMap = new HashMap<>();
+        if (graphInfo.getTemplates() != null) {
+            for (var t : graphInfo.getTemplates()) {
+                templateMap.put(t.getName(), t);
+            }
+        }
+
+        var nodeDefs = expandTemplates(graphInfo.getNodes(), templateMap);
         Map<String, Node<?>> nodesByName = new HashMap<>(nodeDefs.size() * 2);
 
         // 1. Create nodes
@@ -197,6 +212,84 @@ public final class JsonGraphCompiler {
      */
     public interface DependencyInjectable {
         void injectDependencies(Node<?>[] upstreams);
+    }
+
+    /**
+     * The result of compilation: a graph engine ready to run.
+     */
+    private List<GraphDefinition.NodeDef> expandTemplates(List<GraphDefinition.NodeDef> nodes,
+            Map<String, GraphDefinition.TemplateDef> templates) {
+        List<GraphDefinition.NodeDef> expanded = new ArrayList<>();
+        Queue<GraphDefinition.NodeDef> queue = new ArrayDeque<>(nodes);
+
+        while (!queue.isEmpty()) {
+            var node = queue.poll();
+            if ("template".equals(node.getType())) {
+                // Expand
+                String templateName = (String) node.getProperties().get("template");
+                if (templateName == null)
+                    throw new IllegalArgumentException("Template node missing 'template' property: " + node.getName());
+
+                var template = templates.get(templateName);
+                if (template == null)
+                    throw new IllegalArgumentException("Unknown template: " + templateName);
+
+                Map<String, Object> params = node.getProperties();
+
+                for (var tNode : template.getNodes()) {
+                    var newNode = deepCopy(tNode);
+                    // Substitute variables
+                    newNode.setName(substitute(newNode.getName(), params));
+                    if (newNode.getDependencies() != null) {
+                        newNode.setDependencies(newNode.getDependencies().stream()
+                                .map(d -> substitute(d, params))
+                                .collect(java.util.stream.Collectors.toList()));
+                    }
+                    if (newNode.getProperties() != null) {
+                        Map<String, Object> newProps = new HashMap<>();
+                        for (var entry : newNode.getProperties().entrySet()) {
+                            Object val = entry.getValue();
+                            if (val instanceof String s) {
+                                newProps.put(entry.getKey(), substitute(s, params));
+                            } else {
+                                newProps.put(entry.getKey(), val);
+                            }
+                        }
+                        newNode.setProperties(newProps);
+                    }
+                    queue.add(newNode); // Add to queue to handle nested templates
+                }
+            } else {
+                expanded.add(node);
+            }
+        }
+        return expanded;
+    }
+
+    private String substitute(String s, Map<String, Object> params) {
+        if (s == null || !s.contains("{{"))
+            return s;
+        for (var entry : params.entrySet()) {
+            String key = "{{" + entry.getKey() + "}}";
+            if (s.contains(key)) {
+                s = s.replace(key, String.valueOf(entry.getValue()));
+            }
+        }
+        return s;
+    }
+
+    private GraphDefinition.NodeDef deepCopy(GraphDefinition.NodeDef original) {
+        var copy = new GraphDefinition.NodeDef();
+        copy.setName(original.getName());
+        copy.setType(original.getType());
+        copy.setSource(original.isSource());
+        if (original.getDependencies() != null) {
+            copy.setDependencies(new ArrayList<>(original.getDependencies()));
+        }
+        if (original.getProperties() != null) {
+            copy.setProperties(new HashMap<>(original.getProperties()));
+        }
+        return copy;
     }
 
     /**

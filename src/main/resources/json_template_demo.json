@@ -1,0 +1,46 @@
+{
+    "graph": {
+        "name": "template_demo",
+        "version": "1.0",
+        "templates": [
+            {
+                "name": "Smoother",
+                "nodes": [
+                    {
+                        "name": "{{pfx}}.in",
+                        "type": "scalar_source",
+                        "properties": {
+                            "initial_value": 0.0
+                        }
+                    },
+                    {
+                        "name": "{{pfx}}.out",
+                        "type": "ewma",
+                        "dependencies": [
+                            "{{pfx}}.in"
+                        ],
+                        "properties": {
+                            "alpha": 0.5
+                        }
+                    }
+                ]
+            }
+        ],
+        "nodes": [
+            {
+                "type": "template",
+                "properties": {
+                    "template": "Smoother",
+                    "pfx": "A"
+                }
+            },
+            {
+                "type": "template",
+                "properties": {
+                    "template": "Smoother",
+                    "pfx": "B"
+                }
+            }
+        ]
+    }
+}

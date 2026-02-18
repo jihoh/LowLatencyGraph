@@ -1,0 +1,147 @@
+{
+    "graph": {
+        "name": "bond_pricer",
+        "version": "1.0",
+        "templates": [
+            {
+                "name": "Venue",
+                "nodes": [
+                    {
+                        "name": "{{prefix}}.bid",
+                        "type": "scalar_source",
+                        "properties": {
+                            "initial_value": 100.0
+                        }
+                    },
+                    {
+                        "name": "{{prefix}}.bidQty",
+                        "type": "scalar_source",
+                        "properties": {
+                            "initial_value": 1000.0
+                        }
+                    },
+                    {
+                        "name": "{{prefix}}.ask",
+                        "type": "scalar_source",
+                        "properties": {
+                            "initial_value": 100.015625
+                        }
+                    },
+                    {
+                        "name": "{{prefix}}.askQty",
+                        "type": "scalar_source",
+                        "properties": {
+                            "initial_value": 1000.0
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "BondPricing",
+                "nodes": [
+                    {
+                        "type": "template",
+                        "properties": {
+                            "template": "Venue",
+                            "prefix": "{{tenor}}.Btec"
+                        }
+                    },
+                    {
+                        "type": "template",
+                        "properties": {
+                            "template": "Venue",
+                            "prefix": "{{tenor}}.Fenics"
+                        }
+                    },
+                    {
+                        "type": "template",
+                        "properties": {
+                            "template": "Venue",
+                            "prefix": "{{tenor}}.Dweb"
+                        }
+                    },
+                    {
+                        "name": "{{tenor}}.wBid",
+                        "type": "weighted_avg",
+                        "dependencies": [
+                            "{{tenor}}.Btec.bid",
+                            "{{tenor}}.Btec.bidQty",
+                            "{{tenor}}.Fenics.bid",
+                            "{{tenor}}.Fenics.bidQty",
+                            "{{tenor}}.Dweb.bid",
+                            "{{tenor}}.Dweb.bidQty"
+                        ]
+                    },
+                    {
+                        "name": "{{tenor}}.wAsk",
+                        "type": "weighted_avg",
+                        "dependencies": [
+                            "{{tenor}}.Btec.ask",
+                            "{{tenor}}.Btec.askQty",
+                            "{{tenor}}.Fenics.ask",
+                            "{{tenor}}.Fenics.askQty",
+                            "{{tenor}}.Dweb.ask",
+                            "{{tenor}}.Dweb.askQty"
+                        ]
+                    },
+                    {
+                        "name": "{{tenor}}.mid",
+                        "type": "average",
+                        "dependencies": [
+                            "{{tenor}}.wBid",
+                            "{{tenor}}.wAsk"
+                        ]
+                    }
+                ]
+            }
+        ],
+        "nodes": [
+            {
+                "type": "template",
+                "properties": {
+                    "template": "BondPricing",
+                    "tenor": "UST_2Y"
+                }
+            },
+            {
+                "type": "template",
+                "properties": {
+                    "template": "BondPricing",
+                    "tenor": "UST_3Y"
+                }
+            },
+            {
+                "type": "template",
+                "properties": {
+                    "template": "BondPricing",
+                    "tenor": "UST_5Y"
+                }
+            },
+            {
+                "type": "template",
+                "properties": {
+                    "template": "BondPricing",
+                    "tenor": "UST_10Y"
+                }
+            },
+            {
+                "type": "template",
+                "properties": {
+                    "template": "BondPricing",
+                    "tenor": "UST_30Y"
+                }
+            },
+            {
+                "name": "Global.Score",
+                "type": "average",
+                "dependencies": [
+                    "UST_2Y.mid",
+                    "UST_3Y.mid",
+                    "UST_5Y.mid",
+                    "UST_10Y.mid",
+                    "UST_30Y.mid"
+                ]
+            }
+        ]
+    }
+}

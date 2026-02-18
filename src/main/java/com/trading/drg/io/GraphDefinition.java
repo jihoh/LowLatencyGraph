@@ -29,6 +29,7 @@ public final class GraphDefinition {
     public static final class GraphInfo {
         private String name, version;
         private List<NodeDef> nodes;
+        private List<TemplateDef> templates;
 
         public String getName() {
             return name;
@@ -52,6 +53,36 @@ public final class GraphDefinition {
 
         public void setNodes(List<NodeDef> v) {
             nodes = v;
+        }
+
+        public List<TemplateDef> getTemplates() {
+            return templates;
+        }
+
+        public void setTemplates(List<TemplateDef> templates) {
+            this.templates = templates;
+        }
+    }
+
+    /** Definition of a reusable sub-graph template. */
+    public static final class TemplateDef {
+        private String name;
+        private List<NodeDef> nodes;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public List<NodeDef> getNodes() {
+            return nodes;
+        }
+
+        public void setNodes(List<NodeDef> nodes) {
+            this.nodes = nodes;
         }
     }
 
