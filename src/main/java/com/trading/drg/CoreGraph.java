@@ -13,6 +13,9 @@ import com.trading.drg.io.JsonGraphCompiler;
 import com.trading.drg.io.JsonParser;
 import com.trading.drg.wiring.GraphEvent;
 import com.trading.drg.wiring.GraphPublisher;
+import com.trading.drg.util.GraphExplain;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -33,6 +36,8 @@ import java.util.Map;
  * </ul>
  */
 public class CoreGraph {
+    private static final Logger log = LogManager.getLogger(CoreGraph.class);
+
     private final StabilizationEngine engine;
     private final Map<String, Node<?>> nodes;
     private final Disruptor<GraphEvent> disruptor;
@@ -83,6 +88,15 @@ public class CoreGraph {
         this.publisher = new GraphPublisher(engine);
         this.disruptor.handleEventsWith((event, seq, end) -> publisher.onEvent(event, seq, end));
         this.ringBuffer = disruptor.getRingBuffer();
+
+        // --- Export Graph Visualization ---
+        try {
+            String mermaid = new GraphExplain(engine).toMermaid();
+            java.nio.file.Files.writeString(java.nio.file.Path.of("swap_pricing_graph.md"), mermaid);
+            log.info("Graph visualization saved to swap_pricing_graph.md");
+        } catch (java.io.IOException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
