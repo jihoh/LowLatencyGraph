@@ -92,8 +92,11 @@ public class CoreGraph {
         // --- Export Graph Visualization ---
         try {
             String mermaid = new GraphExplain(engine).toMermaid();
-            java.nio.file.Files.writeString(java.nio.file.Path.of("swap_pricing_graph.md"), mermaid);
-            log.info("Graph visualization saved to swap_pricing_graph.md");
+            String fileName = jsonPath.getFileName().toString();
+            String baseName = fileName.endsWith(".json") ? fileName.substring(0, fileName.length() - 5) : fileName;
+            String mdName = baseName + ".md";
+            java.nio.file.Files.writeString(java.nio.file.Path.of(mdName), mermaid);
+            log.info("Graph visualization saved to {}", mdName);
         } catch (java.io.IOException e) {
             e.printStackTrace();
         }
