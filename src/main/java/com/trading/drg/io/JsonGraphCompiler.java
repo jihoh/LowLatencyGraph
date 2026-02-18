@@ -8,6 +8,10 @@ import java.util.*;
 import com.trading.drg.api.*;
 import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.node.VectorSourceNode;
+import com.trading.drg.node.GenericFn1Node;
+import com.trading.drg.node.GenericFn2Node;
+import com.trading.drg.node.GenericFn3Node;
+import com.trading.drg.node.GenericFnNNode;
 import com.trading.drg.util.ScalarCutoffs;
 
 /**
@@ -37,6 +41,55 @@ public final class JsonGraphCompiler {
 
     /** Register built-in factories (double_source, vector_source). */
     public JsonGraphCompiler registerBuiltIns() {
+        // Register common finance nodes using GENERIC adapters
+
+        // --- Fn1 Nodes ---
+        registerFactory("ewma", (name, props) -> new GenericFn1Node(name,
+                new com.trading.drg.fn.finance.Ewma(getDouble(props, "alpha", 0.1)), parseCutoff(props)));
+
+        registerFactory("diff",
+                (name, props) -> new GenericFn1Node(name, new com.trading.drg.fn.finance.Diff(), parseCutoff(props)));
+
+        registerFactory("hist_vol", (name, props) -> new GenericFn1Node(name,
+                new com.trading.drg.fn.finance.HistVol(getInt(props, "window", 10)), parseCutoff(props)));
+
+        registerFactory("log_return", (name, props) -> new GenericFn1Node(name,
+                new com.trading.drg.fn.finance.LogReturn(), parseCutoff(props)));
+
+        registerFactory("macd", (name, props) -> new GenericFn1Node(name, new com.trading.drg.fn.finance.Macd(
+                getInt(props, "fast", 12),
+                getInt(props, "slow", 26)), parseCutoff(props)));
+
+        registerFactory("rolling_max", (name, props) -> new GenericFn1Node(name,
+                new com.trading.drg.fn.finance.RollingMax(getInt(props, "window", 10)), parseCutoff(props)));
+
+        registerFactory("rolling_min", (name, props) -> new GenericFn1Node(name,
+                new com.trading.drg.fn.finance.RollingMin(getInt(props, "window", 10)), parseCutoff(props)));
+
+        registerFactory("rsi", (name, props) -> new GenericFn1Node(name,
+                new com.trading.drg.fn.finance.Rsi(getInt(props, "window", 14)), parseCutoff(props)));
+
+        registerFactory("sma", (name, props) -> new GenericFn1Node(name,
+                new com.trading.drg.fn.finance.Sma(getInt(props, "window", 10)), parseCutoff(props)));
+
+        registerFactory("z_score", (name, props) -> new GenericFn1Node(name,
+                new com.trading.drg.fn.finance.ZScore(getInt(props, "window", 20)), parseCutoff(props)));
+
+        // --- Fn2 Nodes ---
+        registerFactory("beta", (name, props) -> new GenericFn2Node(name,
+                new com.trading.drg.fn.finance.Beta(getInt(props, "window", 20)), parseCutoff(props)));
+
+        registerFactory("correlation", (name, props) -> new GenericFn2Node(name,
+                new com.trading.drg.fn.finance.Correlation(getInt(props, "window", 20)), parseCutoff(props)));
+
+        // --- Fn3 Nodes ---
+        registerFactory("tri_arb_spread", (name, props) -> new GenericFn3Node(name,
+                new com.trading.drg.fn.finance.TriangularArbSpread(), parseCutoff(props)));
+
+        // --- FnN Nodes ---
+        registerFactory("harmonic_mean", (name, props) -> new GenericFnNNode(name,
+                new com.trading.drg.fn.finance.HarmonicMean(), parseCutoff(props)));
+
         registerFactory("scalar_source", (name, props) -> {
             double init = getDouble(props, "initial_value", 0.0);
             ScalarCutoff cutoff = parseCutoff(props);
@@ -81,7 +134,7 @@ public final class JsonGraphCompiler {
         var topo = TopologicalOrder.builder();
         for (var nd : nodeDefs) {
             topo.addNode(nodesByName.get(nd.getName()));
-            if (nd.isSource())
+            if (nd.isSource() || nodesByName.get(nd.getName()) instanceof SourceNode)
                 topo.markSource(nd.getName());
         }
         for (var nd : nodeDefs) {

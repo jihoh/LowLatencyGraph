@@ -1,0 +1,48 @@
+{
+    "graph": {
+        "name": "tri_arb",
+        "version": "1.0",
+        "nodes": [
+            {
+                "name": "EURUSD",
+                "type": "scalar_source",
+                "properties": {
+                    "initial_value": 1.0850
+                }
+            },
+            {
+                "name": "USDJPY",
+                "type": "scalar_source",
+                "properties": {
+                    "initial_value": 145.20
+                }
+            },
+            {
+                "name": "EURJPY",
+                "type": "scalar_source",
+                "properties": {
+                    "initial_value": 157.55
+                }
+            },
+            {
+                "name": "Arb.Spread",
+                "type": "tri_arb_spread",
+                "dependencies": [
+                    "EURUSD",
+                    "USDJPY",
+                    "EURJPY"
+                ]
+            },
+            {
+                "name": "Arb.Spread.Ewma",
+                "type": "ewma",
+                "dependencies": [
+                    "Arb.Spread"
+                ],
+                "properties": {
+                    "alpha": 0.1
+                }
+            }
+        ]
+    }
+}
