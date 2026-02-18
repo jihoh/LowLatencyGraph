@@ -1,11 +1,10 @@
 package com.trading.drg;
 
-import com.trading.drg.api.ScalarValue;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.Random;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Demonstrates the usage of the {@link CoreGraph} wrapper class.
@@ -25,19 +24,40 @@ public class CoreGraphSimpleDemo {
 
         // 3. Simulation Loop
         Random rng = new Random(42);
-        CountDownLatch latch = new CountDownLatch(1);
+        // CountDownLatch latch = new CountDownLatch(1); // Unused
         log.info("Publishing updates...");
+
+        // Use the default reader (watches ALL scalar nodes)
+        // Convenient but copies more data than a specific reader.
+        var reader = graph.getSnapshot().createReader();
+
         for (int i = 0; i < 10_000; i++) {
             double shock = (rng.nextDouble() - 0.5) * 0.01;
-            switch (i % 3) {
-                case 0 -> graph.publish("EURUSD", graph.<ScalarValue>getNode("EURUSD").doubleValue() + shock);
-                case 1 -> graph.publish("USDJPY", graph.<ScalarValue>getNode("USDJPY").doubleValue() + shock * 100);
-                case 2 -> graph.publish("EURJPY", graph.<ScalarValue>getNode("EURJPY").doubleValue() + shock * 100);
+
+            if (!reader.tryRefresh(100)) {
+                log.warn("Failed to get consistent snapshot after 100 attempts");
+                continue;
             }
-            if (i % 1000 == 0)
-                log.info("Published update {}", i);
+
+            // Access by name
+            double currentEurUsd = reader.get("EURUSD");
+            double currentUsdJpy = reader.get("USDJPY");
+            double currentEurJpy = reader.get("EURJPY");
+
+            if (i % 3 == 0) {
+                graph.publish("EURUSD", currentEurUsd + shock);
+            } else if (i % 3 == 1) {
+                graph.publish("USDJPY", currentUsdJpy + shock * 100);
+            } else {
+                graph.publish("EURJPY", currentEurJpy + shock * 100);
+            }
+
+            if (i % 1000 == 0) {
+                log.info("Published update {}. Current Spread: {}", i, reader.get("Arb.Spread"));
+            }
+
+            TimeUnit.MICROSECONDS.sleep(10);
         }
-        latch.countDown();
 
         // 4. Stop Engine
         graph.stop();

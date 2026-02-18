@@ -14,6 +14,7 @@ import com.trading.drg.io.JsonParser;
 import com.trading.drg.wiring.GraphEvent;
 import com.trading.drg.wiring.GraphPublisher;
 import com.trading.drg.util.GraphExplain;
+import com.trading.drg.util.AsyncGraphSnapshot;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -44,6 +45,7 @@ public class CoreGraph {
     private final RingBuffer<GraphEvent> ringBuffer;
     private final GraphPublisher publisher;
     private final com.trading.drg.util.LatencyTrackingListener listener;
+    private final AsyncGraphSnapshot masterSnapshot;
 
     /**
      * Creates a new CoreGraph from a JSON file path string.
@@ -88,6 +90,16 @@ public class CoreGraph {
         this.publisher = new GraphPublisher(engine);
         this.disruptor.handleEventsWith((event, seq, end) -> publisher.onEvent(event, seq, end));
         this.ringBuffer = disruptor.getRingBuffer();
+
+        // --- Async Snapshot Integration ---
+        // Find all nodes that are ScalarValues and add them to the snapshot
+        var scalarNodeNames = nodes.entrySet().stream()
+                .filter(e -> e.getValue() instanceof com.trading.drg.api.ScalarValue)
+                .map(Map.Entry::getKey)
+                .toArray(String[]::new);
+
+        this.masterSnapshot = new AsyncGraphSnapshot(this, scalarNodeNames);
+        this.publisher.setPostStabilizationCallback(this.masterSnapshot::update);
 
         // --- Export Graph Visualization ---
         try {
@@ -148,6 +160,15 @@ public class CoreGraph {
      */
     public com.trading.drg.util.LatencyTrackingListener getLatencyListener() {
         return listener;
+    }
+
+    /**
+     * Returns the master snapshot containing all scalar nodes in the graph.
+     * Use {@link AsyncGraphSnapshot#getDouble(String)} for convenient thread-safe
+     * access.
+     */
+    public AsyncGraphSnapshot getSnapshot() {
+        return masterSnapshot;
     }
 
     /**
