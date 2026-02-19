@@ -12,14 +12,16 @@ public class HarmonicMean implements FnN {
 
     @Override
     public double apply(double[] inputs) {
-        if (inputs.length == 0)
-            return 0.0;
+        if (inputs == null || inputs.length == 0) {
+            return Double.NaN; // Consistent with Average for empty/null inputs
+        }
 
         double sumInverse = 0;
         // Zero-GC loop
         for (double val : inputs) {
-            if (val == 0.0)
-                return 0.0; // Avoid division by zero
+            if (Double.isNaN(val) || val == 0.0) {
+                return Double.NaN; // Cannot divide by zero or process NaN
+            }
             sumInverse += 1.0 / val;
         }
 

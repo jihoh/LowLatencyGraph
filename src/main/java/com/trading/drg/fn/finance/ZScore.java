@@ -30,28 +30,39 @@ public class ZScore implements Fn1 {
 
     @Override
     public double apply(double input) {
-        if (count < size) {
-            window[head] = input;
-            sum += input;
-            sumSq += input * input;
-            head = (head + 1) % size;
-            count++;
-        } else {
-            double old = window[head];
-            sum += input - old;
-            sumSq += (input * input) - (old * old);
-            window[head] = input;
-            head = (head + 1) % size;
+        if (Double.isNaN(input)) {
+            return Double.NaN;
         }
 
+        // 1. Update Sum and SumSq
+        // Remove old
+        if (count >= size) {
+            double old = window[head];
+            sum -= old;
+            sumSq -= old * old;
+        } else {
+            count++;
+        }
+
+        // Add new
+        window[head] = input;
+        sum += input;
+        sumSq += input * input;
+
+        // Advance pointer
+        head++;
+        if (head >= size)
+            head = 0;
+
         if (count < 2)
-            return 0.0;
+            return 0.0; // Typically 0 Z-score for single point or just wait?
+        // Z-score undefined for < 2 points usually, but 0 is safe placeholder.
 
         double mean = sum / count;
         double variance = (sumSq / count) - (mean * mean);
 
-        if (variance < 1e-12)
-            return 0.0; // Avoid divide by zero
+        if (variance <= 1e-9)
+            return 0.0; // Avoid division by zero/small variance
 
         double stdDev = Math.sqrt(variance);
         return (input - mean) / stdDev;

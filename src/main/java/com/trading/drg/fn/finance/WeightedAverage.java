@@ -5,19 +5,28 @@ import com.trading.drg.fn.FnN;
 public class WeightedAverage implements FnN {
     @Override
     public double apply(double[] inputs) {
-        double sumProd = 0.0;
-        double sumW = 0.0;
-        // Expect inputs as pairs: (value, weight, value, weight, ...)
+        if (inputs == null || inputs.length == 0)
+            return Double.NaN;
+        // Expect inputs to be pairs: [value1, weight1, value2, weight2, ...]
+        if (inputs.length % 2 != 0)
+            return Double.NaN;
+
+        double sumProduct = 0;
+        double sumWeight = 0;
+
         for (int i = 0; i < inputs.length; i += 2) {
             double val = inputs[i];
-            // If odd number of inputs, last weight is missing (assume 1.0 or ignore?)
-            // Safest to check bounds
-            if (i + 1 >= inputs.length) break;
-            
-            double w = inputs[i + 1];
-            sumProd += val * w;
-            sumW += w;
+            double weight = inputs[i + 1];
+
+            if (Double.isNaN(val) || Double.isNaN(weight))
+                return Double.NaN;
+
+            sumProduct += val * weight;
+            sumWeight += weight;
         }
-        return (sumW == 0) ? 0.0 : sumProd / sumW;
+
+        if (sumWeight == 0)
+            return Double.NaN;
+        return sumProduct / sumWeight;
     }
 }

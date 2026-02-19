@@ -22,12 +22,19 @@ public class Ewma implements Fn1 {
 
     @Override
     public double apply(double input) {
+        if (Double.isNaN(input)) {
+            return Double.NaN;
+        }
+
+        // Handle First Tick
         if (!initialized) {
             state = input;
             initialized = true;
             return state;
         }
 
+        // Classic EWMA Formula:
+        // New = Alpha * Input + (1 - Alpha) * Old
         state = alpha * input + (1.0 - alpha) * state;
         return state;
     }

@@ -3,6 +3,8 @@ package com.trading.drg.util;
 import com.trading.drg.api.*;
 import com.trading.drg.engine.*;
 
+import lombok.extern.log4j.Log4j2;
+
 import com.trading.drg.api.StabilizationListener;
 
 /**
@@ -24,6 +26,8 @@ import com.trading.drg.api.StabilizationListener;
  * not critical.
  */
 public final class LatencyTrackingListener implements StabilizationListener {
+    private static final org.apache.logging.log4j.Logger log = org.apache.logging.log4j.LogManager
+            .getLogger(LatencyTrackingListener.class);
     private long stabilizeStartNanos, lastLatencyNanos;
     private long totalStabilizations, totalLatencyNanos;
     private long minLatencyNanos = Long.MAX_VALUE, maxLatencyNanos = Long.MIN_VALUE;
@@ -41,7 +45,7 @@ public final class LatencyTrackingListener implements StabilizationListener {
 
     @Override
     public void onNodeError(long epoch, int ti, String name, Throwable error) {
-        // No-op for latency tracking
+        log.error("Graph Failure at Node '{}': {}", name, error.getMessage());
     }
 
     @Override

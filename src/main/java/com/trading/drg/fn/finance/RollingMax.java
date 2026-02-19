@@ -23,18 +23,25 @@ public class RollingMax implements Fn1 {
 
     @Override
     public double apply(double input) {
-        window[head] = input;
-        head = (head + 1) % size;
-        if (count < size)
-            count++;
+        if (Double.isNaN(input)) {
+            return Double.NaN;
+        }
 
-        // Linear scan to find max
+        window[head] = input;
+        head++;
+        if (head >= size) {
+            head = 0;
+        }
+
+        if (count < size) {
+            count++;
+        }
+
         double max = -Double.MAX_VALUE;
-        int limit = (count == size) ? size : count;
-        max = window[0];
-        for (int i = 1; i < limit; i++) {
-            if (window[i] > max)
+        for (int i = 0; i < count; i++) {
+            if (window[i] > max) {
                 max = window[i];
+            }
         }
         return max;
     }

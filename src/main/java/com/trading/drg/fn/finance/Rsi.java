@@ -24,10 +24,14 @@ public class Rsi implements Fn1 {
 
     @Override
     public double apply(double input) {
+        if (Double.isNaN(input)) {
+            return Double.NaN;
+        }
+
         if (!initialized) {
             prevPrice = input;
             initialized = true;
-            return 50.0; // Neutral on first tick
+            return 50.0; // Start at neutral
         }
 
         double change = input - prevPrice;
@@ -36,7 +40,7 @@ public class Rsi implements Fn1 {
         double gain = Math.max(0, change);
         double loss = Math.max(0, -change);
 
-        // Wilder's Smoothing: a * curr + (1-a) * prev
+        // Wilder's Smoothing: newAvg = alpha * newVal + (1 - alpha) * oldAvg
         avgGain = alpha * gain + (1.0 - alpha) * avgGain;
         avgLoss = alpha * loss + (1.0 - alpha) * avgLoss;
 

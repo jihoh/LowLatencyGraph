@@ -24,6 +24,10 @@ public class Sma implements Fn1 {
 
     @Override
     public double apply(double input) {
+        if (Double.isNaN(input)) {
+            return Double.NaN;
+        }
+
         if (count < size) {
             // Fill phase
             window[head] = input;

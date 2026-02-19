@@ -11,12 +11,16 @@ import com.trading.drg.fn.Fn3;
  */
 public class TriangularArbSpread implements Fn3 {
     @Override
-    public double apply(double leg1, double leg2, double direct) {
-        // leg1: EUR/USD
-        // leg2: USD/JPY
-        // direct: EUR/JPY
+    public double apply(double eurUsd, double usdJpy, double eurJpy) {
+        if (Double.isNaN(eurUsd) || Double.isNaN(usdJpy) || Double.isNaN(eurJpy)) {
+            return Double.NaN;
+        }
+        // 1. Calculate Synthetic EUR/JPY
+        // (EUR/USD) * (USD/JPY) = EUR/JPY
+        double synthetic = eurUsd * usdJpy;
 
-        double synthetic = leg1 * leg2;
-        return direct - synthetic;
+        // 2. Calculate Spread
+        // Direct - Synthetic
+        return eurJpy - synthetic;
     }
 }

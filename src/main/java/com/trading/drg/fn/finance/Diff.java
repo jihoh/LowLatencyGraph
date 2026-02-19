@@ -13,6 +13,10 @@ public class Diff implements Fn1 {
 
     @Override
     public double apply(double input) {
+        if (Double.isNaN(input)) {
+            return Double.NaN;
+        }
+
         if (!initialized) {
             prev = input;
             initialized = true;

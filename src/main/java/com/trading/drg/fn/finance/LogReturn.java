@@ -13,16 +13,19 @@ public class LogReturn implements Fn1 {
 
     @Override
     public double apply(double input) {
+        if (Double.isNaN(input) || input <= 0) {
+            return Double.NaN;
+        }
+
         if (!initialized) {
             prev = input;
             initialized = true;
             return 0.0;
         }
 
-        // Guard against division by zero or log of non-positive
-        if (prev <= 0 || input <= 0) {
+        if (prev <= 0) {
             prev = input;
-            return 0.0; // or NaN, but 0 is safer for pipelines
+            return Double.NaN;
         }
 
         double ret = Math.log(input / prev);

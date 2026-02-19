@@ -33,53 +33,58 @@ public class Correlation implements Fn2 {
 
     @Override
     public double apply(double x, double y) {
-        if (count < size) {
-            // Fill
-            xWindow[head] = x;
-            yWindow[head] = y;
-            sumX += x;
-            sumY += y;
-            sumX2 += x * x;
-            sumY2 += y * y;
-            sumXY += x * y;
-            head = (head + 1) % size;
-            count++;
-        } else {
-            // Update
+        if (Double.isNaN(x) || Double.isNaN(y))
+            return Double.NaN;
+
+        // Remove old
+        if (count >= size) {
             double oldX = xWindow[head];
             double oldY = yWindow[head];
-
-            xWindow[head] = x;
-            yWindow[head] = y;
-
-            sumX += x - oldX;
-            sumY += y - oldY;
-            sumX2 += (x * x) - (oldX * oldX);
-            sumY2 += (y * y) - (oldY * oldY);
-            sumXY += (x * y) - (oldX * oldY);
-
-            head = (head + 1) % size;
+            sumX -= oldX;
+            sumY -= oldY;
+            sumXY -= oldX * oldY;
+            sumX2 -= oldX * oldX;
+            sumY2 -= oldY * oldY;
+        } else {
+            // Logic error in previous snippet: count++ should happen if NOT full.
+            // But let's be cleaner.
+            // If full, remove old. If not full, count increases.
+            // But removal happens at 'head' which is the oldest.
+            // If full, we overwrite 'head'.
         }
+
+        // Add new
+        xWindow[head] = x;
+        yWindow[head] = y;
+        sumX += x;
+        sumY += y;
+        sumXY += x * y;
+        sumX2 += x * x;
+        sumY2 += y * y;
+
+        head++;
+        if (head >= size)
+            head = 0;
+
+        if (count < size)
+            count++;
 
         if (count < 2)
             return 0.0;
 
-        // E[XY] - E[X]E[Y]
-        // This is Cov(X,Y) * N^2 ... wait.
-        // Cov = (SumXY / N) - (SumX/N)*(SumY/N)
-        // VarX = (SumX2 / N) - (SumX/N)^2
-
         // To avoid divisions, multiply everything by N^2?
         // Corr = Cov / sqrt(VarX * VarY)
-        // = [ N*SumXY - SumX*SumY ] / sqrt( [N*SumX2 - SumX^2] * [N*SumY2 - SumY^2] )
+        // Cov = (SumXY - SumX*SumY/N) / N
+        // VarX = (SumX2 - SumX^2/N) / N
+        // Corr = (N*SumXY - SumX*SumY) / sqrt((N*SumX2 - SumX^2) * (N*SumY2 - SumY^2))
 
         double n = count;
         double num = n * sumXY - sumX * sumY;
         double denX = n * sumX2 - sumX * sumX;
         double denY = n * sumY2 - sumY * sumY;
 
-        if (denX <= 1e-12 || denY <= 1e-12)
-            return 0.0;
+        if (denX <= 1e-9 || denY <= 1e-9)
+            return 0.0; // Avoid division by zero or NaN due to sqrt of neg
 
         return num / Math.sqrt(denX * denY);
     }

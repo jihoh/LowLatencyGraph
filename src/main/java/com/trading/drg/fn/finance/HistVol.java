@@ -30,35 +30,45 @@ public class HistVol implements Fn1 {
     }
 
     @Override
-    public double apply(double input) {
-        double old = 0.0;
-
-        if (count < size) {
-            // Fill phase
-            window[head] = input;
-            sum += input;
-            sumSq += input * input;
-            head = (head + 1) % size;
-            count++;
-        } else {
-            // Full phase
-            old = window[head];
-            sum += input - old;
-            sumSq += (input * input) - (old * old);
-            window[head] = input;
-            head = (head + 1) % size;
+    public double apply(double logReturn) {
+        if (Double.isNaN(logReturn)) {
+            return Double.NaN;
         }
 
+        // Standard Deviation of Log Returns * Sqrt(AnnualizationFactor)
+
+        // 1. Update Sum and SumSq
+        // Remove old
+        if (count >= size) {
+            double old = window[head];
+            sum -= old;
+            sumSq -= old * old;
+        } else {
+            count++;
+        }
+
+        // Add new
+        window[head] = logReturn;
+        sum += logReturn;
+        sumSq += logReturn * logReturn;
+
+        // Advance pointer
+        head++;
+        if (head >= size)
+            head = 0;
+
         if (count < 2)
-            return 0.0;
+            return 0.0; // Need at least 2 points for variance
 
         double mean = sum / count;
         double variance = (sumSq / count) - (mean * mean);
 
-        // Variance can be slightly negative due to floating point errors
-        if (variance < 1e-12)
-            return 0.0;
+        // Numerical stability check
+        if (variance < 0)
+            variance = 0.0;
 
+        // The original code did not have an annualizationFactor.
+        // Assuming it should return the standard deviation directly if not provided.
         return Math.sqrt(variance);
     }
 }
