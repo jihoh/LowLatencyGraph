@@ -36,14 +36,10 @@ public class CoreGraphDemo {
         for (int i = 0; i < updates; i++) {
             double shock = (rng.nextDouble() - 0.5) * 0.01;
 
-            // [CONSUMER] Refresh snapshot for both input generation and monitoring
-            // Try to get a consistent view of the world
-            if (!reader.tryRefresh(100)) {
-                if (i % 1000 == 0)
-                    log.warn("Failed to get consistent snapshot");
-                // Skip this tick if we can't get a clear picture of the market
-                continue;
-            }
+            // [CONSUMER] Refresh snapshot (Wait-Free)
+            // Triple Buffering guarantees this is always successful and consistent
+            // immediately.
+            reader.refresh();
 
             // Use snapshot values for the next step of the random walk
             double currentEurUsd = reader.get("EURUSD");

@@ -34,10 +34,10 @@ public class CoreGraphSimpleDemo {
         for (int i = 0; i < 10_000; i++) {
             double shock = (rng.nextDouble() - 0.5) * 0.01;
 
-            if (!reader.tryRefresh(100)) {
-                log.warn("Failed to get consistent snapshot after 100 attempts");
-                continue;
-            }
+            // [CONSUMER] Refresh snapshot (Wait-Free)
+            // Triple Buffering guarantees this is always successful and consistent
+            // immediately.
+            reader.refresh();
 
             // Access by name
             double currentEurUsd = reader.get("EURUSD");
