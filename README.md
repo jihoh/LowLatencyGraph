@@ -213,10 +213,6 @@ public class Ewma implements Fn1 {
 
 ### 3.3 The Main Application (`CoreGraphDemo.java`)
 
-Here is how you wire it all together in Java. This `main` method represents your application entry point.
-
-### 3.3 The Main Application (`CoreGraphDemo.java`)
-
 Here is how you wire it all together in Java. This single `main` method demonstrates the full lifecycle: Initialization, Source Optimization, Publishing, and Wait-Free Consumption.
 
 ```java
