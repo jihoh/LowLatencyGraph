@@ -44,7 +44,8 @@ public class CoreGraph {
     private final Disruptor<GraphEvent> disruptor;
     private final RingBuffer<GraphEvent> ringBuffer;
     private final GraphPublisher publisher;
-    private final com.trading.drg.util.LatencyTrackingListener listener;
+    private final com.trading.drg.util.CompositeStabilizationListener compositeListener;
+    private final com.trading.drg.util.LatencyTrackingListener latencyListener;
     private final AsyncGraphSnapshot masterSnapshot;
 
     /**
@@ -76,8 +77,12 @@ public class CoreGraph {
         this.nodes = compiled.nodesByName();
 
         // Register default listener
-        this.listener = new com.trading.drg.util.LatencyTrackingListener();
-        this.engine.setListener(this.listener);
+        // Register default listener via Composite
+        this.compositeListener = new com.trading.drg.util.CompositeStabilizationListener();
+        this.latencyListener = new com.trading.drg.util.LatencyTrackingListener();
+        this.compositeListener.addForComposite(this.latencyListener);
+
+        this.engine.setListener(this.compositeListener);
 
         // 2. Setup Disruptor
         this.disruptor = new Disruptor<>(
@@ -159,7 +164,17 @@ public class CoreGraph {
      * Returns the default latency listener for metrics access.
      */
     public com.trading.drg.util.LatencyTrackingListener getLatencyListener() {
-        return listener;
+        return latencyListener;
+    }
+
+    /**
+     * Enables detailed per-node profiling.
+     * Use the returned listener to dump statistics.
+     */
+    public com.trading.drg.util.NodeProfileListener enableNodeProfiling() {
+        var profileListener = new com.trading.drg.util.NodeProfileListener();
+        compositeListener.addForComposite(profileListener);
+        return profileListener;
     }
 
     /**

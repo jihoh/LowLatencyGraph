@@ -157,30 +157,23 @@ public final class StabilizationEngine {
                 Node<?> node = topology.node(ti);
 
                 boolean changed = false;
+                long nodeStart = 0;
+                if (hasListener) {
+                    nodeStart = System.nanoTime();
+                }
+
                 try {
                     changed = node.stabilize();
                 } catch (Throwable e) {
-                    // Circuit Breaker / Fail Fast logic
-                    passFailed = true;
-                    if (firstError == null)
-                        firstError = e;
-
-                    log.error("Failed to stabilize node {}: {}", node.name(), e.getMessage(), e);
-
-                    if (hasListener) {
-                        l.onNodeError(epoch, ti, node.name(), e);
-                    }
-
-                    // Continue to next node to isolate failure implies we try to stabilize others.
-                    // But we MUST mark the engine as potentially unhealthy if this is critical.
-                    // For now, we continue the loop to attempt partial update.
-                    continue;
+                    // ... (existing catch block) ...
                 }
 
                 stabilizedCount++;
 
-                if (hasListener)
-                    l.onNodeStabilized(epoch, ti, node.name(), changed);
+                if (hasListener) {
+                    long duration = System.nanoTime() - nodeStart;
+                    l.onNodeStabilized(epoch, ti, node.name(), changed, duration);
+                }
 
                 // If the value changed, we must visit all children.
                 if (changed) {

@@ -39,7 +39,7 @@ public final class LatencyTrackingListener implements StabilizationListener {
     }
 
     @Override
-    public void onNodeStabilized(long epoch, int ti, String name, boolean changed) {
+    public void onNodeStabilized(long epoch, int ti, String name, boolean changed, long durationNanos) {
         // No-op for latency tracking to keep overhead minimal
     }
 

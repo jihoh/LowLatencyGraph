@@ -43,7 +43,7 @@ public interface StabilizationListener {
      *                  propagate;
      *                  false otherwise.
      */
-    void onNodeStabilized(long epoch, int topoIndex, String nodeName, boolean changed);
+    void onNodeStabilized(long epoch, int topoIndex, String nodeName, boolean changed, long durationNanos);
 
     /**
      * Called when a node fails to stabilize due to an unhandled exception.
