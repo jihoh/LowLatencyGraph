@@ -21,7 +21,7 @@ public class JsonBondPricerDemo {
         // 1. Initialize CoreGraph with template-based JSON
         var graph = new CoreGraph("src/main/resources/bond_pricer_template.json");
         var listener = graph.enableLatencyTracking();
-        graph.start();
+        // graph.start(); // Removed
 
         // 2. Simulation Parameters
         String[] tenors = { "UST_2Y", "UST_3Y", "UST_5Y", "UST_10Y", "UST_30Y" };
@@ -44,11 +44,14 @@ public class JsonBondPricerDemo {
             double bidPx = mid - spread / 2.0;
             double askPx = mid + spread / 2.0;
 
-            // Publish updates
-            graph.publish(prefix + ".bid", bidPx, false);
-            graph.publish(prefix + ".bidQty", (double) (1000 + rng.nextInt(500)), false);
-            graph.publish(prefix + ".ask", askPx, false);
-            graph.publish(prefix + ".askQty", (double) (1000 + rng.nextInt(500)), true);
+            // Update inputs
+            graph.update(prefix + ".bid", bidPx);
+            graph.update(prefix + ".bidQty", (double) (1000 + rng.nextInt(500)));
+            graph.update(prefix + ".ask", askPx);
+            graph.update(prefix + ".askQty", (double) (1000 + rng.nextInt(500)));
+
+            // Stabilize
+            graph.stabilize();
 
             if (i % 5000 == 0) {
                 var scoreNode = graph.<ScalarValue>getNode("Global.Score");
@@ -65,6 +68,6 @@ public class JsonBondPricerDemo {
         // 4. Get Latency Stats
         log.info("Latency Stats:\n" + listener.dump());
 
-        graph.stop();
+        // graph.stop(); // Removed
     }
 }

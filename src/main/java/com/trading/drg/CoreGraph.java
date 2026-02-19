@@ -1,18 +1,21 @@
 package com.trading.drg;
 
-import com.lmax.disruptor.BlockingWaitStrategy;
-import com.lmax.disruptor.RingBuffer;
-import com.lmax.disruptor.dsl.Disruptor;
-import com.lmax.disruptor.dsl.ProducerType;
-import com.lmax.disruptor.util.DaemonThreadFactory;
 import com.trading.drg.api.Node;
 import com.trading.drg.api.StabilizationListener;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.io.GraphDefinition;
 import com.trading.drg.io.JsonGraphCompiler;
 import com.trading.drg.io.JsonParser;
-import com.trading.drg.wiring.GraphEvent;
-import com.trading.drg.wiring.GraphPublisher;
+// Removed Wiring imports
+import com.trading.drg.util.GraphExplain;
+import com.trading.drg.util.AsyncGraphSnapshot;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import com.trading.drg.engine.StabilizationEngine;
+import com.trading.drg.io.GraphDefinition;
+import com.trading.drg.io.JsonGraphCompiler;
+import com.trading.drg.io.JsonParser;
+// wiring imports removed
 import com.trading.drg.util.GraphExplain;
 import com.trading.drg.util.AsyncGraphSnapshot;
 import org.apache.logging.log4j.LogManager;
@@ -41,11 +44,13 @@ public class CoreGraph {
 
     private final StabilizationEngine engine;
     private final Map<String, Node<?>> nodes;
-    private final Disruptor<GraphEvent> disruptor;
-    private final RingBuffer<GraphEvent> ringBuffer;
-    private final GraphPublisher publisher;
+    // Removed Disruptor, RingBuffer, Publisher
+
     private final com.trading.drg.util.CompositeStabilizationListener compositeListener;
     private final AsyncGraphSnapshot masterSnapshot;
+
+    // Cache source nodes for O(1) updates
+    private final Node<?>[] sourceNodes;
 
     /**
      * Creates a new CoreGraph from a JSON file path string.
@@ -75,23 +80,19 @@ public class CoreGraph {
         this.engine = compiled.engine();
         this.nodes = compiled.nodesByName();
 
-        // Register default listener
+        // Pre-cache source nodes for update()
+        var topology = engine.topology();
+        this.sourceNodes = new Node<?>[topology.nodeCount()];
+        for (int i = 0; i < topology.nodeCount(); i++) {
+            if (topology.isSource(i)) {
+                sourceNodes[i] = topology.node(i);
+            }
+        }
+
         // Register default listener via Composite
         this.compositeListener = new com.trading.drg.util.CompositeStabilizationListener();
 
         this.engine.setListener(this.compositeListener);
-
-        // 2. Setup Disruptor
-        this.disruptor = new Disruptor<>(
-                GraphEvent::new,
-                1024,
-                DaemonThreadFactory.INSTANCE,
-                ProducerType.SINGLE,
-                new BlockingWaitStrategy());
-
-        this.publisher = new GraphPublisher(engine);
-        this.disruptor.handleEventsWith((event, seq, end) -> publisher.onEvent(event, seq, end));
-        this.ringBuffer = disruptor.getRingBuffer();
 
         // --- Async Snapshot Integration ---
         // Find all nodes that are ScalarValues and add them to the snapshot
@@ -101,7 +102,9 @@ public class CoreGraph {
                 .toArray(String[]::new);
 
         this.masterSnapshot = new AsyncGraphSnapshot(this, scalarNodeNames);
-        this.publisher.setPostStabilizationCallback(this.masterSnapshot::update);
+        // Post-stabilization callback now handled manually by stabilize()
+        // or by a listener if preferred, but for Snapshot we want it guaranteed.
+        // We will call snapshot.update() inside our manual stabilize() method.
 
         // --- Export Graph Visualization ---
         try {
@@ -114,20 +117,6 @@ public class CoreGraph {
         } catch (java.io.IOException e) {
             e.printStackTrace();
         }
-    }
-
-    /**
-     * Starts the disruptor thread. Must be called before publishing events.
-     */
-    public void start() {
-        disruptor.start();
-    }
-
-    /**
-     * Stops the disruptor thread.
-     */
-    public void stop() {
-        disruptor.shutdown();
     }
 
     /**
@@ -146,15 +135,6 @@ public class CoreGraph {
      */
     public StabilizationEngine getEngine() {
         return engine;
-    }
-
-    /**
-     * Returns the graph publisher, allowing access to callbacks.
-     *
-     * @return The GraphPublisher.
-     */
-    public GraphPublisher getPublisher() {
-        return publisher;
     }
 
     /**
@@ -199,40 +179,68 @@ public class CoreGraph {
     }
 
     /**
-     * Publishes a value update to a named node.
-     * Defaults to marking the batch as ended (triggering stabilization).
-     *
-     * @param nodeName The name of the node to update.
-     * @param value    The new value.
+     * Helper to get nodeId by name.
      */
-    public void publish(String nodeName, double value) {
-        publish(nodeName, value, true);
+    public int getNodeId(String name) {
+        return engine.topology().topoIndex(name);
     }
 
     /**
-     * Publishes a value update to a named node with manual batch control.
+     * Directly updates a Scalar Input Node.
+     * This method does NOT trigger stabilization. Call {@link #stabilize()} after a
+     * batch of updates.
      *
-     * @param nodeName The name of the node to update.
+     * @param nodeName The name of the source node.
      * @param value    The new value.
-     * @param batchEnd If true, stabilization will be triggered after this update.
-     *                 If false, the update is queued until a subsequent
-     *                 batchEnd=true event.
-     * @throws IllegalArgumentException if the node name is not found in the
-     *                                  topology.
      */
-    public void publish(String nodeName, double value, boolean batchEnd) {
-        // Look up ID directly from topology to avoid map lookups if possible,
-        // but here we use the engine's topology which uses a map internally anyway.
-        // If performance is critical, callers should cache the ID, but for ease of use
-        // this is fine.
-        int nodeId = engine.topology().topoIndex(nodeName);
+    public void update(String nodeName, double value) {
+        update(getNodeId(nodeName), value);
+    }
 
-        long seq = ringBuffer.next();
-        try {
-            GraphEvent event = ringBuffer.get(seq);
-            event.setDoubleUpdate(nodeId, value, batchEnd, seq);
-        } finally {
-            ringBuffer.publish(seq);
+    /**
+     * Directly updates a Scalar Input Node by ID.
+     * This method does NOT trigger stabilization. Call {@link #stabilize()} after a
+     * batch of updates.
+     *
+     * @param nodeId The topological index of the source node.
+     * @param value  The new value.
+     */
+    public void update(int nodeId, double value) {
+        if (nodeId < 0 || nodeId >= sourceNodes.length)
+            return;
+
+        Node<?> node = sourceNodes[nodeId];
+        if (node instanceof com.trading.drg.node.ScalarSourceNode sn) {
+            sn.updateDouble(value);
+            engine.markDirty(nodeId);
         }
     }
+
+    public void update(int nodeId, int index, double value) {
+        if (nodeId < 0 || nodeId >= sourceNodes.length)
+            return;
+
+        Node<?> node = sourceNodes[nodeId];
+        if (node instanceof com.trading.drg.node.VectorSourceNode vsn) {
+            vsn.updateAt(index, value);
+            engine.markDirty(nodeId);
+        }
+    }
+
+    /**
+     * Triggers a stabilization cycle on the engine.
+     * If the graph stabilizes successfully, the AsyncSnapshot is updated.
+     *
+     * @return Number of nodes recomputed.
+     */
+    public int stabilize() {
+        int n = engine.stabilize();
+        // Update the convenient/safe snapshot for readers
+        masterSnapshot.update(engine.epoch(), n);
+        return n;
+    }
+
+    // Deprecated / Backwards Compat proxies if needed,
+    // but we are adhering to a "breaking change" refactor plan.
+    // Methods start(), stop(), publish() are REMOVED.
 }

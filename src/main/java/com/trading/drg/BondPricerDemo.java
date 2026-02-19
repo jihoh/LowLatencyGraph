@@ -3,18 +3,13 @@ package com.trading.drg;
 import com.trading.drg.api.*;
 import com.trading.drg.engine.*;
 import com.trading.drg.dsl.*;
-import com.trading.drg.wiring.*;
+// import com.trading.drg.wiring.*;
 import com.trading.drg.node.*;
 
-import com.lmax.disruptor.BlockingWaitStrategy;
-import com.lmax.disruptor.RingBuffer;
-import com.lmax.disruptor.dsl.Disruptor;
-import com.lmax.disruptor.dsl.ProducerType;
-import com.lmax.disruptor.util.DaemonThreadFactory;
+// Disruptor imports removed
 import com.trading.drg.api.ScalarValue;
 import com.trading.drg.api.Node;
-import com.trading.drg.wiring.GraphEvent;
-import com.trading.drg.wiring.GraphPublisher;
+// wiring imports removed
 import com.trading.drg.util.GraphExplain;
 
 import org.apache.logging.log4j.LogManager;
@@ -95,53 +90,22 @@ public class BondPricerDemo {
         engine.setListener(new com.trading.drg.util.LatencyTrackingListener());
         var nodes = context.nodesByName();
 
-        // 3. Setup Disruptor
-        int bufferSize = 1024;
-        Disruptor<GraphEvent> disruptor = new Disruptor<>(
-                GraphEvent::new,
-                bufferSize,
-                DaemonThreadFactory.INSTANCE,
-                ProducerType.SINGLE,
-                new BlockingWaitStrategy());
-
-        // 4. Connect GraphPublisher
-        GraphPublisher publisher = new GraphPublisher(engine);
+        // 3. Setup Mechanism (Direct Engine Usage)
+        // No Disruptor needed.
 
         long tStart = System.nanoTime();
-        int[] updateCount = { 0 };
-        int totalUpdates = 200_000; // Increased count
-        CountDownLatch latch = new CountDownLatch(1);
+        int totalUpdates = 200_000;
 
-        publisher.setPostStabilizationCallback((epoch, count) -> {
-            updateCount[0]++;
-            if (updateCount[0] % 10000 == 0) {
-                printSnapshot("5Y", nodes);
-            }
-            if (updateCount[0] >= totalUpdates) {
-                latch.countDown();
-            }
-        });
-
-        disruptor.handleEventsWith((event, sequence, endOfBatch) -> publisher.onEvent(event, sequence, endOfBatch));
-
-        disruptor.start();
-        RingBuffer<GraphEvent> ringBuffer = disruptor.getRingBuffer();
-
-        // --- Export Graph Visualization ---
-        try {
-            String mermaid = new GraphExplain(engine).toMermaid();
-            java.nio.file.Files.writeString(java.nio.file.Path.of("bond_pricing_graph.md"), mermaid);
-            log.info("Graph visualization saved to bond_pricing_graph.md");
-        } catch (java.io.IOException e) {
-            e.printStackTrace();
-        }
-        // ----------------------------------
-
-        // 5. Simulation Loop
+        // 4. Simulation Loop
         Random rng = new Random(42);
         log.info("Starting producer...");
 
-        // Pre-resolve node IDs (Zero-GC hot path)
+        // Pre-resolve nodes (Zero-GC hot path)
+        ScalarSourceNode[] bidNodes = new ScalarSourceNode[tenors.length * venues.length];
+        ScalarSourceNode[] bidQtyNodes = new ScalarSourceNode[tenors.length * venues.length];
+        ScalarSourceNode[] askNodes = new ScalarSourceNode[tenors.length * venues.length];
+        ScalarSourceNode[] askQtyNodes = new ScalarSourceNode[tenors.length * venues.length];
+
         int[] bidIds = new int[tenors.length * venues.length];
         int[] bidQtyIds = new int[tenors.length * venues.length];
         int[] askIds = new int[tenors.length * venues.length];
@@ -152,6 +116,11 @@ public class BondPricerDemo {
             String prefix = "UST_" + tenor;
             for (String venue : venues) {
                 String base = prefix + "." + venue;
+                bidNodes[idx] = (ScalarSourceNode) nodes.get(base + ".bid");
+                bidQtyNodes[idx] = (ScalarSourceNode) nodes.get(base + ".bidQty");
+                askNodes[idx] = (ScalarSourceNode) nodes.get(base + ".ask");
+                askQtyNodes[idx] = (ScalarSourceNode) nodes.get(base + ".askQty");
+
                 bidIds[idx] = context.getNodeId(base + ".bid");
                 bidQtyIds[idx] = context.getNodeId(base + ".bidQty");
                 askIds[idx] = context.getNodeId(base + ".ask");
@@ -169,41 +138,28 @@ public class BondPricerDemo {
             double bidPx = mid - spread / 2.0;
             double askPx = mid + spread / 2.0;
 
-            publish(ringBuffer, bidIds[k], bidPx, false);
-            publish(ringBuffer, bidQtyIds[k], 1000 + rng.nextInt(500), false);
-            publish(ringBuffer, askIds[k], askPx, false);
-            publish(ringBuffer, askQtyIds[k], 1000 + rng.nextInt(500), true); // End of batch
+            bidNodes[k].updateDouble(bidPx);
+            engine.markDirty(bidIds[k]);
+
+            bidQtyNodes[k].updateDouble(1000 + rng.nextInt(500));
+            engine.markDirty(bidQtyIds[k]);
+
+            askNodes[k].updateDouble(askPx);
+            engine.markDirty(askIds[k]);
+
+            askQtyNodes[k].updateDouble(1000 + rng.nextInt(500));
+            engine.markDirty(askQtyIds[k]);
+
+            engine.stabilize();
+
+            if (i % 10000 == 0) {
+                printSnapshot("5Y", nodes);
+            }
         }
 
-        latch.await();
         long tEnd = System.nanoTime();
         double nanosPerOp = (double) (tEnd - tStart) / totalUpdates;
         log.info(String.format("Done. %.2f ns/op", nanosPerOp));
-
-        disruptor.shutdown();
-    }
-
-    // Weighted Average Logic: Pairs of (Value, Weight)
-    private static double weightedAvg(double[] inputs) {
-        double sumProd = 0.0;
-        double sumW = 0.0;
-        for (int i = 0; i < inputs.length; i += 2) {
-            double val = inputs[i];
-            double w = inputs[i + 1];
-            sumProd += val * w;
-            sumW += w;
-        }
-        return (sumW == 0) ? 0.0 : sumProd / sumW;
-    }
-
-    private static void publish(RingBuffer<GraphEvent> rb, int nodeId, double value, boolean batchEnd) {
-        long seq = rb.next();
-        try {
-            GraphEvent event = rb.get(seq);
-            event.setDoubleUpdate(nodeId, value, batchEnd, seq);
-        } finally {
-            rb.publish(seq);
-        }
     }
 
     private static void printSnapshot(String tenor, Map<String, Node<?>> nodes) {
@@ -218,5 +174,18 @@ public class BondPricerDemo {
             double s = (score instanceof ScalarValue) ? ((ScalarValue) score).doubleValue() : Double.NaN;
             log.info(String.format("[%s] wBid: %.4f | wAsk: %.4f | Global.Score: %.4f", tenor, b, a, s));
         }
+    }
+
+    // Weighted Average Logic: Pairs of (Value, Weight)
+    private static double weightedAvg(double[] inputs) {
+        double sumProd = 0.0;
+        double sumW = 0.0;
+        for (int i = 0; i < inputs.length; i += 2) {
+            double val = inputs[i];
+            double w = inputs[i + 1];
+            sumProd += val * w;
+            sumW += w;
+        }
+        return (sumW == 0) ? 0.0 : sumProd / sumW;
     }
 }

@@ -24,13 +24,15 @@ public class CoreGraphDemo {
         NodeProfileListener profiler = graph.enableNodeProfiling();
         var latencyListener = graph.enableLatencyTracking();
 
-        // 2. [REQUIRED] Start Engine
-        graph.start();
+        // 2. [REQUIRED] Start Engine -> Removed (Passive Mode)
+        // graph.start();
 
         // 3. [OPTIONAL] Simulation Loop
         Random rng = new Random(42);
         int updates = 10_000;
-        CountDownLatch latch = new CountDownLatch(1);
+
+        // CountDownLatch removed as we are single threaded now effectively,
+        // or rather we control the loop.
 
         // Create a reusable reader for consistent access to ALL fields
         // Watch all scalar nodes by default
@@ -51,19 +53,15 @@ public class CoreGraphDemo {
             double currentEurJpy = reader.get("EURJPY");
 
             if (i % 500 == 0) {
-                graph.publish("EURJPY", 158.0, true);
+                graph.update("EURJPY", 158.0);
+                graph.stabilize();
             } else {
-                graph.publish("EURUSD", currentEurUsd + shock, false);
-                graph.publish("USDJPY", currentUsdJpy + shock * 100, false);
-                // Last update in batch triggers stabilization
-                graph.publish("EURJPY", currentEurJpy + shock * 100, true);
+                graph.update("EURUSD", currentEurUsd + shock);
+                graph.update("USDJPY", currentUsdJpy + shock * 100);
+                graph.update("EURJPY", currentEurJpy + shock * 100);
+                // Trigger stabilization manually
+                graph.stabilize();
             }
-
-            if (i == updates - 1) {
-                latch.countDown();
-            }
-
-            TimeUnit.MICROSECONDS.sleep(1);
 
             // [MONITOR] Log the state we just saw (or the state that drove this update)
             if (i % 1000 == 0) {
@@ -79,18 +77,18 @@ public class CoreGraphDemo {
                             currentEurJpy));
                 }
             }
+
+            // Artificial delay to simulate real-time
+            // TimeUnit.MICROSECONDS.sleep(1);
         }
 
-        Thread.sleep(1000); // Wait for processing
-
         // 5. [OPTIONAL] Get Latency Stats
-        // var listener = graph.getLatencyListener(); // Removed
         log.info("Demo complete.");
         System.out.println("\n--- Global Latency Stats ---");
         System.out.println(latencyListener.dump());
 
-        // 7. [REQUIRED] Stop Engine
-        graph.stop();
+        // 7. [REQUIRED] Stop Engine -> Removed (Passive Mode)
+        // graph.stop();
 
         System.out.println("\n--- Node Performance Profile ---");
         System.out.println(profiler.dump());

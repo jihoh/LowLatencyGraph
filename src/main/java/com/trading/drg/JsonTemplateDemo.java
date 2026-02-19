@@ -15,7 +15,7 @@ public class JsonTemplateDemo {
 
         // 1. Initialize CoreGraph with template-based JSON
         var graph = new CoreGraph("src/main/resources/json_template_demo.json");
-        graph.start();
+        // graph.start();
 
         // 2. Access nodes created from templates
         var aIn = graph.<ScalarValue>getNode("A.in");
@@ -26,15 +26,17 @@ public class JsonTemplateDemo {
         log.info("Initial Values: A.out={}, B.out={}", aOut.doubleValue(), bOut.doubleValue());
 
         // 3. Update A
-        graph.publish("A.in", 10.0, true);
+        graph.update("A.in", 10.0);
+        graph.stabilize();
         Thread.sleep(100);
         log.info("After A=10: A.out={}, B.out={}", aOut.doubleValue(), bOut.doubleValue());
 
         // 4. Update B
-        graph.publish("B.in", 20.0, true);
+        graph.update("B.in", 20.0);
+        graph.stabilize();
         Thread.sleep(100);
         log.info("After B=20: A.out={}, B.out={}", aOut.doubleValue(), bOut.doubleValue());
 
-        graph.stop();
+        // graph.stop();
     }
 }

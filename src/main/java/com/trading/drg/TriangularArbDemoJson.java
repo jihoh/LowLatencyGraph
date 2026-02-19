@@ -1,10 +1,6 @@
 package com.trading.drg;
 
-import com.lmax.disruptor.BlockingWaitStrategy;
-import com.lmax.disruptor.RingBuffer;
-import com.lmax.disruptor.dsl.Disruptor;
-import com.lmax.disruptor.dsl.ProducerType;
-import com.lmax.disruptor.util.DaemonThreadFactory;
+// Disruptor imports removed
 import com.trading.drg.api.Node;
 import com.trading.drg.api.ScalarValue;
 import com.trading.drg.fn.finance.TriangularArbSpread;
@@ -15,8 +11,8 @@ import com.trading.drg.node.ScalarNode;
 import com.trading.drg.util.GraphExplain;
 import com.trading.drg.util.ScalarCutoffs;
 import com.trading.drg.fn.finance.Ewma;
-import com.trading.drg.wiring.GraphEvent;
-import com.trading.drg.wiring.GraphPublisher;
+// wiring imports removed
+import com.trading.drg.node.ScalarSourceNode;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -56,15 +52,8 @@ public class TriangularArbDemoJson {
         var listener = new com.trading.drg.util.LatencyTrackingListener();
         engine.setListener(listener);
 
-        // 5. Setup Disruptor & Publisher
-        Disruptor<GraphEvent> disruptor = new Disruptor<>(
-                GraphEvent::new,
-                1024,
-                DaemonThreadFactory.INSTANCE,
-                ProducerType.SINGLE,
-                new BlockingWaitStrategy());
-
-        GraphPublisher publisher = new GraphPublisher(engine);
+        // 5. Setup (Direct Engine Usage)
+        // No Disruptor needed.
 
         // Get the specific node we want to watch
         var arbSpreadNode = (ScalarValue) context.get("Arb.Spread");
@@ -73,25 +62,15 @@ public class TriangularArbDemoJson {
         var eurJpyNode = (ScalarValue) context.get("EURJPY");
         var arbEwmaNode = (ScalarValue) context.get("Arb.Spread.Ewma");
 
+        // Cast to ScalarSourceNode for updates
+        var eurUsdSource = (ScalarSourceNode) context.get("EURUSD");
+        var usdJpySource = (ScalarSourceNode) context.get("USDJPY");
+        var eurJpySource = (ScalarSourceNode) context.get("EURJPY");
+
         // Pre-resolve node IDs using the engine's topology
         int eurUsdId = engine.topology().topoIndex("EURUSD");
         int usdJpyId = engine.topology().topoIndex("USDJPY");
         int eurJpyId = engine.topology().topoIndex("EURJPY");
-
-        publisher.setPostStabilizationCallback((epoch, count) -> {
-            if (epoch % 1000 == 0) {
-                double spread = arbSpreadNode.doubleValue();
-                if (Math.abs(spread) > 0.05) {
-                    log.info(String.format(
-                            "[Arb Opportunity] Spread: %.4f | EWMA: %.4f | EURUSD: %.4f | USDJPY: %.2f | EURJPY: %.2f",
-                            spread, arbEwmaNode.doubleValue(), eurUsdNode.doubleValue(), usdJpyNode.doubleValue(),
-                            eurJpyNode.doubleValue()));
-                }
-            }
-        });
-
-        disruptor.handleEventsWith((event, sequence, endOfBatch) -> publisher.onEvent(event, sequence, endOfBatch));
-        disruptor.start();
 
         // --- Export Graph Visualization ---
         try {
@@ -101,8 +80,6 @@ public class TriangularArbDemoJson {
         } catch (java.io.IOException e) {
             e.printStackTrace();
         }
-
-        RingBuffer<GraphEvent> ringBuffer = disruptor.getRingBuffer();
 
         // 6. Simulation Loop
         Random rng = new Random(42);
@@ -114,15 +91,29 @@ public class TriangularArbDemoJson {
             double shock = (rng.nextDouble() - 0.5) * 0.01;
 
             if (i % 500 == 0) {
-                publish(ringBuffer, eurJpyId, 158.0, true);
+                eurJpySource.updateDouble(158.0);
+                engine.markDirty(eurJpyId);
             } else {
-                publish(ringBuffer, eurUsdId, eurUsdNode.doubleValue() + shock, false);
-                publish(ringBuffer, usdJpyId, usdJpyNode.doubleValue() + shock * 100, false);
-                publish(ringBuffer, eurJpyId, eurJpyNode.doubleValue() + shock * 100, true);
+                eurUsdSource.updateDouble(eurUsdNode.doubleValue() + shock);
+                engine.markDirty(eurUsdId);
+
+                usdJpySource.updateDouble(usdJpyNode.doubleValue() + shock * 100);
+                engine.markDirty(usdJpyId);
+
+                eurJpySource.updateDouble(eurJpyNode.doubleValue() + shock * 100);
+                engine.markDirty(eurJpyId);
             }
 
-            if (i == updates - 1) {
-                latch.countDown();
+            engine.stabilize();
+
+            if (i % 1000 == 0) {
+                double spread = arbSpreadNode.doubleValue();
+                if (Math.abs(spread) > 0.05) {
+                    log.info(String.format(
+                            "[Arb Opportunity] Spread: %.4f | EWMA: %.4f | EURUSD: %.4f | USDJPY: %.2f | EURJPY: %.2f",
+                            spread, arbEwmaNode.doubleValue(), eurUsdNode.doubleValue(), usdJpyNode.doubleValue(),
+                            eurJpyNode.doubleValue()));
+                }
             }
 
             try {
@@ -139,18 +130,6 @@ public class TriangularArbDemoJson {
                 listener.minLatencyNanos(),
                 listener.maxLatencyNanos(),
                 listener.totalStabilizations()));
-
-        disruptor.shutdown();
-    }
-
-    private static void publish(RingBuffer<GraphEvent> rb, int nodeId, double value, boolean batchEnd) {
-        long seq = rb.next();
-        try {
-            GraphEvent event = rb.get(seq);
-            event.setDoubleUpdate(nodeId, value, batchEnd, seq);
-        } finally {
-            rb.publish(seq);
-        }
     }
 
     /**

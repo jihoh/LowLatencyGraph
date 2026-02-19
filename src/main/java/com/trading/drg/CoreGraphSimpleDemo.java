@@ -20,7 +20,7 @@ public class CoreGraphSimpleDemo {
         var graph = new CoreGraph("src/main/resources/tri_arb.json");
 
         // 2. Start Engine
-        graph.start();
+        // graph.start();
 
         // 3. Simulation Loop
         Random rng = new Random(42);
@@ -45,12 +45,13 @@ public class CoreGraphSimpleDemo {
             double currentEurJpy = reader.get("EURJPY");
 
             if (i % 3 == 0) {
-                graph.publish("EURUSD", currentEurUsd + shock);
+                graph.update("EURUSD", currentEurUsd + shock);
             } else if (i % 3 == 1) {
-                graph.publish("USDJPY", currentUsdJpy + shock * 100);
+                graph.update("USDJPY", currentUsdJpy + shock * 100);
             } else {
-                graph.publish("EURJPY", currentEurJpy + shock * 100);
+                graph.update("EURJPY", currentEurJpy + shock * 100);
             }
+            graph.stabilize();
 
             if (i % 1000 == 0) {
                 log.info("Published update {}. Current Spread: {}", i, reader.get("Arb.Spread"));
@@ -60,7 +61,7 @@ public class CoreGraphSimpleDemo {
         }
 
         // 4. Stop Engine
-        graph.stop();
+        // graph.stop();
         log.info("Demo complete.");
     }
 }

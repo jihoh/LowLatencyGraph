@@ -9,7 +9,7 @@ public class NodeProfileDemo {
 
         // 1. Initialize Graph
         CoreGraph graph = new CoreGraph("src/main/resources/tri_arb.json");
-        graph.start();
+        // graph.start();
 
         // 2. Enable Profiling
         NodeProfileListener profiler = graph.enableNodeProfiling();
@@ -26,8 +26,9 @@ public class NodeProfileDemo {
 
         while (System.currentTimeMillis() - start < 2000) {
             double shock = (rng.nextDouble() - 0.5) * 0.001;
-            graph.publish("EURUSD", 1.0850 + shock);
-            graph.publish("USDJPY", 145.20 + shock * 100);
+            graph.update("EURUSD", 1.0850 + shock);
+            graph.update("USDJPY", 145.20 + shock * 100);
+            graph.stabilize();
 
             // Spin a bit to allow stabilization
             Thread.sleep(1);
@@ -37,7 +38,9 @@ public class NodeProfileDemo {
         System.out.println("\n--- Node Performance Profile ---");
         System.out.println(profiler.dump());
 
-        graph.stop();
+        System.out.println(profiler.dump());
+
+        // graph.stop();
         System.exit(0);
     }
 }

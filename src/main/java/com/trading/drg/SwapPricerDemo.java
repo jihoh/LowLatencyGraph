@@ -1,19 +1,14 @@
 package com.trading.drg;
 
 import com.trading.drg.api.*;
-import com.trading.drg.wiring.*;
+// import com.trading.drg.wiring.*;
 import com.trading.drg.node.*;
 import com.trading.drg.dsl.GraphBuilder;
 
-import com.lmax.disruptor.BlockingWaitStrategy;
-import com.lmax.disruptor.RingBuffer;
-import com.lmax.disruptor.dsl.Disruptor;
-import com.lmax.disruptor.dsl.ProducerType;
-import com.lmax.disruptor.util.DaemonThreadFactory;
+// Disruptor imports removed
 import com.trading.drg.api.ScalarValue;
 import com.trading.drg.api.Node;
-import com.trading.drg.wiring.GraphEvent;
-import com.trading.drg.wiring.GraphPublisher;
+// wiring imports removed
 import com.trading.drg.util.GraphExplain;
 import com.trading.drg.node.MapNode;
 
@@ -126,42 +121,11 @@ public class SwapPricerDemo {
         var engine = context.engine();
         engine.setListener(new com.trading.drg.util.LatencyTrackingListener());
 
-        // 3. Disruptor Setup
-        Disruptor<GraphEvent> disruptor = new Disruptor<>(
-                GraphEvent::new, 1024, DaemonThreadFactory.INSTANCE,
-                ProducerType.SINGLE, new BlockingWaitStrategy());
-
-        GraphPublisher publisher = new GraphPublisher(engine);
+        // 3. Status
+        // No Disruptor needed.
 
         long tStart = System.nanoTime();
-        int[] updateCount = { 0 };
         int totalUpdates = 200_000;
-        CountDownLatch latch = new CountDownLatch(1);
-
-        publisher.setPostStabilizationCallback((epoch, count) -> {
-            updateCount[0]++;
-            if (updateCount[0] % 50000 == 0) {
-                printReport(report);
-            }
-            if (updateCount[0] >= totalUpdates) {
-                latch.countDown();
-            }
-        });
-
-        disruptor.handleEventsWith((event, sequence, endOfBatch) -> publisher.onEvent(event, sequence, endOfBatch));
-
-        disruptor.start();
-        RingBuffer<GraphEvent> ringBuffer = disruptor.getRingBuffer();
-
-        // --- Export Graph Visualization ---
-        try {
-            String mermaid = new GraphExplain(engine).toMermaid();
-            java.nio.file.Files.writeString(java.nio.file.Path.of("swap_pricing_graph.md"), mermaid);
-            log.info("Graph visualization saved to swap_pricing_graph.md");
-        } catch (java.io.IOException e) {
-            e.printStackTrace();
-        }
-        // ----------------------------------
 
         // 4. Simulation Loop
         Random rng = new Random(42);
@@ -172,39 +136,38 @@ public class SwapPricerDemo {
         int spreadId = context.getNodeId("Mkt.SwapSpread.5Y");
         int rateId = context.getNodeId("Mkt.SOFR.Rate");
 
+        // Pre-resolve nodes for direct update
+        ScalarSourceNode yieldNode = (ScalarSourceNode) context.nodesByName().get("Mkt.UST_5Y.Yield");
+        ScalarSourceNode spreadNode = (ScalarSourceNode) context.nodesByName().get("Mkt.SwapSpread.5Y");
+        ScalarSourceNode rateNode = (ScalarSourceNode) context.nodesByName().get("Mkt.SOFR.Rate");
+
         for (int i = 0; i < totalUpdates; i++) {
             // Random walk on Market Data
             double yieldShock = rng.nextGaussian() * 0.01;
             double spreadShock = rng.nextGaussian() * 0.001;
             double rateShock = rng.nextGaussian() * 0.01;
 
-            // Publish updates
-            // We need to fetch current values to walk them, but here we just produce new
-            // random values for speed
-            // Or assumes "last produced".
+            // Direct updates
+            yieldNode.updateDouble(4.50 + yieldShock);
+            engine.markDirty(yieldId);
 
-            publish(ringBuffer, yieldId, 4.50 + yieldShock, false);
-            publish(ringBuffer, spreadId, 0.15 + spreadShock, false);
-            publish(ringBuffer, rateId, 4.40 + rateShock, true); // Trigger stabilize
+            spreadNode.updateDouble(0.15 + spreadShock);
+            engine.markDirty(spreadId);
+
+            rateNode.updateDouble(4.40 + rateShock);
+            engine.markDirty(rateId);
+
+            // Stabilize
+            engine.stabilize();
+
+            if (i % 50000 == 0) {
+                printReport(report);
+            }
         }
-
-        latch.await();
 
         long elapsed = System.nanoTime() - tStart;
         log.info(String.format("Processed %d updates (batches) in %.1f ms (%.0f batches/sec)",
                 totalUpdates, elapsed / 1e6, 1e9 * totalUpdates / elapsed));
-
-        disruptor.shutdown();
-    }
-
-    private static void publish(RingBuffer<GraphEvent> rb, int nodeId, double value, boolean batchEnd) {
-        long seq = rb.next();
-        try {
-            GraphEvent event = rb.get(seq);
-            event.setDoubleUpdate(nodeId, value, batchEnd, seq);
-        } finally {
-            rb.publish(seq);
-        }
     }
 
     private static void printReport(MapNode node) {

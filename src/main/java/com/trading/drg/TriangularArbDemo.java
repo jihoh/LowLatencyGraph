@@ -1,16 +1,11 @@
 package com.trading.drg;
 
-import com.lmax.disruptor.BlockingWaitStrategy;
-import com.lmax.disruptor.RingBuffer;
-import com.lmax.disruptor.dsl.Disruptor;
-import com.lmax.disruptor.dsl.ProducerType;
-import com.lmax.disruptor.util.DaemonThreadFactory;
+// Disruptor imports removed
 import com.trading.drg.dsl.GraphBuilder;
 import com.trading.drg.fn.finance.TriangularArbSpread;
 import com.trading.drg.fn.finance.Ewma;
 import com.trading.drg.util.GraphExplain;
-import com.trading.drg.wiring.GraphEvent;
-import com.trading.drg.wiring.GraphPublisher;
+// Wiring imports removed
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -54,49 +49,12 @@ public class TriangularArbDemo {
         var listener = new com.trading.drg.util.LatencyTrackingListener();
         engine.setListener(listener);
 
-        // 3. Setup Disruptor
-        Disruptor<GraphEvent> disruptor = new Disruptor<>(
-                GraphEvent::new,
-                1024,
-                DaemonThreadFactory.INSTANCE,
-                ProducerType.SINGLE,
-                new BlockingWaitStrategy());
-
-        // 4. Connect GraphPublisher
-        GraphPublisher publisher = new GraphPublisher(engine);
-
-        // Callback to read value from the node
-        publisher.setPostStabilizationCallback((epoch, count) -> {
-            if (epoch % 1000 == 0) {
-                double spread = arbSpread.doubleValue();
-                if (Math.abs(spread) > 0.05) {
-                    log.info(
-                            String.format(
-                                    "[Arb Opportunity] Spread: %.4f | EWMA: %.4f | EURUSD: %.4f | USDJPY: %.2f | EURJPY: %.2f",
-                                    spread, arbEwma.doubleValue(), eurUsd.doubleValue(), usdJpy.doubleValue(),
-                                    eurJpy.doubleValue()));
-                }
-            }
-        });
-
-        disruptor.handleEventsWith((event, sequence, endOfBatch) -> publisher.onEvent(event, sequence, endOfBatch));
-        disruptor.start();
-
-        // --- Export Graph Visualization ---
-        try {
-            String mermaid = new GraphExplain(engine).toMermaid();
-            java.nio.file.Files.writeString(java.nio.file.Path.of("tri_arb_demo.md"), mermaid);
-            log.info("Graph visualization saved to tri_arb_demo.md");
-        } catch (java.io.IOException e) {
-            e.printStackTrace();
-        }
-
-        RingBuffer<GraphEvent> ringBuffer = disruptor.getRingBuffer();
+        // 3. Setup Mechanism (Direct Engine Usage)
+        // No Disruptor needed for this simple demo.
 
         // 5. Simulation Loop
         Random rng = new Random(42);
         int updates = 10_000;
-        CountDownLatch latch = new CountDownLatch(1);
 
         // Pre-resolve node IDs
         int eurUsdId = context.getNodeId("EURUSD");
@@ -110,15 +68,32 @@ public class TriangularArbDemo {
 
             // Occasionally create an arb opportunity
             if (i % 500 == 0) {
-                publish(ringBuffer, eurJpyId, 158.0, true); // Big jump
+                eurJpy.updateDouble(158.0);
+                engine.markDirty(eurJpyId);
             } else {
-                publish(ringBuffer, eurUsdId, eurUsd.doubleValue() + shock, false);
-                publish(ringBuffer, usdJpyId, usdJpy.doubleValue() + shock * 100, false);
-                publish(ringBuffer, eurJpyId, eurJpy.doubleValue() + shock * 100, true);
+                eurUsd.updateDouble(eurUsd.doubleValue() + shock);
+                engine.markDirty(eurUsdId);
+
+                usdJpy.updateDouble(usdJpy.doubleValue() + shock * 100);
+                engine.markDirty(usdJpyId);
+
+                eurJpy.updateDouble(eurJpy.doubleValue() + shock * 100);
+                engine.markDirty(eurJpyId);
             }
 
-            if (i == updates - 1) {
-                latch.countDown();
+            // Run engine (stabilize)
+            engine.stabilize();
+
+            // Check results (Manual Callback logic inline)
+            if (i % 1000 == 0) {
+                double spread = arbSpread.doubleValue();
+                if (Math.abs(spread) > 0.05) {
+                    log.info(
+                            String.format(
+                                    "[Arb Opportunity] Spread: %.4f | EWMA: %.4f | EURUSD: %.4f | USDJPY: %.2f | EURJPY: %.2f",
+                                    spread, arbEwma.doubleValue(), eurUsd.doubleValue(), usdJpy.doubleValue(),
+                                    eurJpy.doubleValue()));
+                }
             }
 
             // Throttle slightly
@@ -128,7 +103,6 @@ public class TriangularArbDemo {
             }
         }
 
-        // latch.await(); // In real app, wait for processing. Here just wait a bit.
         Thread.sleep(1000);
 
         log.info("Demo complete.");
@@ -137,17 +111,5 @@ public class TriangularArbDemo {
                 listener.minLatencyNanos(),
                 listener.maxLatencyNanos(),
                 listener.totalStabilizations()));
-
-        disruptor.shutdown();
-    }
-
-    private static void publish(RingBuffer<GraphEvent> rb, int nodeId, double value, boolean batchEnd) {
-        long seq = rb.next();
-        try {
-            GraphEvent event = rb.get(seq);
-            event.setDoubleUpdate(nodeId, value, batchEnd, seq);
-        } finally {
-            rb.publish(seq);
-        }
     }
 }
