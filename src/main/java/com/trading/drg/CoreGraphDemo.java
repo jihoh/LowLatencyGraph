@@ -3,6 +3,8 @@ package com.trading.drg;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.trading.drg.util.NodeProfileListener;
+
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -19,6 +21,7 @@ public class CoreGraphDemo {
         // 1. [REQUIRED] Initialize CoreGraph - Simplifies: Parsing, Compilation, Engine
         // Setup, Disruptor Setup
         var graph = new CoreGraph("src/main/resources/tri_arb.json");
+        NodeProfileListener profiler = graph.enableNodeProfiling();
 
         // 2. [REQUIRED] Start Engine
         graph.start();
@@ -90,5 +93,8 @@ public class CoreGraphDemo {
 
         // 7. [REQUIRED] Stop Engine
         graph.stop();
+
+        System.out.println("\n--- Node Performance Profile ---");
+        System.out.println(profiler.dump());
     }
 }
