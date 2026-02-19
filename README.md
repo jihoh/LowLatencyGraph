@@ -427,36 +427,18 @@ Use **Java Flight Recorder (JFR)** to verify the "Zero Allocation" promise.
     *   **Boxed Integers/Doubles:** None.
     *   **String Concatenation:** None.
 
----
-
-## 7. Directory Structure
-
-Understanding the project layout:
-
-*   **/src/main/resources/**:
-    *   `tri_arb.json`: The layout for the main demo.
-    *   `bond_pricer.json`: Example fixed income layout.
-
-*   **/src/main/java/com/trading/drg/**:
-    *   `CoreGraph.java`: The main facade class you interact with.
-    *   `CoreGraphDemo.java`: The reference implementation (Triangular Arb).
-    *   `CoreGraphSimpleDemo.java`: A clearer, minimal usage example.
-
-*   **/src/main/java/com/trading/drg/api/**:
-    *   `Node.java`: The base interface for graph nodes.
-    *   `ScalarValue.java`: Interface for nodes producing `double`.
-    *   `Fn1.java`, `Fn2.java`, ...: Interfaces for compute logic.
-
-*   **/src/main/java/com/trading/drg/engine/**:
-    *   `StabilizationEngine.java`: The core execution kernel (The "Brain").
-    *   `GraphBuilder.java`: The compiler that builds the CSR arrays.
-
-*   **/src/main/java/com/trading/drg/util/**:
-    *   `AsyncGraphSnapshot.java`: Implementation of the Triple-Buffering logic.
-    *   `GraphExplain.java`: Visualization tools (Mermaid diagrams).
-
-*   **/src/main/java/com/trading/drg/fn/finance/**:
-    *   `TriangularArbSpread.java`: Example custom logic.
-    *   `Ewma.java`: Example stateful logic.
 
 ---
+
+## 7. Reliability & Error Handling
+
+CoreGraph implements a **Fail-Safe** pattern for all calculation nodes (`Fn` implementations) to ensure that a single node failure does not crash the entire graph engine.
+
+### 7.1 Fail-Safe Pattern
+*   **Safety:** All `apply()` methods are wrapped in `try-catch` blocks.
+*   **Isolation:** If a node throws an exception (e.g., usage error, edge case), it returns `Double.NaN`.
+*   **Propagation:** `Double.NaN` propagates downstream, marking dependent values as "unhealthy" without stopping the engine.
+*   **Logging:** Errors are logged using `ErrorRateLimiter` to prevent log flooding (max 1 log every 1000ms per node type).
+
+### 7.2 Handling Unhealthy Values
+Consumers should check for `Double.isNaN(value)` when reading from the snapshot or within their own custom logic to handle upstream failures gracefully.
