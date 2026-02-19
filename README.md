@@ -10,7 +10,7 @@ Unlike traditional object-oriented systems where business logic is scattered acr
 
 *   **Ultra-Low Latency:** Optimized for ~1 microsecond stabilization latency on modern CPUs.
 *   **Predictability:** **Zero-GC** (Garbage Collection) on the hot path. All memory is pre-allocated.
-*   **Throughput:** Capable of processing millions of market data updates per second via LMAX Disruptor batching.
+*   **Throughput:** Capable of processing millions of updates per second on a single thread.
 *   **Wait-Free Consumption:** A Triple-Buffered snapshot mechanism allows the main application thread to read consistent data without ever blocking the graph engine.
 *   **Safety:** Statically typed, cycle-free topology with explicit ownership.
 
@@ -29,41 +29,39 @@ CoreGraph is built on a **Single-Writer / Single-Reader** architecture optimized
 
 ### 2.1 The Data Flow
 
-The system is composed of three distinct threading domains, bridged by lock-free data structures.
+The system is designed as a **Passive** graph engine. The application thread drives the execution, giving you full control over threading and batching.
 
 ```
-
-     [LMAX RingBuffer]  <-- The Bridge: Handling Backpressure & Batching
-             │
-             │ (1) GraphEvent (Mutable Flyweight)
-             ▼
-    [Graph Processor]
-             │ 
-             │ (2) GraphPublisher calls stabilization
-             ▼
-   [StabilizationEngine]
-             │
-             │ (3) Walk Topological Order (int[] array scan)
-             │ (4) If (Node is Dirty):
-             │         Recompute();
-             │         Detect Change;
-             │         Mark Children Dirty;
-             ▼
- [Post-Stabilization Callback]
-             │
-             │ (5) AsyncGraphSnapshot.update() (Atomic Triple-Buffer Swap)
-             ▼
-    [Main Application]
-             │
-             │ (6) reader.refresh()
-             │ (7) Send Orders / Update UI
+ [Application Thread]
+         │
+         │ (1) Update Source Nodes
+         │     node.updateDouble(value);
+         │     engine.markDirty(nodeId);
+         │
+         │ (2) Call Stabilize
+         ▼
+ [StabilizationEngine]
+         │
+         │ (3) Walk Topological Order (int[] array scan)
+         │ (4) If (Node is Dirty):
+         │         Recompute();
+         │         Detect Change;
+         │         Mark Children Dirty;
+         ▼
+ [Post-Stabilization]
+         │
+         │ (5) AsyncGraphSnapshot.update() (Atomic Triple-Buffer Swap)
+         ▼
+ [Reader / UI / Risk System]
+         │
+         │ (6) reader.refresh()
+         │ (7) Read Consistent State
 ```
 
 ### 2.2 Core Components
 
 | Component | Responsibility | Optimization Strategy |
 |-----------|----------------|-----------------------|
-| `CoreGraph` | **Façade**. The main entry point for the application. | Manages the lifecycle of the Engine, Disruptor, and Snapshotting, simplifying initialization. |
 | `StabilizationEngine` | **Runtime Kernel**. Executes the graph logic. | **Zero-Allocation**. Uses `double[]` for values and flat `int[]` arrays for connectivity. Eliminates pointer chasing. |
 | `GraphBuilder` | **Compiler**. Defines the topology. | Compiles the graph description into **CSR (Compressed Sparse Row)** format - flattened integer arrays for maximum cache locality. |
 | `AsyncGraphSnapshot` | **Bridge**. Safe data access. | **Triple Buffering**. Ensures the writer never blocks waiting for a reader, and the reader never retries. |
@@ -213,7 +211,7 @@ public class Ewma implements Fn1 {
 
 ### 3.3 The Main Application (`CoreGraphDemo.java`)
 
-Here is how you wire it all together in Java. This single `main` method demonstrates the full lifecycle: Initialization, Source Optimization, Publishing, and Wait-Free Consumption.
+Here is how you wire it all together in Java. This single `main` method demonstrates the full lifecycle: Initialization, Direct Updates, and Wait-Free Consumption.
 
 ```java
 public class CoreGraphDemo {
@@ -221,65 +219,38 @@ public class CoreGraphDemo {
         // --------------------------------------------------------------------
         // Step 1: Initialization
         // --------------------------------------------------------------------
-        // Initialize CoreGraph with the JSON definition.
-        // The constructor parses, builds, and optimizes the graph.
         CoreGraph graph = new CoreGraph("src/main/resources/tri_arb.json");
-
-        // Start the Engine (spins up the background LMAX Disruptor thread)
-        graph.start();
+        StabilizationEngine engine = graph.engine();
 
         // --------------------------------------------------------------------
         // Step 2: Optimizing Sources (Cold Path)
         // --------------------------------------------------------------------
         // Resolve IDs once at startup to avoid String hashing on the hot path.
-        int eurUsdId = graph.getNodeId("EURUSD");
-        int usdJpyId = graph.getNodeId("USDJPY");
-        int eurJpyId = graph.getNodeId("EURJPY");
+        int eurUsdId = engine.topology().topoIndex("EURUSD");
+        int usdJpyId = engine.topology().topoIndex("USDJPY");
         
-        // --------------------------------------------------------------------
-        // Step 3: Simulation Loop (Hot Path - Publisher)
-        // --------------------------------------------------------------------
-        Thread publisher = new Thread(() -> {
-            Random rng = new Random();
-            double shock = 0.0;
-            
-            while (!Thread.currentThread().isInterrupted()) {
-                // Simulate generic market moves
-                shock = (rng.nextDouble() - 0.5) * 0.001;
-                
-                // Thread-Safe, Non-Blocking publish to LMAX RingBuffer.
-                // These updates are automatically batched by the consumer.
-                graph.publish(eurUsdId, 1.0850 + shock);
-                graph.publish(usdJpyId, 145.20 + shock * 100);
-                
-                try { Thread.sleep(1); } catch (InterruptedException e) { break; }
-            }
-        });
-        publisher.start();
+        // Get Source Nodes for direct updates
+        var eurUsd = (ScalarSourceNode) graph.nodes().get("EURUSD");
+        var usdJpy = (ScalarSourceNode) graph.nodes().get("USDJPY");
 
         // --------------------------------------------------------------------
-        // Step 4: Consuming Results (Wait-Free Reads)
+        // Step 3: Simulation Loop (Hot Path - Application Thread)
         // --------------------------------------------------------------------
-        // Create a reader (watches all scalar nodes by default)
-        var reader = graph.getSnapshot().createReader();
-
-        // Main Application Loop
+        // In a passive model, YOU control the thread.
+        
         while (true) {
-            // 1. Refresh Snapshot
-            //    Atomic pointer swap (Triple Buffering). 
-            //    Wait-Free: Guaranteed immediate success. Zero locks.
-            reader.refresh();
+            // 1. Update Inputs
+            eurUsd.updateDouble(1.0850 + shock);
+            engine.markDirty(eurUsdId);
 
-            // 2. Read Consistent Values form the snapshot
-            double spread = reader.get("Arb.Spread");
-            double ewma   = reader.get("Arb.Spread.Ewma");
-
-            // 3. Act on Logic
-            if (Math.abs(spread) > 10.0) {
-                System.out.printf("[Signal] Arb Opportunity! Spread: %.4f | EWMA: %.4f%n", spread, ewma);
-            }
+            usdJpy.updateDouble(145.20 + shock * 100);
+            engine.markDirty(usdJpyId);
             
-            Thread.sleep(100); // Poll at your own pace
+            // 2. Stabilize (Propagate Changes)
+            engine.stabilize();
+            
+            // 3. (Optional) Read Snapshot
+            // ...
         }
     }
 }
@@ -404,9 +375,9 @@ Ensure your `Rsi` class has a constructor matching the properties map or a speci
 3.  **Snapshot Buffer (Reader-local):** The snapshot the reader is currently engaging with.
 
 **The Swap Protocol:**
-*   **On Publish (Writer):**
-    1.  Write to `Dirty Buffer`.
-    2.  Atomically swap `Dirty` and `Clean`. The old `Clean` becomes the new `Dirty` (recycled).
+*   **On Stabilization (Application Thread):**
+    1.  Engine computes values into the `Dirty Buffer` (the working state).
+    2.  At the end of `stabilize()`, it atomically swaps `Dirty` and `Clean`.
 *   **On Refresh (Reader):**
     1.  Atomically swap `Snapshot` and `Clean`. The old `Snapshot` becomes the new `Clean` (recycled).
 
