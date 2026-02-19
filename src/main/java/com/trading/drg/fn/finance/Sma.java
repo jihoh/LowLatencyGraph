@@ -22,27 +22,35 @@ public class Sma implements Fn1 {
         this.window = new double[size];
     }
 
+    private static final org.apache.logging.log4j.Logger log = org.apache.logging.log4j.LogManager.getLogger(Sma.class);
+    private final com.trading.drg.util.ErrorRateLimiter limiter = new com.trading.drg.util.ErrorRateLimiter(log, 1000);
+
     @Override
     public double apply(double input) {
-        if (Double.isNaN(input)) {
-            return Double.NaN;
-        }
+        try {
+            if (Double.isNaN(input)) {
+                return Double.NaN;
+            }
 
-        if (count < size) {
-            // Fill phase
-            window[head] = input;
-            sum += input;
-            head = (head + 1) % size;
-            count++;
-            return sum / count;
-        } else {
-            // Full phase: remove old, add new
-            double old = window[head];
-            sum -= old;
-            sum += input;
-            window[head] = input;
-            head = (head + 1) % size;
-            return sum / size;
+            if (count < size) {
+                // Fill phase
+                window[head] = input;
+                sum += input;
+                head = (head + 1) % size;
+                count++;
+                return sum / count;
+            } else {
+                // Full phase: remove old, add new
+                double old = window[head];
+                sum -= old;
+                sum += input;
+                window[head] = input;
+                head = (head + 1) % size;
+                return sum / size;
+            }
+        } catch (Throwable t) {
+            limiter.log("Error in Sma", t);
+            return Double.NaN;
         }
     }
 }

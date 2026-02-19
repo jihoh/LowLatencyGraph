@@ -28,43 +28,52 @@ public class ZScore implements Fn1 {
         this.window = new double[size];
     }
 
+    private static final org.apache.logging.log4j.Logger log = org.apache.logging.log4j.LogManager
+            .getLogger(ZScore.class);
+    private final com.trading.drg.util.ErrorRateLimiter limiter = new com.trading.drg.util.ErrorRateLimiter(log, 1000);
+
     @Override
     public double apply(double input) {
-        if (Double.isNaN(input)) {
+        try {
+            if (Double.isNaN(input)) {
+                return Double.NaN;
+            }
+
+            // 1. Update Sum and SumSq
+            // Remove old
+            if (count >= size) {
+                double old = window[head];
+                sum -= old;
+                sumSq -= old * old;
+            } else {
+                count++;
+            }
+
+            // Add new
+            window[head] = input;
+            sum += input;
+            sumSq += input * input;
+
+            // Advance pointer
+            head++;
+            if (head >= size)
+                head = 0;
+
+            if (count < 2)
+                return 0.0; // Typically 0 Z-score for single point or just wait?
+            // Z-score undefined for < 2 points usually, but 0 is safe placeholder.
+
+            double mean = sum / count;
+            double variance = (sumSq / count) - (mean * mean);
+
+            if (variance <= 1e-9)
+                return 0.0; // Avoid division by zero/small variance
+
+            double stdDev = Math.sqrt(variance);
+            return (input - mean) / stdDev;
+        } catch (Throwable t) {
+            limiter.log("Error in ZScore", t);
             return Double.NaN;
         }
-
-        // 1. Update Sum and SumSq
-        // Remove old
-        if (count >= size) {
-            double old = window[head];
-            sum -= old;
-            sumSq -= old * old;
-        } else {
-            count++;
-        }
-
-        // Add new
-        window[head] = input;
-        sum += input;
-        sumSq += input * input;
-
-        // Advance pointer
-        head++;
-        if (head >= size)
-            head = 0;
-
-        if (count < 2)
-            return 0.0; // Typically 0 Z-score for single point or just wait?
-        // Z-score undefined for < 2 points usually, but 0 is safe placeholder.
-
-        double mean = sum / count;
-        double variance = (sumSq / count) - (mean * mean);
-
-        if (variance <= 1e-9)
-            return 0.0; // Avoid division by zero/small variance
-
-        double stdDev = Math.sqrt(variance);
-        return (input - mean) / stdDev;
     }
 }

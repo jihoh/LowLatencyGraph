@@ -20,10 +20,19 @@ public class Macd implements Fn1 {
         this.slow = new Ewma(2.0 / (slowPeriod + 1));
     }
 
+    private static final org.apache.logging.log4j.Logger log = org.apache.logging.log4j.LogManager
+            .getLogger(Macd.class);
+    private final com.trading.drg.util.ErrorRateLimiter limiter = new com.trading.drg.util.ErrorRateLimiter(log, 1000);
+
     @Override
     public double apply(double input) {
-        double f = fast.apply(input);
-        double s = slow.apply(input);
-        return f - s;
+        try {
+            double f = fast.apply(input);
+            double s = slow.apply(input);
+            return f - s;
+        } catch (Throwable t) {
+            limiter.log("Error in Macd", t);
+            return Double.NaN;
+        }
     }
 }

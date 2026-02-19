@@ -10,21 +10,30 @@ import com.trading.drg.fn.FnN;
  */
 public class HarmonicMean implements FnN {
 
+    private static final org.apache.logging.log4j.Logger log = org.apache.logging.log4j.LogManager
+            .getLogger(HarmonicMean.class);
+    private final com.trading.drg.util.ErrorRateLimiter limiter = new com.trading.drg.util.ErrorRateLimiter(log, 1000);
+
     @Override
     public double apply(double[] inputs) {
-        if (inputs == null || inputs.length == 0) {
-            return Double.NaN; // Consistent with Average for empty/null inputs
-        }
-
-        double sumInverse = 0;
-        // Zero-GC loop
-        for (double val : inputs) {
-            if (Double.isNaN(val) || val == 0.0) {
-                return Double.NaN; // Cannot divide by zero or process NaN
+        try {
+            if (inputs == null || inputs.length == 0) {
+                return Double.NaN; // Consistent with Average for empty/null inputs
             }
-            sumInverse += 1.0 / val;
-        }
 
-        return inputs.length / sumInverse;
+            double sumInverse = 0;
+            // Zero-GC loop
+            for (double val : inputs) {
+                if (Double.isNaN(val) || val == 0.0) {
+                    return Double.NaN; // Cannot divide by zero or process NaN
+                }
+                sumInverse += 1.0 / val;
+            }
+
+            return inputs.length / sumInverse;
+        } catch (Throwable t) {
+            limiter.log("Error in HarmonicMean", t);
+            return Double.NaN;
+        }
     }
 }

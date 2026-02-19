@@ -29,46 +29,55 @@ public class HistVol implements Fn1 {
         this.window = new double[size];
     }
 
+    private static final org.apache.logging.log4j.Logger log = org.apache.logging.log4j.LogManager
+            .getLogger(HistVol.class);
+    private final com.trading.drg.util.ErrorRateLimiter limiter = new com.trading.drg.util.ErrorRateLimiter(log, 1000);
+
     @Override
     public double apply(double logReturn) {
-        if (Double.isNaN(logReturn)) {
+        try {
+            if (Double.isNaN(logReturn)) {
+                return Double.NaN;
+            }
+
+            // Standard Deviation of Log Returns * Sqrt(AnnualizationFactor)
+
+            // 1. Update Sum and SumSq
+            // Remove old
+            if (count >= size) {
+                double old = window[head];
+                sum -= old;
+                sumSq -= old * old;
+            } else {
+                count++;
+            }
+
+            // Add new
+            window[head] = logReturn;
+            sum += logReturn;
+            sumSq += logReturn * logReturn;
+
+            // Advance pointer
+            head++;
+            if (head >= size)
+                head = 0;
+
+            if (count < 2)
+                return 0.0; // Need at least 2 points for variance
+
+            double mean = sum / count;
+            double variance = (sumSq / count) - (mean * mean);
+
+            // Numerical stability check
+            if (variance < 0)
+                variance = 0.0;
+
+            // The original code did not have an annualizationFactor.
+            // Assuming it should return the standard deviation directly if not provided.
+            return Math.sqrt(variance);
+        } catch (Throwable t) {
+            limiter.log("Error in HistVol", t);
             return Double.NaN;
         }
-
-        // Standard Deviation of Log Returns * Sqrt(AnnualizationFactor)
-
-        // 1. Update Sum and SumSq
-        // Remove old
-        if (count >= size) {
-            double old = window[head];
-            sum -= old;
-            sumSq -= old * old;
-        } else {
-            count++;
-        }
-
-        // Add new
-        window[head] = logReturn;
-        sum += logReturn;
-        sumSq += logReturn * logReturn;
-
-        // Advance pointer
-        head++;
-        if (head >= size)
-            head = 0;
-
-        if (count < 2)
-            return 0.0; // Need at least 2 points for variance
-
-        double mean = sum / count;
-        double variance = (sumSq / count) - (mean * mean);
-
-        // Numerical stability check
-        if (variance < 0)
-            variance = 0.0;
-
-        // The original code did not have an annualizationFactor.
-        // Assuming it should return the standard deviation directly if not provided.
-        return Math.sqrt(variance);
     }
 }
