@@ -173,6 +173,15 @@ public final class StabilizationEngine {
                 if (hasListener) {
                     long duration = System.nanoTime() - nodeStart;
                     l.onNodeStabilized(epoch, ti, node.name(), changed, duration);
+
+                    // Phase 8: NaN Detection
+                    // If the node is a ScalarValue and evaluates to NaN, report it as an error
+                    // even if no exception was thrown (e.g. handled by fail-safe).
+                    if (node instanceof ScalarValue sv) {
+                        if (Double.isNaN(sv.doubleValue())) {
+                            l.onNodeError(epoch, ti, node.name(), new RuntimeException("Node evaluated to NaN"));
+                        }
+                    }
                 }
 
                 // If the value changed, we must visit all children.
