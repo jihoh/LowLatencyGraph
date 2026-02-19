@@ -1,652 +1,309 @@
-# CoreGraph Developer Manual
+# CoreGraph Developer Guide
 
 ## 1. Introduction
 
 **CoreGraph** is a specialized, high-performance graph engine designed for **low-latency electronic trading**. It allows you to model complex pricing, risk, and signal logic as a **Directed Acyclic Graph (DAG)**.
 
+Unlike traditional object-oriented systems where business logic is scattered across many classes and callback handlers, CoreGraph centralizes your logic into a single, deterministic, and easily testable structure defined by data.
+
 ### Key Capabilities
-*   **Speed:** ~1 microsecond stabilization latency for typical subgraphs.
-*   **Throughput:** ~1 million updates/second
-*   **Predictability:** Zero Garbage Collection (GC) during runtime.
+
+*   **Ultra-Low Latency:** Optimized for ~1 microsecond stabilization latency on modern CPUs.
+*   **Predictability:** **Zero-GC** (Garbage Collection) on the hot path. All memory is pre-allocated.
+*   **Throughput:** Capable of processing millions of market data updates per second via LMAX Disruptor batching.
+*   **Wait-Free Consumption:** A Triple-Buffered snapshot mechanism allows the main application thread to read consistent data without ever blocking the graph engine.
 *   **Safety:** Statically typed, cycle-free topology with explicit ownership.
+
+### Use Cases
+
+*   **Pricing:** Swaps, Bonds, and Futures pricing.
+*   **Auto-Hedging:** Real-time delta and risk calculations.
+*   **Signals:** Custom signals and technical indicators (RSI, EWMA, MACD) on tick data.
+*   **Algos:** Custom trading algorithms.
 
 ---
 
 ## 2. Architecture
 
-Understanding the internal data flow is critical for writing efficient graph logic.
+CoreGraph is built on a **Single-Writer / Single-Reader** architecture optimized for CPU cache locality and eliminating thread contention.
 
-### 2.1 Data Flow
+### 2.1 The Data Flow
+
+The system is composed of three distinct threading domains, bridged by lock-free data structures.
 
 ```
-   [Graph Consumer Thread]
+
+     [LMAX RingBuffer]  <-- The Bridge: Handling Backpressure & Batching
              │
+             │ (1) GraphEvent (Mutable Flyweight)
              ▼
-[GraphPublisher (EventHandler)]
-             │
-             │ (1) Read Event (int nodeId, double val)
-             │ (2) Update Primitive Source Array
-             │ (3) Mark 'dirty' bit for Node ID
+    [Graph Processor]
+             │ 
+             │ (2) GraphPublisher calls stabilization
              ▼
    [StabilizationEngine]
              │
-             │ (4) Walk Topological Order
-             │ (5) If (dirty || parentChanged):
-             │         Compute();
-             │         Compare vs Previous;
-             │         If (Changed) Mark Children Dirty;
+             │ (3) Walk Topological Order (int[] array scan)
+             │ (4) If (Node is Dirty):
+             │         Recompute();
+             │         Detect Change;
+             │         Mark Children Dirty;
              ▼
-[Post-Stabilization Callback]
- (Safe place to read outputs)
+ [Post-Stabilization Callback]
+             │
+             │ (5) AsyncGraphSnapshot.update() (Atomic Triple-Buffer Swap)
+             ▼
+    [Main Application]
+             │
+             │ (6) reader.refresh()
+             │ (7) Send Orders / Update UI
 ```
 
 ### 2.2 Core Components
 
-| Component | Role | Optimization |
-|-----------|------|--------------|
-| `GraphBuilder` | **Compiler**. Defines topology and validates cycles. | Compiles graph to **CSR (Compressed Sparse Row)** format - flattened integer arrays for cache locality. |
-| `StabilizationEngine` | **Runtime**. Executes the graph. | **Zero-Allocation**. Uses `double[]` for state and `int[]` for connectivity. No object iterators. |
-| `GraphEvent` | **Transport**. Moves data from Network -> Graph. | **Mutable Flyweight**. Lives in the RingBuffer to avoid allocation per message. |
-| `GraphPublisher` | **Bridge**. Connects Disruptor to Engine. | **Batching**. If the consumer falls behind, it updates *all* pending events before stabilizing *once*. |
+| Component | Responsibility | Optimization Strategy |
+|-----------|----------------|-----------------------|
+| `CoreGraph` | **Façade**. The main entry point for the application. | Manages the lifecycle of the Engine, Disruptor, and Snapshotting, simplifying initialization. |
+| `StabilizationEngine` | **Runtime Kernel**. Executes the graph logic. | **Zero-Allocation**. Uses `double[]` for values and flat `int[]` arrays for connectivity. Eliminates pointer chasing. |
+| `GraphBuilder` | **Compiler**. Defines the topology. | Compiles the graph description into **CSR (Compressed Sparse Row)** format - flattened integer arrays for maximum cache locality. |
+| `AsyncGraphSnapshot` | **Bridge**. Safe data access. | **Triple Buffering**. Ensures the writer never blocks waiting for a reader, and the reader never retries. |
+| `JsonGraphCompiler` | **Loader**. JSON -> Graph. | Allows defining topology in data, decoupling strategy configuration from code compilation. |
 
 ### 2.3 The "Epoch" Concept
 Every time `stabilize()` is called, the engine increments an internal `epoch` counter.
-*   This creates a **Logical Time** step.
+*   This creates a distinct **Logical Time** step.
 *   All nodes computed in Epoch `N` see a consistent snapshot of inputs from Epoch `N-1` or `N`.
-*   This guarantees **Atomic Consistency**: You never see "half a curve update".
+*   This guarantees **Atomic Consistency**: You typically never see "half a curve update" or "half an arb". If an input changes, all dependent nodes are updated before any output is visible.
+
+### 2.4 Memory Layout (Structure of Arrays)
+To keep the CPU cache hot, CoreGraph avoids objects for graph nodes.
+Instead of `Node` objects, the engine uses **Parallel Arrays**:
+
+```
+int[] nodeType;   // { COMPUTE, SOURCE, COMPUTE ... }
+double[] values;  // { 1.05,    145.2,  157.0 ... }
+long[] epochs;    // { 101,     101,    101 ... }
+int[] dirtyBits;  // { 0,       1,      0 ... }
+```
+
+When the engine walks the graph, it streams through these primitive arrays. This is significantly faster than chasing pointers in a traditional object graph.
 
 ---
 
-## 3. Core Concepts
+## 3. The CoreGraphDemo Walkthrough
 
-### 3.1 The Push-Wait-Stabilize Pattern
-CoreGraph is **Lazy**. Setting a value does *not* trigger computation immediately.
+The most effective way to understand CoreGraph is to walk through the `CoreGraphDemo` reference implementation. This demo simulates a **Triangular Arbitrage** strategy, calculating the spread between a direct currency pair and a synthetic cross rate.
 
-1.  **Push:** Update one or more source nodes.
-2.  **Wait:** (Optional) Update more sources. The engine just marks bits dirty.
-3.  **Stabilize:** Call `engine.stabilize()`. The engine waves the changes through the graph.
+### 3.1 The Topology (`tri_arb.json`)
+The strategy logic is defined in `src/main/resources/tri_arb.json`. This strict separation means you can change parameters (like `alpha` for EWMA) or dependencies without recompiling the code.
 
-### 3.2 Primitive First
-*   We use `double` and `double[]` everywhere.
-*   **Boxing (`Double`) is banned** on the hot path.
-*   **String Lookups are banned** on the hot path. Use cached `int` IDs.
-
----
-
-## 4. Quant Cookbook: 12 Real-World Examples
-
-All examples use `GraphBuilder g`.
-
-### Example 1: Mid Price & Spread (Scalar)
-The "Hello World" of trading.
-
-```java
-// Sources
-var bid = g.scalarSource("mkt.bid", 100.0);
-var ask = g.scalarSource("mkt.ask", 100.5);
-
-// Logic: Mid = (Bid + Ask) / 2
-var mid = g.compute("calc.mid", (b, a) -> (b + a) / 2.0, bid, ask);
-
-// Logic: Spread = Ask - Bid
-var spread = g.compute("calc.spread", (a, b) -> a - b, ask, bid);
-```
-
-### Example 2: FX Cross Rate (Triangular Arb)
-Deriving `EUR/JPY` from `EUR/USD` and `USD/JPY`.
-
-```java
-var eurUsd = g.scalarSource("mkt.eur_usd", 1.08);
-var usdJpy = g.scalarSource("mkt.usd_jpy", 150.00);
-
-// Cross: EUR/JPY = EUR/USD * USD/JPY
-var eurJpy = g.compute("calc.eur_jpy", 
-    (eu, uj) -> eu * uj, 
-    eurUsd, usdJpy
-);
-```
-
-### Example 3: Order Book Imbalance (Signal)
-A strictly normalized signal (-1 to +1) based on liquidity.
-
-```java
-var bidQ = g.scalarSource("mkt.bid_qty", 1000);
-var askQ = g.scalarSource("mkt.ask_qty", 5000);
-
-// Imbalance = (BidQ - AskQ) / (BidQ + AskQ)
-var imbalance = g.compute("sig.imbalance", 
-    (bq, aq) -> {
-        double sum = bq + aq;
-        return (sum == 0) ? 0.0 : (bq - aq) / sum;
-    }, 
-    bidQ, askQ
-);
-```
-
-### Example 4: VWAP Snapshot (Weighted Average)
-Calculating the Volume Weighted Average Price of the last N trades.
-*Note: Real VWAP requires state (history). This is a snapshot version.*
-
-```java
-var p1 = g.scalarSource("trade.p1", 100.50); var v1 = g.scalarSource("trade.v1", 100);
-var p2 = g.scalarSource("trade.p2", 100.55); var v2 = g.scalarSource("trade.v2", 200);
-
-// VWAP = Sum(P*V) / Sum(V)
-// Use computeN for array inputs
-var vwap = g.computeN("calc.vwap",
-    (inputs) -> {
-        double sumPv = 0, sumV = 0;
-        for(int i=0; i<inputs.length; i+=2) {
-            double p = inputs[i];
-            double v = inputs[i+1];
-            sumPv += p * v;
-            sumV += v;
-        }
-        return (sumV == 0) ? 0 : sumPv / sumV;
-    },
-    p1, v1, p2, v2
-);
-```
-
-### Example 5: Yield Curve Bootstrap (Vector)
-Calculating Discount Factors from raw rates. `VectorNode` dominates here.
-
-```java
-int POINTS = 10;
-var rates = g.vectorSource("mkt.rates", POINTS); // Input: [0.045, 0.046...]
-
-// Output: Discount Factors df = 1 / (1 + r)^t
-// Times are constant: 1Y, 2Y... 10Y
-double[] times = {1,2,3,4,5,6,7,8,9,10};
-
-var dfs = g.computeVector("calc.dfs", POINTS, 1e-9,
-    (inputs, output) -> {
-        VectorSourceNode rNode = (VectorSourceNode)inputs[0];
-        for(int i=0; i<POINTS; i++) {
-            double r = rNode.valueAt(i);
-            output[i] = 1.0 / Math.pow(1.0 + r, times[i]);
-        }
-    },
-    rates
-);
-```
-
-### Example 6: Scenario Analysis (Parallel Shift)
-"What is the curve if rates go up 50bps?"
-
-```java
-var baseCurve = g.vectorSource("base_curve", 10);
-var shift = g.scalarSource("scenario.shift", 0.0050); // +50bps
-
-var shockedCurve = g.computeVector("scen.up50", 10, 1e-9,
-    (inputs, output) -> {
-        VectorSourceNode curve = (VectorSourceNode)inputs[0];
-        double s = ((ScalarValue)inputs[1]).doubleValue();
+```json
+{
+    "nodes": [
+        { 
+            "id": "EURUSD", 
+            "type": "Source", 
+            "initialValue": 1.0850 
+        },
+        { 
+            "id": "USDJPY", 
+            "type": "Source", 
+            "initialValue": 145.20 
+        },
+        { 
+            "id": "EURJPY", 
+            "type": "Source", 
+            "initialValue": 157.55 
+        },
         
-        for(int i=0; i<10; i++) {
-            output[i] = curve.valueAt(i) + s;
+        {
+            "id": "Arb.Spread",
+            "type": "Compute",
+            "operation": "tri_arb_spread",
+            "inputs": ["EURUSD", "USDJPY", "EURJPY"]
+        },
+        {
+            "id": "Arb.Spread.Ewma",
+            "type": "Compute",
+            "operation": "ewma",
+            "properties": { "alpha": 0.1 },
+            "inputs": ["Arb.Spread"]
         }
-    },
-    baseCurve, shift
-);
-```
-
-### Example 7: Volatility Surface Slice (Vector Element)
-Extracting a single "Smile" (Strike vs Vol) at a specific tenor from a full surface.
-
-```java
-// Assume surface is flattened: [T1_K1, T1_K2, ... T2_K1...]
-var surface = g.vectorSource("mkt.vol_surface", 100); 
-
-// We want the slice at Index 20-29 (The 1Y tenor)
-var slice1Y = g.computeVector("vol.1y_slice", 10, 1e-6,
-    (inputs, output) -> {
-        VectorSourceNode surf = (VectorSourceNode)inputs[0];
-        // Efficient array copy (Zero-GC, effectively System.arraycopy)
-        for(int i=0; i<10; i++) {
-            output[i] = surf.valueAt(20 + i);
-        }
-    },
-    surface
-);
-```
-
-### Example 8: Safe-Spread Logic (Circuit Breaker)
-Widening the spread if Volatility spikes.
-
-```java
-var rawSpread = g.scalarSource("algo.spread", 0.02);
-var vol = g.scalarSource("mkt.vol", 0.15);
-
-// 1. Condition: Is Vol > 50%?
-var highVol = g.condition("state.high_vol", vol, v -> v > 0.50);
-
-// 2. Logic: If HighVol, 5x spread. Else 1x.
-var wideSpread = g.compute("calc.wide_spread", s -> s * 5.0, rawSpread);
-
-// 3. Selection
-var finalSpread = g.select("final_spread", 
-    highVol, 
-    wideSpread, // True branch
-    rawSpread   // False branch
-);
-```
-
-### Example 9: Synthetic Instrument
-Implied price of a product that doesn't trade, derived from proxies.
-e.g., `SynPrice = ProxyA * 0.5 + ProxyB * 0.5 + Spread`
-
-```java
-var proxyA = g.scalarSource("mkt.proxy_a", 100);
-var proxyB = g.scalarSource("mkt.proxy_b", 101);
-var basis = g.scalarSource("cfg.basis", 0.50);
-
-var synPrice = g.compute("calc.syn",
-    (a, b, bases) -> (a * 0.5) + (b * 0.5) + bases,
-    proxyA, proxyB, basis
-);
-```
-
-### Example 10: P&L Report (MapNode)
-Bundling multiple greek risks into a key-value snapshot for reporting.
-
-```java
-var npv = g.scalarSource("risk.npv", 1000);
-var delta = g.scalarSource("risk.delta", 50);
-var gamma = g.scalarSource("risk.gamma", 2);
-
-// Map keys defined at build time
-var report = g.mapNode("report.pnl",
-    (inputs, writer) -> {
-        // Fast writer (flyweight)
-        writer.put("NPV",   inputs[0].doubleValue());
-        writer.put("Delta", inputs[1].doubleValue());
-        writer.put("Gamma", inputs[2].doubleValue());
-    },
-    new String[]{ "NPV", "Delta", "Gamma" },
-    npv, delta, gamma
-);
-```
-
-### Example 11: Mass Production with Templates (TemplateFactory)
-You often need to price 1,000 swaps with identical logic but different parameters (Notional, Fixed Rate).
-Use the `TemplateFactory` pattern.
-
-```java
-// 1. Define Config Record
-record SwapConfig(double notional, double fixedRate) {}
-// 2. Define Output Record (Holds the Nodes)
-record SwapOutputs(Node<?> npv, Node<?> dv01) {}
-
-// 3. Define the Template Logic
-TemplateFactory<SwapConfig, SwapOutputs> swapTemplate = (b, prefix, cfg) -> {
-    // Inputs (could be looked up or passed in)
-    var curve = b.vectorSource("mkt.curve", 10);
-    
-    var npv = b.compute(prefix + ".NPV", 
-        (r) -> cfg.notional * (r[0] - cfg.fixedRate), // Simplified logic
-        curve
-    );
-    
-    var dv01 = b.compute(prefix + ".DV01", ...);
-    
-    return new SwapOutputs(npv, dv01);
-};
-
-// 4. Instantiate 1000 Swaps
-for (int i=0; i<1000; i++) {
-    var cfg = new SwapConfig(1_000_000, 0.05);
-    // "Stamp" the logic into the graph
-    var swap = g.template("Swap" + i, swapTemplate, cfg);
-    
-    // Wire swap.npv() to a report...
+    ]
 }
 ```
 
-### Example 12: Stateful Logic (EWMA)
-Sometimes you need history (e.g., Moving Average).
-The graph is stateless by default, but you can capture state in the closure.
+**Key Elements:**
+*   `id`: The unique name of the node. Used for lookups and debugging.
+*   `type`: `Source` (input) or `Compute` (calculated).
+*   `operation`: Limits the logic to a registered function name.
+*   `inputs`: List of dependencies by ID. The order matters and matches the `Fn` arguments.
+*   `properties`: Static configuration passed to the `Fn` constructor (e.g., `alpha`).
 
-**The Closure Trick:**
-Use a 1-element array to hold state inside the lambda. The lambda is instantiated **once** at build time, so the array persists.
+### 3.2 The Logic (Explicit `Fn` Classes)
 
-```java
-var price = g.scalarSource("mkt.px", 100.0);
+CoreGraph avoids cryptic lambdas in favor of explicit classes that implement the `FnN` interfaces. This approach provides:
+1.  **Type Safety:** The compiler verifies the number of arguments (arity).
+2.  **State Encapsulation:** Logic that needs history (like EWMA) keeps its state private.
+3.  **Reusability:** The same class can be used in multiple graphs.
+4.  **Testability:** You can unit test the logic in isolation from the graph engine.
 
-// Capture state in closure
-final double[] state = new double[1]; // [0] = lastEMA
-final boolean[] init = { false };     // Is initialized?
-
-var ewma = g.compute("sig.ewma", (px) -> {
-    if (!init[0]) {
-        state[0] = px; // Init with first price
-        init[0] = true;
-        return px;
-    }
-    
-    double alpha = 0.1;
-    double prev = state[0];
-    double next = alpha * px + (1.0 - alpha) * prev;
-    
-    // Update state for next cycle
-    state[0] = next;
-    return next;
-}, price);
-```
-
-### Example 13: Boolean Logic (Signals)
-CoreGraph supports boolean signals for logic gates and valid/invalid flags.
+#### Triangular Arbitrage Logic (`TriangularArbSpread.java`)
+This class implements `Fn3`, meaning it takes 3 inputs and produces 1 output.
 
 ```java
-var mid = g.scalarSource("mkt.mid", 100.0);
+package com.trading.drg.fn.finance;
 
-// 1. Create Boolean Signal (Condition)
-// Returns a BooleanNode that is true/false based on the predicate
-var isValid = g.condition("sig.valid", mid, m -> m > 0 && !Double.isNaN(m));
+import com.trading.drg.fn.Fn3;
 
-// 2. Use it in downstream logic
-// e.g. "SafePrice" = Mid if Valid, else NaN
-var safePrice = g.compute("calc.safe_price", 
-    (m, valid) -> valid ? m : Double.NaN,
-    mid, isValid
-);
-
-// 3. Complex Boolean Logic
-// You can combine booleans using generic compute
-var isBigRequest = g.condition("sig.big", ...);
-var isTradeable = g.compute("sig.tradeable", (v, b) -> v && !b, isValid, isBigRequest);
-```
-
----
-
-## 5. Best Practices
-
-### 5.1 Granularity: "Business Units" vs. "AST"
-
-**The "Graph Tax"**: Every node introduces overhead (dirty check, recursion, cache fixup).
-*   **Do Not**: Create a node for every `+` or `-` operator. (AST style).
-*   **Do**: Bundle coherent equations into a single `compute` node. (Business Logic style).
-
-**Example: Euclidean Distance** `sqrt(x^2 + y^2)`
-*   **Bad**: `X` -> `SqrX`, `Y` -> `SqrY`, `Sum` -> `Sqrt`. (5 nodes).
-*   **Good**: `X,Y` -> `Calc` (where `Calc = Math.sqrt(x*x + y*y)`). (1 node). The JIT compiler optimizes the internals of the node into efficient machine instructions (SQRTSD).
-
-### 5.2 VectorNode vs. ScalarNodes
-
-**Question:** "Why not just use 100 `ScalarNode`s for a Yield Curve?"
-
-**Answer: CPU Architecture.**
-1.  **Cache Locality:** `VectorNode` uses a contiguous `double[]`. The CPU pulls in 64 bytes (8 doubles) in a single cycle. With scattered objects, you get cache misses on every access.
-2.  **Engine Overhead:** Processing 1 node is 100x cheaper than processing 100 nodes.
-3.  **Consistency:** Vectors update atomically. There is no risk of a "teared" state where half the curve is old and half is new.
-
-**Rule:**
-*   Distinct Values (`Spot`, `VIX`) -> `ScalarNode`.
-*   Homogeneous Data (`YieldCurve`, `VolSurface`) -> `VectorNode`.
-
-### 5.3 Zero-Allocation Rules
-To maintain the "Zero-GC" promise:
-
-1.  **No `new` in Lambdas**: Never allocate objects inside a `compute` lambda.
-2.  **Use Scratch Buffers**: Use `GraphBuilder.scratchDoubles()` or pass pre-allocated arrays to your functions.
-3.  **No Strings**: Do not perform String concatenation or parsing on the hot path.
-
-### 5.4 Lookup Caching
-String lookups (e.g., `getNode("bid")`) are slow (HashMap access).
-**Always** cache integer IDs at startup:
-
----
-
-## 6. Integration Guide: Production Wiring
-
-This section details how to integrate CoreGraph into a production trading chassis.
-
-### 6.1 The Lifecycle
-
-1.  **Construction (Cold Path)**: Build the graph, load configuration.
-2.  **Compilation (Warm Path)**: `g.buildWithContext()`. Perform JIT warmup.
-3.  **Optimization (Warm Path)**: Cache all Node IDs.
-4.  **Runtime (Hot Path)**: Enter the event loop.
-
-### 6.2 Caching Node IDs (Crucial)
-
-**Problem:** `engine.getNodeId("Mkt.Bid")` involves hashing a String and checking a Map. This allocates memory and is O(L) where L is string length.
-**Solution:** Resolve all IDs to `int` during startup. The engine uses direct array access (O(1)) for `int` IDs.
-
-```java
-// In your init() method:
-GraphContext ctx = g.buildWithContext();
-
-// Store these in fields
-private final int bidId = ctx.getNodeId("Mkt.Bid");
-private final int askId = ctx.getNodeId("Mkt.Ask");
-```
-
-### 6.3 The Disruptor Pattern
-
-We recommend the **Single Producer, Single Consumer** pattern.
-
-#### Architecture
-`[Network IO] -> [RingBuffer<GraphEvent>] -> [GraphPublisher] -> [StabilizationEngine]`
-
-#### Step 1: The Event Factory
-Pre-allocate 1024 (or power of 2) events in the RingBuffer.
-
-```java
-Disruptor<GraphEvent> disruptor = new Disruptor<>(
-    GraphEvent::new, 1024, DaemonThreadFactory.INSTANCE,
-    ProducerType.SINGLE, new BlockingWaitStrategy()
-);
-```
-
-#### Step 2: The Producer (Hot Loop)
-This runs on your Netty/NIO thread. It must translate network messages to Graph IDs.
-The `batchEnd` flag is critical here. It tells the consumer if it should stabilize now (true) or wait for more updates (false).
-
-```java
-public void onMarketData(int instrumentId, double price) {
-    long seq = ringBuffer.next();
-    try {
-        GraphEvent e = ringBuffer.get(seq);
-        int graphNodeId = this.nodeMap[instrumentId];
+public class TriangularArbSpread implements Fn3 {
+    @Override
+    public double apply(double eurUsd, double usdJpy, double eurJpy) {
+        // 1. Calculate Synthetic EUR/JPY
+        //    (EUR/USD) * (USD/JPY) = EUR/JPY
+        double synthetic = eurUsd * usdJpy;
         
-        // batchEnd=true means "Stabilize now". 
-        // batchEnd=false means "Just update state, I have more changes coming".
-        e.setDoubleUpdate(graphNodeId, price, true, seq); 
-    } finally {
-        ringBuffer.publish(seq);
+        // 2. Calculate Spread
+        //    Direct - Synthetic
+        return eurJpy - synthetic;
     }
 }
 ```
 
-#### Step 3: The Consumer (GraphPublisher) & Batching
-The `GraphPublisher` (included in library) acts as the bridge. It implements `EventHandler<GraphEvent>`.
-
-**Smart Batching:**
-The Disruptor passes a boolean `endOfBatch` to the handler. The `GraphPublisher` uses this to coalesce updates:
-1.  If `endOfBatch == false`, it applies the update but **does not stabilize**.
-2.  If `endOfBatch == true` OR the event's `batchEnd == true`, it **triggers stabilization**.
-
-This means if the consumer is slow, it might process 100 updates and then run 1 graph calculation, maximizing throughput.
+#### Stateful Logic (`Ewma.java`)
+This class implements `Fn1` (1 input, 1 output). Notice how it manages private state (`state`, `initialized`) without garbage collection overhead.
 
 ```java
-GraphPublisher publisher = new GraphPublisher(engine);
+package com.trading.drg.fn.finance;
 
-// Register a Callback to READ outputs safely AFTER stabilization
-publisher.setPostStabilizationCallback((epoch, count) -> {
-    // This runs on the Graph Thread. Safe to read outputs.
-    double mid = midNode.doubleValue();
-    riskEngine.send(mid);
-});
-
-disruptor.handleEventsWith(publisher::onEvent);
-disruptor.start();
-```
-
-### 6.4 Threading Model
-
-CoreGraph is **Single-Threaded**.
-*   **The Golden Rule:** Only ONE thread may call `engine.stabilize()` at a time.
-*   **Visibility:** If you read graph outputs from another thread (e.g., UI), you must ensure memory visibility (e.g., via `volatile` reads or passing messages back to a UI queue).
-
-**Recommendation:** Pin the Graph Thread to a specific CPU core to avoid context switching.
-
-### 6.5 Monitoring & Observability
-
-#### Metrics (JMX/Micrometer)
-Export these counters:
-1.  `stabilization_count`: Total number of stabilizations.
-2.  `nodes_recomputed_per_cycle`: Average nodes touched (Work amplification).
-3.  `stabilization_latency`: Histogram (P99).
-
-#### Profiling (Java Flight Recorder)
-Run JFR in production.
-*   **Target:** `StabilizationEngine.stabilize()`.
-*   **Success Criteria:** Zero allocation samples inside this method.
-*   **Warning Signs:** `Double.valueOf`, `Iterator.next`, `String.format` appearing in the hot path.
-
-## 7. Finance Library (Class-Based Nodes)
-
-CoreGraph provides a library of zero-allocation, stateful financial functions in `com.trading.drg.fn.finance`.
-These classes implement `Fn1` (scalar -> scalar) or `Fn2` (scalar, scalar -> scalar) and can be used directly in `compute` nodes.
-
-### 7.1 Key Benefits
-1.  **Zero GC:** State is pre-allocated (arrays) and reused.
-2.  **Encapsulation:** No need to manage `double[]` arrays in lambdas manually.
-3.  **Composability:** Easy to chain.
-
-### 7.2 Available Functions
-
-| Class | Description | Usage |
-|-------|-------------|-------|
-| `Ewma` | Exponential Moving Average | `new Ewma(alpha)` |
-| `Sma` | Simple Moving Average (Ring Buffer) | `new Sma(windowSize)` |
-| `Diff` | First Difference (`x[t] - x[t-1]`) | `new Diff()` |
-| `LogReturn` | Log Return (`ln(x[t] / x[t-1])`) | `new LogReturn()` |
-| `HistVol` | Historic Volatility (StdDev) | `new HistVol(windowSize)` |
-| `ZScore` | Z-Score (`(x - mean) / stdDev`) | `new ZScore(windowSize)` |
-| `Rsi` | Relative Strength Index (Wilder's) | `new Rsi(period)` |
-| `Macd` | MACD Line (`FastEWMA - SlowEWMA`) | `new Macd(fast, slow)` |
-| `RollingMax` | Rolling Maximum (Linear Scan) | `new RollingMax(windowSize)` |
-| `RollingMin` | Rolling Minimum (Linear Scan) | `new RollingMin(windowSize)` |
-| `Beta` | Rolling Beta (`Cov(X,Y)/Var(X)`) | `new Beta(windowSize)` |
-| `Correlation` | Rolling Correlation | `new Correlation(windowSize)` |
-
-### 7.3 Usage Example
-
-```java
-import com.trading.drg.fn.finance.*;
-
-// 1. Define Sources
-var price = g.scalarSource("mkt.mid", 100.0);
-
-// 2. Use Class-Based Nodes
-// RSI 14
-var rsi = g.compute("sig.rsi", new Rsi(14), price);
-
-// MACD (12, 26)
-var macdLine = g.compute("sig.macd", new Macd(12, 26), price);
-
-// Bollinger Bands (SMA + 2 * StdDev)
-var ma     = g.compute("bb.ma",    new Sma(20), price);
-var stdDev = g.compute("bb.stdev", new HistVol(20), price);
-
-var upper = g.compute("bb.upper", (m, s) -> m + 2*s, ma, stdDev);
-var lower = g.compute("bb.lower", (m, s) -> m - 2*s, ma, stdDev);
-```
-
-### 7.4 How to Implement Custom Class-Based Nodes
-
-You can implement `Fn1`, `Fn2`, `Fn3`, or `FnN` as a class.
-This is especially useful when:
-1.  **Complex Logic**: The calculation is too long for a lambda.
-2.  **Stateful Logic**: You need to maintain internal state (like an EWMA, PID Controller, or Rate Limiter).
-3.  **Reusability**: You use the same logic in multiple places.
-
-#### Example: Stateful EWMA as a Class
-
-Here is how you can encapsulate the "Exponential Moving Average" logic into a clean `Fn1` implementation.
-
-```java
 import com.trading.drg.fn.Fn1;
 
-/**
- * Stateful Exponential Moving Average.
- * Implements Fn1 so it can be used in g.compute(name, new Ewma(0.1), input).
- */
 public class Ewma implements Fn1 {
     private final double alpha;
     private double state;
     private boolean initialized = false;
 
+    // Properties from JSON are passed to the constructor
     public Ewma(double alpha) {
         this.alpha = alpha;
     }
 
     @Override
     public double apply(double input) {
+        // Handle First Tick
         if (!initialized) {
             state = input;
             initialized = true;
             return state;
         }
         
-        // Classic EWMA: New = Alpha * Input + (1 - Alpha) * Old
+        // Classic EWMA Formula:
+        // New = Alpha * Input + (1 - Alpha) * Old
         state = alpha * input + (1.0 - alpha) * state;
         return state;
     }
-}
-```
-
-#### Usage in GraphBuilder
-
-Since `Ewma` implements `Fn1`, you can pass an instance directly to `g.compute`:
-
-```java
-var price = g.scalarSource("mkt.px", 100.0);
-
-// Use the class instance instead of a lambda
-var fastEwma = g.compute("sig.ewma_fast", new Ewma(0.5), price);
-var slowEwma = g.compute("sig.ewma_slow", new Ewma(0.05), price);
-```
-
-#### Why this is better than closure-based state
-*   **Cleaner**: No `final double[] state = new double[1]` hacks.
-*   **Encapsulated**: The state is private to the class instance.
-
-#### Example: Triangular Arbitrage (Fn3)
-
-This class calculates the difference (spread) between a direct currency pair and a synthetic cross rate.
-
-```java
-import com.trading.drg.fn.Fn3;
-
-public class TriangularArbSpread implements Fn3 {
-    @Override
-    public double apply(double leg1, double leg2, double direct) {
-        // Spread = Direct - (Leg1 * Leg2)
-        return direct - (leg1 * leg2);
+    
+    // Optional: Reset state for replay scenarios
+    public void reset() {
+        initialized = false;
+        state = 0.0;
     }
 }
 ```
 
-**Usage:**
+### 3.3 The Main Application (`CoreGraphDemo.java`)
+
+Here is how you wire it all together in Java. This `main` method represents your application entry point.
+
+### 3.3 The Main Application (`CoreGraphDemo.java`)
+
+Here is how you wire it all together in Java. This single `main` method demonstrates the full lifecycle: Initialization, Source Optimization, Publishing, and Wait-Free Consumption.
 
 ```java
-var eurUsd = g.scalarSource("mkt.eur_usd", 1.05);
-var usdJpy = g.scalarSource("mkt.usd_jpy", 150.0);
-var eurJpy = g.scalarSource("mkt.eur_jpy", 157.5);
+public class CoreGraphDemo {
+    public static void main(String[] args) throws InterruptedException {
+        // --------------------------------------------------------------------
+        // Step 1: Initialization
+        // --------------------------------------------------------------------
+        // Initialize CoreGraph with the JSON definition.
+        // The constructor parses, builds, and optimizes the graph.
+        CoreGraph graph = new CoreGraph("src/main/resources/tri_arb.json");
 
-var arbSpread = g.compute("sig.arb_spread", 
-    new TriangularArbSpread(), 
-    eurUsd, usdJpy, eurJpy
-);
+        // Start the Engine (spins up the background LMAX Disruptor thread)
+        graph.start();
+
+        // --------------------------------------------------------------------
+        // Step 2: Optimizing Sources (Cold Path)
+        // --------------------------------------------------------------------
+        // Resolve IDs once at startup to avoid String hashing on the hot path.
+        int eurUsdId = graph.getNodeId("EURUSD");
+        int usdJpyId = graph.getNodeId("USDJPY");
+        int eurJpyId = graph.getNodeId("EURJPY");
+        
+        // --------------------------------------------------------------------
+        // Step 3: Simulation Loop (Hot Path - Publisher)
+        // --------------------------------------------------------------------
+        Thread publisher = new Thread(() -> {
+            Random rng = new Random();
+            double shock = 0.0;
+            
+            while (!Thread.currentThread().isInterrupted()) {
+                // Simulate generic market moves
+                shock = (rng.nextDouble() - 0.5) * 0.001;
+                
+                // Thread-Safe, Non-Blocking publish to LMAX RingBuffer.
+                // These updates are automatically batched by the consumer.
+                graph.publish(eurUsdId, 1.0850 + shock);
+                graph.publish(usdJpyId, 145.20 + shock * 100);
+                
+                try { Thread.sleep(1); } catch (InterruptedException e) { break; }
+            }
+        });
+        publisher.start();
+
+        // --------------------------------------------------------------------
+        // Step 4: Consuming Results (Wait-Free Reads)
+        // --------------------------------------------------------------------
+        // Create a reader (watches all scalar nodes by default)
+        var reader = graph.getSnapshot().createReader();
+
+        // Main Application Loop
+        while (true) {
+            // 1. Refresh Snapshot
+            //    Atomic pointer swap (Triple Buffering). 
+            //    Wait-Free: Guaranteed immediate success. Zero locks.
+            reader.refresh();
+
+            // 2. Read Consistent Values form the snapshot
+            double spread = reader.get("Arb.Spread");
+            double ewma   = reader.get("Arb.Spread.Ewma");
+
+            // 3. Act on Logic
+            if (Math.abs(spread) > 10.0) {
+                System.out.printf("[Signal] Arb Opportunity! Spread: %.4f | EWMA: %.4f%n", spread, ewma);
+            }
+            
+            Thread.sleep(100); // Poll at your own pace
+        }
+    }
+}
 ```
 
-#### Example: Harmonic Mean (FnN)
+---
 
-This class calculates the Harmonic Mean of N inputs (e.g., averaging P/E ratios).
-All inputs are of the same type.
+## 4. Developing Custom Logic
+
+Extending CoreGraph with new financial logic is straightforward. You simply implement one of the `Fn` interfaces located in `com.trading.drg.api`.
+
+### Supported Interfaces
+
+*   `Fn1`: `double apply(double a)`
+*   `Fn2`: `double apply(double a, double b)`
+*   `Fn3`: `double apply(double a, double b, double c)`
+*   `FnN`: `double apply(double[] inputs)` - Generic N-ary function.
+
+### Example: Harmonic Mean (FnN)
+Calculating the Harmonic Mean of an array of inputs (useful for averaging execution prices or P/E ratios).
 
 ```java
 import com.trading.drg.fn.FnN;
@@ -657,25 +314,153 @@ public class HarmonicMean implements FnN {
         if (inputs.length == 0) return 0.0;
         
         double sumInverse = 0;
+        
+        // Use enhanced for-loop or indexed loop
+        // Avoid streaming APIs (Arrays.stream) to ensure Zero-GC.
         for (double val : inputs) {
             sumInverse += 1.0 / val;
         }
+        
         return inputs.length / sumInverse;
     }
 }
 ```
 
-**Usage:**
+### Developing Stateful Functions
+
+When your logic needs history (Rolling Max, Min, StdDev), follow these rules:
+
+1.  **State Fields**: Declare `private` fields in your class to hold state elements (e.g., `double sum`, `double sumSq`, `double[] ringBuffer`).
+2.  **Constructor**: Initialize arrays here. Never allocate in `apply()`.
+3.  **Apply Logic**: Update your state and return the current value.
+4.  **Reset**: Provide a method to clear state if you plan to support graph resets.
+
+### Testing Custom Functions
+
+Because `Fn` classes are just POJOs (Plain Old Java Objects), unit testing is trivial.
+Ensure all calculators are fully unit tested
 
 ```java
-var pe1 = g.scalarSource("pe.google", 25.0);
-var pe2 = g.scalarSource("pe.amazon", 40.0);
-var pe3 = g.scalarSource("pe.meta",   30.0);
-
-// Calculate average P/E of the sector
-var sectorPE = g.computeN("calc.sector_pe", 
-    new HarmonicMean(),
-    pe1, pe2, pe3
-);
+@Test
+void testEwma() {
+    Ewma ewma = new Ewma(0.5);
+    
+    // T=0: Init
+    assertEquals(100.0, ewma.apply(100.0), 0.001);
+    
+    // T=1: Input 110. Expected: 0.5*110 + 0.5*100 = 105
+    assertEquals(105.0, ewma.apply(110.0), 0.001);
+    
+    // T=2: Input 105. Expected: 0.5*105 + 0.5*105 = 105
+    assertEquals(105.0, ewma.apply(105.0), 0.001);
+}
 ```
 
+---
+
+## 5. Configuration Reference (JSON)
+
+ The `graph.json` file is the blueprint for your strategy.
+
+### Root Object
+```json
+{
+  "nodes": [ ... ]
+}
+```
+
+### Node Object Schema
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | String | Yes | Unique identifier for the node. Format `category.name` is recommended. |
+| `type` | String | Yes | `Source` for inputs, `Compute` for calculations. |
+| `operation` | String | No | Required for `Compute` nodes. Must match a registered `Fn` name. |
+| `initialValue`| Double | No | Required for `Source` nodes. The starting value. |
+| `inputs` | List\<String\>| No | List of Node IDs this node depends on. Order matches `Fn` args. |
+| `properties` | Object | No | Key-value pairs passed to the `Fn` constructor (e.g., window sizes). |
+
+### Example: RSI Configuration
+
+```json
+{
+  "id": "sig.rsi_14",
+  "type": "Compute",
+  "operation": "rsi",
+  "inputs": ["mkt.close_price"],
+  "properties": {
+    "period": 14
+  }
+}
+```
+
+Ensure your `Rsi` class has a constructor matching the properties map or a specific signature supported by the factory.
+
+---
+
+## 6. Advanced Mechanics & Performance Tuning
+
+### 6.1 Triple Buffering Deep Dive
+
+**The Three Buffers:**
+1.  **Dirty Buffer (Writer-local):** The Graph Thread writes new updates here. It is private to the writer.
+2.  **Clean Buffer (Shared Atomic):** The latest *complete* snapshot. This acts as the hand-off point.
+3.  **Snapshot Buffer (Reader-local):** The snapshot the reader is currently engaging with.
+
+**The Swap Protocol:**
+*   **On Publish (Writer):**
+    1.  Write to `Dirty Buffer`.
+    2.  Atomically swap `Dirty` and `Clean`. The old `Clean` becomes the new `Dirty` (recycled).
+*   **On Refresh (Reader):**
+    1.  Atomically swap `Snapshot` and `Clean`. The old `Snapshot` becomes the new `Clean` (recycled).
+
+**Why it matters:**
+*   **No Locks:** Neither thread ever waits on a `synchronized` block or `ReentrantLock`.
+*   **Consistency:** The reader always sees a full, valid snapshot of the *entire* graph at a specific epoch of time.
+
+### 6.2 Profiling Best Practices
+
+Use **Java Flight Recorder (JFR)** to verify the "Zero Allocation" promise.
+
+1.  Start your application with JFR enabled.
+2.  Record for 60 seconds during peak load.
+3.  Open in Java Mission Control.
+4.  Inspect **Method Profiling** -> `StabilizationEngine.stabilize()`.
+5.  **Success Criteria:**
+    *   **TLAB Allocations:** 0 bytes.
+    *   **Boxed Integers/Doubles:** None.
+    *   **String Concatenation:** None.
+
+---
+
+## 7. Directory Structure
+
+Understanding the project layout:
+
+*   **/src/main/resources/**:
+    *   `tri_arb.json`: The layout for the main demo.
+    *   `bond_pricer.json`: Example fixed income layout.
+
+*   **/src/main/java/com/trading/drg/**:
+    *   `CoreGraph.java`: The main facade class you interact with.
+    *   `CoreGraphDemo.java`: The reference implementation (Triangular Arb).
+    *   `CoreGraphSimpleDemo.java`: A clearer, minimal usage example.
+
+*   **/src/main/java/com/trading/drg/api/**:
+    *   `Node.java`: The base interface for graph nodes.
+    *   `ScalarValue.java`: Interface for nodes producing `double`.
+    *   `Fn1.java`, `Fn2.java`, ...: Interfaces for compute logic.
+
+*   **/src/main/java/com/trading/drg/engine/**:
+    *   `StabilizationEngine.java`: The core execution kernel (The "Brain").
+    *   `GraphBuilder.java`: The compiler that builds the CSR arrays.
+
+*   **/src/main/java/com/trading/drg/util/**:
+    *   `AsyncGraphSnapshot.java`: Implementation of the Triple-Buffering logic.
+    *   `GraphExplain.java`: Visualization tools (Mermaid diagrams).
+
+*   **/src/main/java/com/trading/drg/fn/finance/**:
+    *   `TriangularArbSpread.java`: Example custom logic.
+    *   `Ewma.java`: Example stateful logic.
+
+---
