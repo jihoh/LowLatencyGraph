@@ -428,6 +428,29 @@ Use **Java Flight Recorder (JFR)** to verify the "Zero Allocation" promise.
     *   **String Concatenation:** None.
 
 
+    *   **String Concatenation:** None.
+
+### 6.3 Performance Benchmarks
+
+Sample latency statistics from `CoreGraphDemo` :
+
+```text
+--- Global Latency Stats ---
+Metric               |      Value |   Avg (us) |   Min (us) |   Max (us)
+------------------------------------------------------------------------------------------
+Total Stabilizations |      10330 |       0.62 |       0.13 |     249.29
+
+
+--- Node Performance Profile ---
+Node Name                      |      Count |   Avg (us) |   Min (us) |   Max (us)
+------------------------------------------------------------------------------------------
+Arb.Spread                     |      10330 |       0.08 |       0.00 |      14.04
+Arb.Spread.Ewma                |      10330 |       0.05 |       0.00 |       5.38
+EURUSD                         |       9981 |       0.03 |       0.00 |       6.25
+USDJPY                         |       9981 |       0.03 |       0.00 |       4.17
+EURJPY                         |      10000 |       0.02 |       0.00 |       5.71
+```
+
 ---
 
 ## 7. Reliability & Error Handling
