@@ -45,7 +45,6 @@ public class CoreGraph {
     private final RingBuffer<GraphEvent> ringBuffer;
     private final GraphPublisher publisher;
     private final com.trading.drg.util.CompositeStabilizationListener compositeListener;
-    private final com.trading.drg.util.LatencyTrackingListener latencyListener;
     private final AsyncGraphSnapshot masterSnapshot;
 
     /**
@@ -79,8 +78,6 @@ public class CoreGraph {
         // Register default listener
         // Register default listener via Composite
         this.compositeListener = new com.trading.drg.util.CompositeStabilizationListener();
-        this.latencyListener = new com.trading.drg.util.LatencyTrackingListener();
-        this.compositeListener.addForComposite(this.latencyListener);
 
         this.engine.setListener(this.compositeListener);
 
@@ -161,9 +158,12 @@ public class CoreGraph {
     }
 
     /**
-     * Returns the default latency listener for metrics access.
+     * Enables latency tracking.
+     * If already enabled, returns the existing listener.
      */
-    public com.trading.drg.util.LatencyTrackingListener getLatencyListener() {
+    public com.trading.drg.util.LatencyTrackingListener enableLatencyTracking() {
+        var latencyListener = new com.trading.drg.util.LatencyTrackingListener();
+        compositeListener.addForComposite(latencyListener);
         return latencyListener;
     }
 

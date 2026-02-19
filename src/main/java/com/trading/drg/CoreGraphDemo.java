@@ -22,6 +22,7 @@ public class CoreGraphDemo {
         // Setup, Disruptor Setup
         var graph = new CoreGraph("src/main/resources/tri_arb.json");
         NodeProfileListener profiler = graph.enableNodeProfiling();
+        var latencyListener = graph.enableLatencyTracking();
 
         // 2. [REQUIRED] Start Engine
         graph.start();
@@ -83,13 +84,10 @@ public class CoreGraphDemo {
         Thread.sleep(1000); // Wait for processing
 
         // 5. [OPTIONAL] Get Latency Stats
-        var listener = graph.getLatencyListener();
+        // var listener = graph.getLatencyListener(); // Removed
         log.info("Demo complete.");
-        log.info(String.format("Latency Stats: Avg: %.2f us | Min: %d ns | Max: %d ns | Total Events: %d",
-                listener.avgLatencyMicros(),
-                listener.minLatencyNanos(),
-                listener.maxLatencyNanos(),
-                listener.totalStabilizations()));
+        System.out.println("\n--- Global Latency Stats ---");
+        System.out.println(latencyListener.dump());
 
         // 7. [REQUIRED] Stop Engine
         graph.stop();

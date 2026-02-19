@@ -20,6 +20,7 @@ public class JsonBondPricerDemo {
 
         // 1. Initialize CoreGraph with template-based JSON
         var graph = new CoreGraph("src/main/resources/bond_pricer_template.json");
+        var listener = graph.enableLatencyTracking();
         graph.start();
 
         // 2. Simulation Parameters
@@ -62,12 +63,7 @@ public class JsonBondPricerDemo {
         log.info(String.format("Done. %.2f ns/op (includes graph overhead)", nanosPerOp));
 
         // 4. Get Latency Stats
-        var listener = graph.getLatencyListener();
-        log.info(String.format("Latency Stats: Avg: %.2f us | Min: %d ns | Max: %d ns | Total Events: %d",
-                listener.avgLatencyMicros(),
-                listener.minLatencyNanos(),
-                listener.maxLatencyNanos(),
-                listener.totalStabilizations()));
+        log.info("Latency Stats:\n" + listener.dump());
 
         graph.stop();
     }

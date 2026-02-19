@@ -98,4 +98,19 @@ public final class LatencyTrackingListener implements StabilizationListener {
         minLatencyNanos = Long.MAX_VALUE;
         maxLatencyNanos = Long.MIN_VALUE;
     }
+
+    public String dump() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("%-20s | %10s | %10s | %10s | %10s\n", "Metric", "Value", "Avg (us)", "Min (us)",
+                "Max (us)"));
+        sb.append("------------------------------------------------------------------------------------------\n");
+        sb.append(String.format("%-20s | %10d | %10.2f | %10.2f | %10.2f\n",
+                "Total Stabilizations",
+                totalStabilizations,
+                avgLatencyMicros(),
+                minLatencyNanos() / 1000.0,
+                maxLatencyNanos() / 1000.0));
+
+        return sb.toString();
+    }
 }
