@@ -244,20 +244,6 @@ public final class GraphBuilder {
         return factory.create(this, prefix, config);
     }
 
-    // ── Scratch space (pre-allocated at build time) ──────────────
-
-    public double[] scratchDoubles(int size) {
-        return new double[size];
-    }
-
-    public double[][] scratchDoubles2D(int rows, int cols) {
-        return new double[rows][cols];
-    }
-
-    public long[] scratchLongs(int size) {
-        return new long[size];
-    }
-
     // ── Build ────────────────────────────────────────────────────
 
     /**
