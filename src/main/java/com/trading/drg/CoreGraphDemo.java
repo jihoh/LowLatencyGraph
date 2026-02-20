@@ -21,7 +21,7 @@ public class CoreGraphDemo {
         // --- Start Dashboard Server ---
         log.info("Booting Live Dashboard Server...");
         var dashboardServer = new com.trading.drg.web.GraphDashboardServer();
-        dashboardServer.start(7070);
+        dashboardServer.start(8080);
 
         // Attach the WebSocket broadcster to the engine
         var wsListener = new com.trading.drg.web.WebsocketPublisherListener(graph.getEngine(), dashboardServer);
