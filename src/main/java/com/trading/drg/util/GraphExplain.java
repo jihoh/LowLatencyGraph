@@ -102,12 +102,23 @@ public final class GraphExplain {
             Node<?> node = topology.node(i);
             String safeName = sanitize(node.name());
 
-            // Stylize nodes based on type/role
+            // Format the value nicely
+            double val = 0.0;
+            if (node instanceof ScalarNode sn) {
+                val = sn.doubleValue();
+            } else if (node instanceof ScalarSourceNode ssn) {
+                val = ssn.doubleValue();
+            }
+            String valueStr = String.format("%.4f", val);
+
+            // Stylize nodes based on type/role with HTML labels for bold values
             if (topology.isSource(i)) {
-                sb.append("  ").append(safeName).append("([\"").append(node.name()).append("\"]);\n");
+                sb.append("  ").append(safeName).append("([\"").append(node.name())
+                        .append("<br/><b>").append(valueStr).append("</b>\"]);\n");
                 sb.append("  style ").append(safeName).append(" fill:#e1f5fe,stroke:#01579b,stroke-width:2px;\n");
             } else {
-                sb.append("  ").append(safeName).append("[\"").append(node.name()).append("\"];\n");
+                sb.append("  ").append(safeName).append("[\"").append(node.name())
+                        .append("<br/><b>").append(valueStr).append("</b>\"];\n");
             }
 
             int cc = topology.childCount(i);
