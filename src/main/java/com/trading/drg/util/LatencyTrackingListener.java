@@ -28,6 +28,8 @@ import com.trading.drg.api.StabilizationListener;
 public final class LatencyTrackingListener implements StabilizationListener {
     private static final org.apache.logging.log4j.Logger log = org.apache.logging.log4j.LogManager
             .getLogger(LatencyTrackingListener.class);
+
+    private final ErrorRateLimiter errLimiter = new ErrorRateLimiter(log, 1000); // 1-second throttle
     private long stabilizeStartNanos, lastLatencyNanos;
     private long totalStabilizations, totalLatencyNanos;
     private long minLatencyNanos = Long.MAX_VALUE, maxLatencyNanos = Long.MIN_VALUE;
@@ -45,7 +47,7 @@ public final class LatencyTrackingListener implements StabilizationListener {
 
     @Override
     public void onNodeError(long epoch, int ti, String name, Throwable error) {
-        log.error("Graph Failure at Node '{}': {}", name, error.getMessage());
+        errLimiter.log(String.format("Graph Failure at Node '%s': %s", name, error.getMessage()), null);
     }
 
     @Override

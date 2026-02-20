@@ -61,6 +61,7 @@ public final class StabilizationEngine {
 
     private int lastStabilizedCount;
     private long epoch;
+    private long eventsProcessed;
     private StabilizationListener listener;
 
     public StabilizationEngine(TopologicalOrder topology) {
@@ -93,7 +94,10 @@ public final class StabilizationEngine {
      * Extremely fast (array access).
      */
     public void markDirty(int topoIndex) {
-        dirty[topoIndex] = true;
+        if (!dirty[topoIndex]) {
+            dirty[topoIndex] = true;
+            eventsProcessed++;
+        }
     }
 
     /**
@@ -233,6 +237,10 @@ public final class StabilizationEngine {
 
     public int nodeCount() {
         return topology.nodeCount();
+    }
+
+    public long totalEventsProcessed() {
+        return eventsProcessed;
     }
 
     public TopologicalOrder topology() {

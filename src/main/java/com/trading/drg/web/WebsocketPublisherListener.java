@@ -21,6 +21,9 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
     private final StabilizationEngine engine;
     private final GraphDashboardServer server;
+    private final String initialMermaid;
+    private final com.trading.drg.util.ErrorRateLimiter errLimiter = new com.trading.drg.util.ErrorRateLimiter(log,
+            1000);
 
     private final java.util.Map<String, Long> nanCounters = new java.util.HashMap<>();
 
@@ -36,6 +39,9 @@ public class WebsocketPublisherListener implements StabilizationListener {
     public WebsocketPublisherListener(StabilizationEngine engine, GraphDashboardServer server) {
         this.engine = engine;
         this.server = server;
+        this.initialMermaid = new com.trading.drg.util.GraphExplain(engine).toMermaid()
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n");
     }
 
     public void setLatencyListener(LatencyTrackingListener latencyListener) {
@@ -87,7 +93,8 @@ public class WebsocketPublisherListener implements StabilizationListener {
         // 2. Append metrics
         jsonBuilder.append(",\"metrics\":{")
                 .append("\"nodesUpdated\":").append(nodesStabilized).append(",")
-                .append("\"totalNodes\":").append(nodeCount);
+                .append("\"totalNodes\":").append(nodeCount).append(",")
+                .append("\"eventsProcessed\":").append(engine.totalEventsProcessed());
 
         if (latencyListener != null) {
             jsonBuilder.append(",\"latency\":{")
@@ -139,6 +146,24 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
         jsonBuilder.append("}");
 
+        jsonBuilder.append(",\"topology\":\"").append(initialMermaid).append("\"");
+
+        jsonBuilder.append(",\"routing\":{");
+        for (int i = 0; i < nodeCount; i++) {
+            jsonBuilder.append("\"").append(topology.node(i).name()).append("\":[");
+            int childCount = topology.childCount(i);
+            for (int j = 0; j < childCount; j++) {
+                int childId = topology.child(i, j);
+                jsonBuilder.append("\"").append(topology.node(childId).name()).append("\"");
+                if (j < childCount - 1)
+                    jsonBuilder.append(",");
+            }
+            jsonBuilder.append("]");
+            if (i < nodeCount - 1)
+                jsonBuilder.append(",");
+        }
+        jsonBuilder.append("}");
+
         jsonBuilder.append("}");
 
         // 3. Broadcast to all connected web clients
@@ -154,6 +179,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
     @Override
     public void onNodeError(long epoch, int topoIndex, String nodeName, Throwable error) {
         // In a real system, we might broadcast a special error payload here
-        log.error("Dashboard Publisher observed Node Error in {}: {}", nodeName, error.getMessage());
+        errLimiter.log(String.format("Dashboard Publisher observed Node Error in %s: %s", nodeName, error.getMessage()),
+                null);
     }
 }

@@ -21,8 +21,27 @@ const reactiveEff = document.getElementById('reactive-eff');
 let isGraphRendered = false;
 // Map to keep track of previous values to know when to trigger the flash animation
 const prevValues = new Map();
+// Stores the direct children of each node: { "NodeA": ["NodeB", "NodeC"] }
+let graphRouting = {};
 // Array to track message arrival times for Stabilization Rate calculation
 const messageTimes = [];
+let panZoomInstance = null;
+
+// The UI Zoom buttons bridge over to the active instance
+document.getElementById('zoom-in').addEventListener('click', () => {
+    if (panZoomInstance) panZoomInstance.zoomIn();
+});
+
+document.getElementById('zoom-out').addEventListener('click', () => {
+    if (panZoomInstance) panZoomInstance.zoomOut();
+});
+
+document.getElementById('zoom-reset').addEventListener('click', () => {
+    if (panZoomInstance) {
+        panZoomInstance.resetZoom();
+        panZoomInstance.center();
+    }
+});
 
 function connect() {
     const ws = new WebSocket(`ws://${window.location.host}/ws/graph`);
@@ -47,6 +66,9 @@ function connect() {
 
         // Update Metrics (Latency, Profile, Throguput, Efficiency)
         if (payload.metrics) {
+            if (payload.metrics.eventsProcessed !== undefined) {
+                document.getElementById('events-value').textContent = payload.metrics.eventsProcessed;
+            }
             if (payload.metrics.totalNodes !== undefined) {
                 reactiveEff.textContent = `${payload.metrics.nodesUpdated} / ${payload.metrics.totalNodes}`;
             }
@@ -78,15 +100,44 @@ function connect() {
         }
 
         if (!isGraphRendered) {
-            // First time: Ask Mermaid to render the graph structure we synthesize from the payload
-            const mermaidStr = buildMermaidString(payload.values);
-            const { svg } = await mermaid.render('graph-svg', mermaidStr);
-            graphContainer.innerHTML = svg;
-            isGraphRendered = true;
+            // First time: Read layout from server
+            if (payload.topology) {
+                const mermaidStr = payload.topology;
+                const { svg } = await mermaid.render('graph-svg', mermaidStr);
+                graphContainer.innerHTML = svg;
+                isGraphRendered = true;
 
-            // Store initial values
-            for (const [key, val] of Object.entries(payload.values)) {
-                prevValues.set(key, val);
+                // Hook into SVG and enable interactive vector tracking
+                const svgEl = graphContainer.querySelector('svg');
+                if (svgEl) {
+                    svgEl.removeAttribute('width');
+                    svgEl.removeAttribute('height');
+                    svgEl.style.width = '100%';
+                    svgEl.style.height = '100%';
+                    svgEl.style.maxWidth = 'none';
+
+                    panZoomInstance = svgPanZoom(svgEl, {
+                        zoomEnabled: true,
+                        controlIconsEnabled: false,
+                        fit: true,
+                        center: true,
+                        minZoom: 0.1,
+                        maxZoom: 50
+                    });
+                }
+
+                // Store routing map from backend
+                if (payload.routing) {
+                    graphRouting = payload.routing;
+                }
+
+                // Store initial values
+                for (const [key, val] of Object.entries(payload.values)) {
+                    prevValues.set(key, val);
+                }
+
+                // Attach our custom hover listeners
+                attachHoverListeners();
             }
         } else {
             // Hot Path: Do NOT re-render Mermaid. Just manipulate the DOM.
@@ -224,6 +275,52 @@ function updateGraphDOM(newValues) {
             }
 
             prevValues.set(nodeName, newVal);
+        }
+    }
+}
+
+// Recursively find all downstream components
+function getDownstreamNodes(nodeName, visited = new Set()) {
+    if (visited.has(nodeName)) return [];
+    visited.add(nodeName);
+    const children = graphRouting[nodeName] || [];
+    let allDownstream = [nodeName, ...children]; // Includes the node itself
+    for (const child of children) {
+        allDownstream = allDownstream.concat(getDownstreamNodes(child, visited));
+    }
+    return Array.from(new Set(allDownstream));
+}
+
+// Apply or remove hover CSS mathematically 
+function highlightNodes(nodeNames, isHovered) {
+    for (const name of nodeNames) {
+        const svgNodeId = getMermaidNodeId(name);
+        const nodeGroup = document.querySelector(`[id^="flowchart-${svgNodeId}-"]`);
+        if (nodeGroup) {
+            if (isHovered) {
+                nodeGroup.classList.add('node-hover-highlight');
+            } else {
+                nodeGroup.classList.remove('node-hover-highlight');
+            }
+        }
+    }
+}
+
+// Bind native browser pointer events onto the underlying DOM structure generated by Mermaid
+function attachHoverListeners() {
+    for (const nodeName of Object.keys(graphRouting)) {
+        const svgNodeId = getMermaidNodeId(nodeName);
+        const nodeGroup = document.querySelector(`[id^="flowchart-${svgNodeId}-"]`);
+
+        if (nodeGroup) {
+            nodeGroup.addEventListener('mouseenter', () => {
+                const downstream = getDownstreamNodes(nodeName);
+                highlightNodes(downstream, true);
+            });
+            nodeGroup.addEventListener('mouseleave', () => {
+                const downstream = getDownstreamNodes(nodeName);
+                highlightNodes(downstream, false);
+            });
         }
     }
 }

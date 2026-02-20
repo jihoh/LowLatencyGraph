@@ -21,21 +21,28 @@
 
     <main>
         <div class="graph-container">
-            <!-- Mermaid.js will mount here -->
-            <pre class="mermaid" id="graph-view">
-            </pre>
+            <div class="zoom-controls">
+                <button id="zoom-in" title="Zoom In">+</button>
+                <button id="zoom-reset" title="Reset Zoom">Fit</button>
+                <button id="zoom-out" title="Zoom Out">-</button>
+            </div>
+            <div class="graph-scroll-area">
+                <!-- Mermaid.js will mount here -->
+                <pre class="mermaid" id="graph-view">
+                </pre>
+            </div>
         </div>
 
         <div class="metrics-panel">
-            <h3>Stabilization Metrics</h3>
+            <h3>Graph Metrics</h3>
             <div class="metric-row">
                 <div class="metric-small">
                     <span class="label">Epoch</span>
                     <span class="value" id="epoch-value">0</span>
                 </div>
                 <div class="metric-small">
-                    <span class="label">Rate (Hz)</span>
-                    <span class="value" id="stab-rate">0</span>
+                    <span class="label">Events</span>
+                    <span class="value" id="events-value">0</span>
                 </div>
                 <div class="metric-small">
                     <span class="label">Evaluated</span>
@@ -43,15 +50,19 @@
                 </div>
             </div>
 
-            <h3>Stabilization Latency</h3>
+            <h3>Stabilization Metrics</h3>
             <div class="metric-row">
                 <div class="metric-small">
-                    <span class="label">Latest (μs)</span>
+                    <span class="label">Latest Latency (μs)</span>
                     <span class="value" id="lat-latest">0.00</span>
                 </div>
                 <div class="metric-small">
-                    <span class="label">Avg (μs)</span>
+                    <span class="label">Avg Latency (μs)</span>
                     <span class="value" id="lat-avg">0.00</span>
+                </div>
+                <div class="metric-small">
+                    <span class="label">Rate (Hz)</span>
+                    <span class="value" id="stab-rate">0</span>
                 </div>
             </div>
 
@@ -91,8 +102,9 @@
         </div>
     </main>
 
-    <!-- Load Mermaid -->
+    <!-- Load Mermaid & Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
     <script src="app.js"></script>
 </body>
 

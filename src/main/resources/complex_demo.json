@@ -1,0 +1,223 @@
+{
+    "graph": {
+        "name": "multi_leaf_tech_index",
+        "version": "4.0",
+        "templates": [
+            {
+                "name": "stock_metrics_deep",
+                "nodes": [
+                    {
+                        "name": "{{TICKER}}",
+                        "type": "scalar_source",
+                        "properties": {
+                            "initial_value": "{{START_PRICE}}"
+                        }
+                    },
+                    {
+                        "name": "{{TICKER}}_LogReturn",
+                        "type": "log_return",
+                        "dependencies": [
+                            "{{TICKER}}"
+                        ]
+                    },
+                    {
+                        "name": "{{TICKER}}_Vol",
+                        "type": "hist_vol",
+                        "dependencies": [
+                            "{{TICKER}}_LogReturn"
+                        ],
+                        "properties": {
+                            "window": 10
+                        }
+                    },
+                    {
+                        "name": "{{TICKER}}_ZScore",
+                        "type": "z_score",
+                        "dependencies": [
+                            "{{TICKER}}_Vol"
+                        ],
+                        "properties": {
+                            "window": 20
+                        }
+                    },
+                    {
+                        "name": "{{TICKER}}_Signal",
+                        "type": "ewma",
+                        "dependencies": [
+                            "{{TICKER}}_ZScore"
+                        ],
+                        "properties": {
+                            "alpha": 0.1
+                        }
+                    }
+                ]
+            }
+        ],
+        "nodes": [
+            {
+                "type": "template",
+                "properties": {
+                    "template": "stock_metrics_deep",
+                    "TICKER": "AAPL",
+                    "START_PRICE": 180.50
+                }
+            },
+            {
+                "name": "MSFT",
+                "type": "scalar_source",
+                "properties": {
+                    "initial_value": 410.20
+                }
+            },
+            {
+                "name": "MSFT_SMA",
+                "type": "sma",
+                "dependencies": [
+                    "MSFT"
+                ],
+                "properties": {
+                    "window": 10
+                }
+            },
+            {
+                "name": "GOOG",
+                "type": "scalar_source",
+                "properties": {
+                    "initial_value": 170.15
+                }
+            },
+            {
+                "name": "GOOG_RSI",
+                "type": "rsi",
+                "dependencies": [
+                    "GOOG"
+                ],
+                "properties": {
+                    "window": 14
+                }
+            },
+            {
+                "name": "GOOG_MACD",
+                "type": "macd",
+                "dependencies": [
+                    "GOOG_RSI"
+                ],
+                "properties": {
+                    "fast": 12,
+                    "slow": 26
+                }
+            },
+            {
+                "name": "AMZN",
+                "type": "scalar_source",
+                "properties": {
+                    "initial_value": 185.30
+                }
+            },
+            {
+                "name": "AMZN_Diff",
+                "type": "diff",
+                "dependencies": [
+                    "AMZN"
+                ]
+            },
+            {
+                "name": "AMZN_Vol",
+                "type": "hist_vol",
+                "dependencies": [
+                    "AMZN_Diff"
+                ],
+                "properties": {
+                    "window": 15
+                }
+            },
+            {
+                "name": "AMZN_Signal",
+                "type": "ewma",
+                "dependencies": [
+                    "AMZN_Vol"
+                ],
+                "properties": {
+                    "alpha": 0.2
+                }
+            },
+            {
+                "name": "Shared_Tech_Avg",
+                "type": "average",
+                "dependencies": [
+                    "AAPL_Signal",
+                    "MSFT_SMA"
+                ]
+            },
+            {
+                "name": "Tech_Avg_MACD",
+                "type": "macd",
+                "dependencies": [
+                    "Shared_Tech_Avg"
+                ],
+                "properties": {
+                    "fast": 12,
+                    "slow": 26
+                }
+            },
+            {
+                "name": "GOOG_AMZN_Avg",
+                "type": "average",
+                "dependencies": [
+                    "GOOG_MACD",
+                    "AMZN_Signal"
+                ]
+            },
+            {
+                "name": "GOOG_AMZN_Risk",
+                "type": "rolling_max",
+                "dependencies": [
+                    "GOOG_AMZN_Avg"
+                ],
+                "properties": {
+                    "window": 30
+                }
+            },
+            {
+                "name": "AAPL_Standalone_Risk",
+                "type": "rolling_max",
+                "dependencies": [
+                    "AAPL_Signal"
+                ],
+                "properties": {
+                    "window": 60
+                }
+            },
+            {
+                "name": "GOOG_Momentum_EWMA",
+                "type": "ewma",
+                "dependencies": [
+                    "GOOG_MACD"
+                ],
+                "properties": {
+                    "alpha": 0.15
+                }
+            },
+            {
+                "name": "AMZN_ZScore_Ext",
+                "type": "z_score",
+                "dependencies": [
+                    "AMZN_Signal"
+                ],
+                "properties": {
+                    "window": 25
+                }
+            },
+            {
+                "name": "MSFT_Vol_Ext",
+                "type": "hist_vol",
+                "dependencies": [
+                    "MSFT_SMA"
+                ],
+                "properties": {
+                    "window": 12
+                }
+            }
+        ]
+    }
+}
