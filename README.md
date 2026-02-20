@@ -214,43 +214,48 @@ Here is how you wire it all together in Java. This single `main` method demonstr
 
 ```java
 public class CoreGraphDemo {
-    public static void main(String[] args) throws InterruptedException {
-        // --------------------------------------------------------------------
-        // Step 1: Initialization
-        // --------------------------------------------------------------------
-        CoreGraph graph = new CoreGraph("src/main/resources/tri_arb.json");
-        StabilizationEngine engine = graph.engine();
+    public static void main(String[] args) throws Exception {
+        // Initialize CoreGraph 
+        var graph = new CoreGraph("src/main/resources/tri_arb.json");
+        var profiler = graph.enableNodeProfiling();
+        var latencyListener = graph.enableLatencyTracking();
 
-        // --------------------------------------------------------------------
-        // Step 2: Optimizing Sources (Cold Path)
-        // --------------------------------------------------------------------
-        // Resolve IDs once at startup to avoid String hashing on the hot path.
-        int eurUsdId = engine.topology().topoIndex("EURUSD");
-        int usdJpyId = engine.topology().topoIndex("USDJPY");
-        
-        // Get Source Nodes for direct updates
-        var eurUsd = (ScalarSourceNode) graph.nodes().get("EURUSD");
-        var usdJpy = (ScalarSourceNode) graph.nodes().get("USDJPY");
+        // Simulation Loop
+        Random rng = new Random(42);
+        int updates = 10_000;
 
-        // --------------------------------------------------------------------
-        // Step 3: Simulation Loop (Hot Path - Application Thread)
-        // --------------------------------------------------------------------
-        // In a passive model, YOU control the thread.
-        
-        while (true) {
-            // 1. Update Inputs
-            eurUsd.updateDouble(1.0850 + shock);
-            engine.markDirty(eurUsdId);
+        for (int i = 0; i < updates; i++) {
+            double shock = (rng.nextDouble() - 0.5) * 0.01;
 
-            usdJpy.updateDouble(145.20 + shock * 100);
-            engine.markDirty(usdJpyId);
-            
-            // 2. Stabilize (Propagate Changes)
-            engine.stabilize();
-            
-            // 3. (Optional) Read Snapshot
-            // ...
+            // Use direct values for the next step of the random walk
+            double currentEurUsd = graph.getDouble("EURUSD");
+            double currentUsdJpy = graph.getDouble("USDJPY");
+            double currentEurJpy = graph.getDouble("EURJPY");
+
+            if (i % 500 == 0) {
+                graph.update("EURJPY", 158.0);
+                graph.stabilize();
+            } else {
+                graph.update("EURUSD", currentEurUsd + shock);
+                graph.update("USDJPY", currentUsdJpy + shock * 100);
+                graph.update("EURJPY", currentEurJpy + shock * 100);
+                // Trigger stabilization manually
+                graph.stabilize();
+            }
+
+            if (i % 1000 == 0) {
+                double spread = graph.getDouble("Arb.Spread");
+                if (Math.abs(spread) > 0.05) {
+                    // Log the state we just saw
+                }
+            }
         }
+
+        // Get Latency Stats
+        System.out.println("\n--- Global Latency Stats ---");
+        System.out.println(latencyListener.dump());
+        System.out.println("\n--- Node Performance Profile ---");
+        System.out.println(profiler.dump());
     }
 }
 ```
