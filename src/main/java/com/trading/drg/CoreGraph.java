@@ -81,12 +81,6 @@ public class CoreGraph {
         // Register default listener via Composite
         this.compositeListener = new com.trading.drg.util.CompositeStabilizationListener();
 
-        this.engine.setListener(this.compositeListener);
-
-        // --- Graph Visualization ---
-        var graphExplain = new GraphExplain(engine);
-        log.info("Graph topology:\n{}", graphExplain.dumpTopology());
-        log.info("Mermaid topology:\n{}", graphExplain.toMermaid());
     }
 
     /**

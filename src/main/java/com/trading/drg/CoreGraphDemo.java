@@ -57,14 +57,14 @@ public class CoreGraphDemo {
             }
         }
 
+        System.out.println("\n--- Final Graph State (Mermaid) ---");
+        System.out.println(new com.trading.drg.util.GraphExplain(graph.getEngine()).toMermaid());
+
         // Get Latency Stats
         log.info("Demo complete.");
         System.out.println("\n--- Global Latency Stats ---");
         System.out.println(latencyListener.dump());
         System.out.println("\n--- Node Performance Profile ---");
         System.out.println(profiler.dump());
-
-        System.out.println("\n--- Final Graph State (Mermaid) ---");
-        System.out.println(new com.trading.drg.util.GraphExplain(graph.getEngine()).toMermaid());
     }
 }
