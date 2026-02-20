@@ -72,18 +72,18 @@ Every time `stabilize()` is called, the engine increments an internal `epoch` co
 *   All nodes computed in Epoch `N` see a consistent snapshot of inputs from Epoch `N-1` or `N`.
 *   This guarantees **Atomic Consistency**: You typically never see "half a curve update" or "half an arb". If an input changes, all dependent nodes are updated before any output is visible.
 
-### 2.4 Memory Layout (Structure of Arrays)
-To keep the CPU cache hot, CoreGraph avoids objects for graph nodes.
-Instead of `Node` objects, the engine uses **Parallel Arrays**:
+### 2.4 Memory Layout (CSR Topology)
+To keep the CPU cache hot during the critical `stabilize()` loop, CoreGraph avoids an object-oriented tree structure.
+Instead of Nodes holding `List<Node>` pointers to their children, the engine builds a **Compressed Sparse Row (CSR)** topology:
 
-```
-int[] nodeType;   // { COMPUTE, SOURCE, COMPUTE ... }
-double[] values;  // { 1.05,    145.2,  157.0 ... }
-long[] epochs;    // { 101,     101,    101 ... }
-int[] dirtyBits;  // { 0,       1,      0 ... }
+```java
+Node[] topoOrder;     // Nodes sorted by execution order
+int[] childrenOffset; // Index ranges for each node's children
+int[] childrenList;   // Flattened list of downstream dependencies
+boolean[] dirty;      // Re-evaluation bitset
 ```
 
-When the engine walks the graph, it streams through these primitive arrays. This is significantly faster than chasing pointers in a traditional object graph.
+When the engine walks the graph, it streams through these primitive arrays. This is significantly faster and more cache-friendly than chasing `Iterator` pointers in a traditional object graph.
 
 ---
 
@@ -391,9 +391,6 @@ Use **Java Flight Recorder (JFR)** to verify the "Zero Allocation" promise.
 5.  **Success Criteria:**
     *   **TLAB Allocations:** 0 bytes.
     *   **Boxed Integers/Doubles:** None.
-    *   **String Concatenation:** None.
-
-
     *   **String Concatenation:** None.
 
 ### 6.4 Performance Benchmarks
