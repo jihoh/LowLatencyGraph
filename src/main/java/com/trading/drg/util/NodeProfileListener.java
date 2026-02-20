@@ -16,10 +16,12 @@ public class NodeProfileListener implements StabilizationListener {
         public long totalDurationNanos;
         public long minDurationNanos = Long.MAX_VALUE;
         public long maxDurationNanos = Long.MIN_VALUE;
+        public long lastDurationNanos;
 
         void update(long duration) {
             count++;
             totalDurationNanos += duration;
+            lastDurationNanos = duration;
             if (duration < minDurationNanos)
                 minDurationNanos = duration;
             if (duration > maxDurationNanos)
@@ -74,9 +76,11 @@ public class NodeProfileListener implements StabilizationListener {
      */
     public synchronized String dump() {
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format("%-30s | %10s | %10s | %10s | %10s%n", "Node Name", "Count", "Avg (us)", "Min (us)",
+        sb.append(String.format("%-30s | %10s | %10s | %10s | %10s | %10s%n", "Node Name", "Count", "Recent(us)",
+                "Avg (us)", "Min (us)",
                 "Max (us)"));
-        sb.append("------------------------------------------------------------------------------------------\n");
+        sb.append(
+                "------------------------------------------------------------------------------------------------------\n");
 
         stats.entrySet().stream()
                 .sorted((e1, e2) -> Long.compare(e2.getValue().totalDurationNanos, e1.getValue().totalDurationNanos)) // Sort
@@ -87,9 +91,10 @@ public class NodeProfileListener implements StabilizationListener {
                 .forEach(e -> {
                     String name = e.getKey();
                     NodeStats s = e.getValue();
-                    sb.append(String.format("%-30s | %10d | %10.2f | %10.2f | %10.2f%n",
+                    sb.append(String.format("%-30s | %10d | %10.2f | %10.2f | %10.2f | %10.2f%n",
                             truncate(name, 30),
                             s.count,
+                            s.lastDurationNanos / 1000.0,
                             s.avgMicros(),
                             s.minDurationNanos / 1000.0,
                             s.maxDurationNanos / 1000.0));

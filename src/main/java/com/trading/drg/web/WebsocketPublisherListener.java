@@ -103,6 +103,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
                 var entry = topNodes.get(i);
                 jsonBuilder.append("{")
                         .append("\"name\":\"").append(entry.getKey()).append("\",")
+                        .append("\"latest\":").append(entry.getValue().lastDurationNanos / 1000.0).append(",")
                         .append("\"avg\":").append(entry.getValue().avgMicros())
                         .append("}");
                 if (i < topNodes.size() - 1) {
