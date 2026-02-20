@@ -14,13 +14,13 @@ const epochValue = document.getElementById('epoch-value');
 const latAvg = document.getElementById('lat-avg');
 const latLatest = document.getElementById('lat-latest');
 const profileBody = document.getElementById('profile-body');
-const tickRate = document.getElementById('tick-rate');
+const stabRate = document.getElementById('stab-rate');
 const reactiveEff = document.getElementById('reactive-eff');
 
 let isGraphRendered = false;
 // Map to keep track of previous values to know when to trigger the flash animation
 const prevValues = new Map();
-// Array to track message arrival times for Tick Rate calculation
+// Array to track message arrival times for Stabilization Rate calculation
 const messageTimes = [];
 
 function connect() {
@@ -50,7 +50,7 @@ function connect() {
                 reactiveEff.textContent = `${payload.metrics.nodesUpdated} / ${payload.metrics.totalNodes}`;
             }
 
-            // Real-time Tick Rate (Hz) using a sliding window
+            // Real-time Stabilizations / sec using a sliding window
             const now = performance.now();
             messageTimes.push(now);
             if (messageTimes.length > 50) {
@@ -59,7 +59,7 @@ function connect() {
             if (messageTimes.length > 1) {
                 const elapsedSc = (now - messageTimes[0]) / 1000.0;
                 const hz = (messageTimes.length - 1) / elapsedSc;
-                tickRate.textContent = Math.round(hz);
+                stabRate.textContent = Math.round(hz);
             }
 
             if (payload.metrics.latency) {
