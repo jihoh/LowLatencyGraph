@@ -14,6 +14,7 @@ const epochValue = document.getElementById('epoch-value');
 const latAvg = document.getElementById('lat-avg');
 const latMin = document.getElementById('lat-min');
 const latMax = document.getElementById('lat-max');
+const latLatest = document.getElementById('lat-latest');
 const profileBody = document.getElementById('profile-body');
 const tickRate = document.getElementById('tick-rate');
 const reactiveEff = document.getElementById('reactive-eff');
@@ -64,6 +65,9 @@ function connect() {
             }
 
             if (payload.metrics.latency) {
+                if (payload.metrics.latency.latest !== undefined) {
+                    latLatest.textContent = formatVal(payload.metrics.latency.latest, 2);
+                }
                 latAvg.textContent = formatVal(payload.metrics.latency.avg, 2);
                 latMin.textContent = formatVal(payload.metrics.latency.min, 2);
                 latMax.textContent = formatVal(payload.metrics.latency.max, 2);

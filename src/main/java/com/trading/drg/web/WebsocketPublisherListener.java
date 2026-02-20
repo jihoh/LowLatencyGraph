@@ -84,6 +84,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
         if (latencyListener != null) {
             jsonBuilder.append(",\"latency\":{")
+                    .append("\"latest\":").append(latencyListener.lastLatencyMicros()).append(",")
                     .append("\"avg\":").append(latencyListener.avgLatencyMicros()).append(",")
                     .append("\"min\":").append(latencyListener.minLatencyNanos() / 1000.0).append(",")
                     .append("\"max\":").append(latencyListener.maxLatencyNanos() / 1000.0)
