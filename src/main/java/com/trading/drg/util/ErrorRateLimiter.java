@@ -1,7 +1,6 @@
 package com.trading.drg.util;
 
 import org.apache.logging.log4j.Logger;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A utility class to limit the rate of error logging.
@@ -11,7 +10,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class ErrorRateLimiter {
     private final Logger logger;
     private final long minIntervalNanos;
-    private final AtomicLong lastLogTime = new AtomicLong(0);
+    private long lastLogTime = 0;
 
     public ErrorRateLimiter(Logger logger, long minIntervalMillis) {
         this.logger = logger;
@@ -20,13 +19,9 @@ public class ErrorRateLimiter {
 
     public void log(String message, Throwable t) {
         long now = System.nanoTime();
-        long last = lastLogTime.get();
-        if (now - last > minIntervalNanos) {
-            // Check-and-set to ensure only one thread logs per interval in concurrent
-            // scenarios
-            if (lastLogTime.compareAndSet(last, now)) {
-                logger.error(message + " (Throttled)", t);
-            }
+        if (now - lastLogTime > minIntervalNanos) {
+            lastLogTime = now;
+            logger.error(message + " (Throttled)", t);
         }
     }
 }

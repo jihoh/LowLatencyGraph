@@ -3,7 +3,6 @@ package com.trading.drg.util;
 import com.trading.drg.api.StabilizationListener;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -33,9 +32,9 @@ public class NodeProfileListener implements StabilizationListener {
     }
 
     // Map from Node Name -> Stats
-    // Using ConcurrentHashMap to allow safe inspection from other threads (e.g.
-    // dump())
-    private final Map<String, NodeStats> stats = new ConcurrentHashMap<>();
+    // Using HashMap for zero-overhead on the hot path (single-threaded).
+    // Access in dump() is synchronized for safety if called from another thread.
+    private final Map<String, NodeStats> stats = new HashMap<>();
 
     @Override
     public void onStabilizationStart(long epoch) {
@@ -66,8 +65,10 @@ public class NodeProfileListener implements StabilizationListener {
 
     /**
      * Returns a formatted table of node statistics.
+     * Synchronized to permit safe reading from an external monitoring thread
+     * while the engine thread writes.
      */
-    public String dump() {
+    public synchronized String dump() {
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("%-30s | %10s | %10s | %10s | %10s%n", "Node Name", "Count", "Avg (us)", "Min (us)",
                 "Max (us)"));
