@@ -14,10 +14,20 @@ public class CoreGraphDemo {
     public static void main(String[] args) throws Exception {
         log.info("Starting CoreGraph Demo...");
 
-        // Initialize CoreGraph
         var graph = new CoreGraph("src/main/resources/tri_arb.json");
         var profiler = graph.enableNodeProfiling();
         var latencyListener = graph.enableLatencyTracking();
+
+        // --- Start Dashboard Server ---
+        log.info("Booting Live Dashboard Server...");
+        var dashboardServer = new com.trading.drg.web.GraphDashboardServer();
+        dashboardServer.start(7070);
+
+        // Attach the WebSocket broadcster to the engine
+        var wsListener = new com.trading.drg.web.WebsocketPublisherListener(graph.getEngine(), dashboardServer);
+        wsListener.setLatencyListener(latencyListener);
+        wsListener.setProfileListener(profiler);
+        graph.setListener(wsListener);
 
         // Simulation Loop
         Random rng = new Random(42);
@@ -55,10 +65,16 @@ public class CoreGraphDemo {
                             currentEurJpy));
                 }
             }
+
+            // Sleep so the human watching the dashboard can see the updates
+            Thread.sleep(100);
         }
 
         System.out.println("\n--- Final Graph State (Mermaid) ---");
         System.out.println(new com.trading.drg.util.GraphExplain(graph.getEngine()).toMermaid());
+
+        // Stop the dashboard server after demo
+        dashboardServer.stop();
 
         // Get Latency Stats
         log.info("Demo complete.");

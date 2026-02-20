@@ -11,11 +11,11 @@ import java.util.stream.Collectors;
  */
 public class NodeProfileListener implements StabilizationListener {
 
-    private static class NodeStats {
-        long count;
-        long totalDurationNanos;
-        long minDurationNanos = Long.MAX_VALUE;
-        long maxDurationNanos = Long.MIN_VALUE;
+    public static class NodeStats {
+        public long count;
+        public long totalDurationNanos;
+        public long minDurationNanos = Long.MAX_VALUE;
+        public long maxDurationNanos = Long.MIN_VALUE;
 
         void update(long duration) {
             count++;
@@ -26,7 +26,7 @@ public class NodeProfileListener implements StabilizationListener {
                 maxDurationNanos = duration;
         }
 
-        double avgMicros() {
+        public double avgMicros() {
             return count == 0 ? 0 : (totalDurationNanos / (double) count) / 1000.0;
         }
     }
@@ -35,6 +35,10 @@ public class NodeProfileListener implements StabilizationListener {
     // Using HashMap for zero-overhead on the hot path (single-threaded).
     // Access in dump() is synchronized for safety if called from another thread.
     private final Map<String, NodeStats> stats = new HashMap<>();
+
+    public Map<String, NodeStats> getStats() {
+        return stats;
+    }
 
     @Override
     public void onStabilizationStart(long epoch) {

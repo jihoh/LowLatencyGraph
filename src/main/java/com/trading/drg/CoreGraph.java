@@ -80,6 +80,7 @@ public class CoreGraph {
 
         // Register default listener via Composite
         this.compositeListener = new com.trading.drg.util.CompositeStabilizationListener();
+        this.engine.setListener(this.compositeListener);
 
     }
 
