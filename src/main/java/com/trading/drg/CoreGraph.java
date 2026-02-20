@@ -7,17 +7,8 @@ import com.trading.drg.io.GraphDefinition;
 import com.trading.drg.io.JsonGraphCompiler;
 import com.trading.drg.io.JsonParser;
 // Removed Wiring imports
+import com.trading.drg.api.ScalarValue;
 import com.trading.drg.util.GraphExplain;
-import com.trading.drg.util.AsyncGraphSnapshot;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import com.trading.drg.engine.StabilizationEngine;
-import com.trading.drg.io.GraphDefinition;
-import com.trading.drg.io.JsonGraphCompiler;
-import com.trading.drg.io.JsonParser;
-// wiring imports removed
-import com.trading.drg.util.GraphExplain;
-import com.trading.drg.util.AsyncGraphSnapshot;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -47,7 +38,6 @@ public class CoreGraph {
     // Removed Disruptor, RingBuffer, Publisher
 
     private final com.trading.drg.util.CompositeStabilizationListener compositeListener;
-    private final AsyncGraphSnapshot masterSnapshot;
 
     // Cache source nodes for O(1) updates
     private final Node<?>[] sourceNodes;
@@ -94,18 +84,6 @@ public class CoreGraph {
 
         this.engine.setListener(this.compositeListener);
 
-        // --- Async Snapshot Integration ---
-        // Find all nodes that are ScalarValues and add them to the snapshot
-        var scalarNodeNames = nodes.entrySet().stream()
-                .filter(e -> e.getValue() instanceof com.trading.drg.api.ScalarValue)
-                .map(Map.Entry::getKey)
-                .toArray(String[]::new);
-
-        this.masterSnapshot = new AsyncGraphSnapshot(this, scalarNodeNames);
-        // Post-stabilization callback now handled manually by stabilize()
-        // or by a listener if preferred, but for Snapshot we want it guaranteed.
-        // We will call snapshot.update() inside our manual stabilize() method.
-
         // --- Export Graph Visualization ---
         try {
             String mermaid = new GraphExplain(engine).toMermaid();
@@ -121,11 +99,14 @@ public class CoreGraph {
 
     /**
      * Registers a listener to monitor stabilization events.
+     * Note: This adds to the composite listener rather than overwriting existing
+     * listeners
+     * (such as latency or profiling trackers).
      *
      * @param listener The listener to register.
      */
     public void setListener(StabilizationListener listener) {
-        engine.setListener(listener);
+        compositeListener.addForComposite(listener);
     }
 
     /**
@@ -158,12 +139,15 @@ public class CoreGraph {
     }
 
     /**
-     * Returns the master snapshot containing all scalar nodes in the graph.
-     * Use {@link AsyncGraphSnapshot#getDouble(String)} for convenient thread-safe
-     * access.
+     * Helper to read the current value of a Scalar node directly from the graph.
+     * Guaranteed safe in single-threaded usage.
      */
-    public AsyncGraphSnapshot getSnapshot() {
-        return masterSnapshot;
+    public double getDouble(String name) {
+        Node<?> node = getNode(name);
+        if (node instanceof ScalarValue sv) {
+            return sv.doubleValue();
+        }
+        throw new IllegalArgumentException("Node " + name + " is not a ScalarValue.");
     }
 
     /**
@@ -229,15 +213,11 @@ public class CoreGraph {
 
     /**
      * Triggers a stabilization cycle on the engine.
-     * If the graph stabilizes successfully, the AsyncSnapshot is updated.
      *
      * @return Number of nodes recomputed.
      */
     public int stabilize() {
-        int n = engine.stabilize();
-        // Update the convenient/safe snapshot for readers
-        masterSnapshot.update(engine.epoch(), n);
-        return n;
+        return engine.stabilize();
     }
 
     // Deprecated / Backwards Compat proxies if needed,
