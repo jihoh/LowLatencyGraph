@@ -14,6 +14,7 @@ const epochValue = document.getElementById('epoch-value');
 const latAvg = document.getElementById('lat-avg');
 const latLatest = document.getElementById('lat-latest');
 const profileBody = document.getElementById('profile-body');
+const nanBody = document.getElementById('nan-body');
 const stabRate = document.getElementById('stab-rate');
 const reactiveEff = document.getElementById('reactive-eff');
 
@@ -70,6 +71,9 @@ function connect() {
             }
             if (payload.metrics.profile) {
                 updateProfileTable(payload.metrics.profile);
+            }
+            if (payload.metrics.nanStats) {
+                updateNanTable(payload.metrics.nanStats);
             }
         }
 
@@ -146,6 +150,28 @@ function updateProfileTable(profileArray) {
     profileBody.innerHTML = html;
 }
 
+// Update the Top NaN Stats table dynamically
+function updateNanTable(nanArray) {
+    if (!nanArray || nanArray.length === 0) {
+        nanBody.innerHTML = '<tr><td colspan="2" style="text-align: center; color: var(--text-muted); font-style: italic;">No NaN occurrences</td></tr>';
+        return;
+    }
+    let html = '';
+    for (const stat of nanArray) {
+        let displayName = stat.name;
+        if (displayName.length > 20) {
+            displayName = displayName.substring(0, 17) + '...';
+        }
+        html += `
+            <tr>
+                <td title="${stat.name}">${displayName}</td>
+                <td class="right">${stat.count}</td>
+            </tr>
+        `;
+    }
+    nanBody.innerHTML = html;
+}
+
 // Sanitize name to match Mermaid's internal ID generator
 function getMermaidNodeId(nodeName) {
     if (!nodeName) return "";
@@ -164,20 +190,29 @@ function updateGraphDOM(newValues) {
             const nodeGroup = document.querySelector(`[id^="flowchart-${svgNodeId}-"]`);
 
             if (nodeGroup) {
+                const isNaN = newVal === "NaN";
+                if (isNaN) {
+                    nodeGroup.classList.add('nan-node');
+                } else {
+                    nodeGroup.classList.remove('nan-node');
+                }
+
                 // Find the existing bold tag we injected via <br/><b>...</b> in the mermaid string
                 // Mermaid renders these inside a <foreignObject> or <text> group.
                 const htmlContainer = nodeGroup.querySelector('div, span');
+                const displayVal = isNaN ? "NaN" : formatVal(newVal);
+
                 // The easiest DOM trick is to replace the innerText of the exact matched string
                 if (htmlContainer) {
                     htmlContainer.innerHTML = htmlContainer.innerHTML.replace(
                         new RegExp(`<b>.*?</b>`),
-                        `<b>${formatVal(newVal)}</b>`
+                        `<b>${displayVal}</b>`
                     );
                 } else {
                     // Fallback for strict SVG text nodes (if htmlLabels: false)
                     const textNodes = nodeGroup.querySelectorAll('tspan');
                     if (textNodes.length > 1) {
-                        textNodes[textNodes.length - 1].textContent = formatVal(newVal);
+                        textNodes[textNodes.length - 1].textContent = displayVal;
                     }
                 }
 

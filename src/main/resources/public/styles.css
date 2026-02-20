@@ -282,3 +282,22 @@ td.right {
         opacity: 1;
     }
 }
+
+/* NaN Node Styling */
+.nan-node rect,
+.nan-node circle,
+.nan-node polygon,
+.nan-node path {
+    fill: #2c0b0e !important;
+    stroke: #dc3545 !important;
+    stroke-width: 2px !important;
+}
+
+.nan-node text,
+.nan-node tspan,
+.nan-node div,
+.nan-node span,
+.nan-node b {
+    color: #ffb3b8 !important;
+    fill: #ffb3b8 !important;
+}

@@ -22,6 +22,8 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final StabilizationEngine engine;
     private final GraphDashboardServer server;
 
+    private final java.util.Map<String, Long> nanCounters = new java.util.HashMap<>();
+
     // Optional metrics listeners
     private LatencyTrackingListener latencyListener;
     private NodeProfileListener profileListener;
@@ -68,7 +70,12 @@ public class WebsocketPublisherListener implements StabilizationListener {
                 val = ssn.doubleValue();
             }
 
-            jsonBuilder.append("\"").append(node.name()).append("\":").append(val);
+            if (Double.isNaN(val)) {
+                nanCounters.put(node.name(), nanCounters.getOrDefault(node.name(), 0L) + 1);
+                jsonBuilder.append("\"").append(node.name()).append("\":\"NaN\"");
+            } else {
+                jsonBuilder.append("\"").append(node.name()).append("\":").append(val);
+            }
 
             if (i < nodeCount - 1) {
                 jsonBuilder.append(",");
@@ -105,6 +112,25 @@ public class WebsocketPublisherListener implements StabilizationListener {
                         .append("\"avg\":").append(entry.getValue().avgMicros())
                         .append("}");
                 if (i < topNodes.size() - 1) {
+                    jsonBuilder.append(",");
+                }
+            }
+            jsonBuilder.append("]");
+        }
+
+        if (!nanCounters.isEmpty()) {
+            jsonBuilder.append(",\"nanStats\":[");
+            var topNanNodes = nanCounters.entrySet().stream()
+                    .sorted((e1, e2) -> Long.compare(e2.getValue(), e1.getValue()))
+                    .limit(5)
+                    .toList();
+            for (int i = 0; i < topNanNodes.size(); i++) {
+                var entry = topNanNodes.get(i);
+                jsonBuilder.append("{")
+                        .append("\"name\":\"").append(entry.getKey()).append("\",")
+                        .append("\"count\":").append(entry.getValue())
+                        .append("}");
+                if (i < topNanNodes.size() - 1) {
                     jsonBuilder.append(",");
                 }
             }
