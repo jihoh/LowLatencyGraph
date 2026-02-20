@@ -11,8 +11,6 @@ import com.trading.drg.util.NodeProfileListener;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.Comparator;
-
 /**
  * A listener that observes the graph engine and broadcasts the
  * entire graph state (node values) along with optional telemetry
@@ -79,45 +77,41 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
         jsonBuilder.append("}");
 
-        // 2. Append metrics if available
-        if (latencyListener != null || profileListener != null) {
-            jsonBuilder.append(",\"metrics\":{");
+        // 2. Append metrics
+        jsonBuilder.append(",\"metrics\":{")
+                .append("\"nodesUpdated\":").append(nodesStabilized).append(",")
+                .append("\"totalNodes\":").append(nodeCount);
 
-            if (latencyListener != null) {
-                jsonBuilder.append("\"latency\":{")
-                        .append("\"avg\":").append(latencyListener.avgLatencyMicros()).append(",")
-                        .append("\"min\":").append(latencyListener.minLatencyNanos() / 1000.0).append(",")
-                        .append("\"max\":").append(latencyListener.maxLatencyNanos() / 1000.0)
-                        .append("}");
-            }
-
-            if (latencyListener != null && profileListener != null) {
-                jsonBuilder.append(",");
-            }
-
-            if (profileListener != null) {
-                jsonBuilder.append("\"profile\":[");
-                var topNodes = profileListener.getStats().entrySet().stream()
-                        .sorted((e1, e2) -> Long.compare(e2.getValue().totalDurationNanos,
-                                e1.getValue().totalDurationNanos))
-                        .limit(5)
-                        .toList();
-
-                for (int i = 0; i < topNodes.size(); i++) {
-                    var entry = topNodes.get(i);
-                    jsonBuilder.append("{")
-                            .append("\"name\":\"").append(entry.getKey()).append("\",")
-                            .append("\"avg\":").append(entry.getValue().avgMicros())
-                            .append("}");
-                    if (i < topNodes.size() - 1) {
-                        jsonBuilder.append(",");
-                    }
-                }
-                jsonBuilder.append("]");
-            }
-
-            jsonBuilder.append("}");
+        if (latencyListener != null) {
+            jsonBuilder.append(",\"latency\":{")
+                    .append("\"avg\":").append(latencyListener.avgLatencyMicros()).append(",")
+                    .append("\"min\":").append(latencyListener.minLatencyNanos() / 1000.0).append(",")
+                    .append("\"max\":").append(latencyListener.maxLatencyNanos() / 1000.0)
+                    .append("}");
         }
+
+        if (profileListener != null) {
+            jsonBuilder.append(",\"profile\":[");
+            var topNodes = profileListener.getStats().entrySet().stream()
+                    .sorted((e1, e2) -> Long.compare(e2.getValue().totalDurationNanos,
+                            e1.getValue().totalDurationNanos))
+                    .limit(5)
+                    .toList();
+
+            for (int i = 0; i < topNodes.size(); i++) {
+                var entry = topNodes.get(i);
+                jsonBuilder.append("{")
+                        .append("\"name\":\"").append(entry.getKey()).append("\",")
+                        .append("\"avg\":").append(entry.getValue().avgMicros())
+                        .append("}");
+                if (i < topNodes.size() - 1) {
+                    jsonBuilder.append(",");
+                }
+            }
+            jsonBuilder.append("]");
+        }
+
+        jsonBuilder.append("}");
 
         jsonBuilder.append("}");
 

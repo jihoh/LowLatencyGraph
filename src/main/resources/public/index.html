@@ -28,9 +28,19 @@
 
         <div class="metrics-panel">
             <h3>Simulation State</h3>
-            <div class="metric">
-                <span class="label">Logical Time (Epoch)</span>
-                <span class="value" id="epoch-value">0</span>
+            <div class="metric-row">
+                <div class="metric-small">
+                    <span class="label">Logical Time</span>
+                    <span class="value" id="epoch-value">0</span>
+                </div>
+                <div class="metric-small">
+                    <span class="label">Tick Rate (Hz)</span>
+                    <span class="value" id="tick-rate">0</span>
+                </div>
+                <div class="metric-small">
+                    <span class="label">Evaluated</span>
+                    <span class="value" id="reactive-eff">0 / 0</span>
+                </div>
             </div>
 
             <h3>Global Latency</h3>
@@ -55,7 +65,7 @@
                     <thead>
                         <tr>
                             <th>Node</th>
-                            <th class="right">Avg Time <span style="text-transform: none;">(μs)</span></th>
+                            <th class="right">Avg Time <span style="text-transform: lowercase;">(&mu;s)</span></th>
                         </tr>
                     </thead>
                     <tbody id="profile-body">

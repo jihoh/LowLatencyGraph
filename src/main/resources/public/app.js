@@ -15,10 +15,14 @@ const latAvg = document.getElementById('lat-avg');
 const latMin = document.getElementById('lat-min');
 const latMax = document.getElementById('lat-max');
 const profileBody = document.getElementById('profile-body');
+const tickRate = document.getElementById('tick-rate');
+const reactiveEff = document.getElementById('reactive-eff');
 
 let isGraphRendered = false;
 // Map to keep track of previous values to know when to trigger the flash animation
 const prevValues = new Map();
+// Array to track message arrival times for Tick Rate calculation
+const messageTimes = [];
 
 function connect() {
     const ws = new WebSocket(`ws://${window.location.host}/ws/graph`);
@@ -41,8 +45,24 @@ function connect() {
         // Update epoch counter
         epochValue.textContent = payload.epoch;
 
-        // Update Metrics (Latency & Profile)
+        // Update Metrics (Latency, Profile, Throguput, Efficiency)
         if (payload.metrics) {
+            if (payload.metrics.totalNodes !== undefined) {
+                reactiveEff.textContent = `${payload.metrics.nodesUpdated} / ${payload.metrics.totalNodes}`;
+            }
+
+            // Real-time Tick Rate (Hz) using a sliding window
+            const now = performance.now();
+            messageTimes.push(now);
+            if (messageTimes.length > 50) {
+                messageTimes.shift();
+            }
+            if (messageTimes.length > 1) {
+                const elapsedSc = (now - messageTimes[0]) / 1000.0;
+                const hz = (messageTimes.length - 1) / elapsedSc;
+                tickRate.textContent = Math.round(hz);
+            }
+
             if (payload.metrics.latency) {
                 latAvg.textContent = formatVal(payload.metrics.latency.avg, 2);
                 latMin.textContent = formatVal(payload.metrics.latency.min, 2);
