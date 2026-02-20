@@ -165,7 +165,14 @@ public final class StabilizationEngine {
                 try {
                     changed = node.stabilize();
                 } catch (Throwable e) {
-                    // ... (existing catch block) ...
+                    passFailed = true;
+                    if (firstError == null) {
+                        firstError = e;
+                    }
+                    if (hasListener) {
+                        l.onNodeError(epoch, ti, node.name(), e);
+                    }
+                    break; // Stop processing further nodes on critical failure
                 }
 
                 stabilizedCount++;
