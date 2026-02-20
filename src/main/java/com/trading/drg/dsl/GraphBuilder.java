@@ -209,25 +209,6 @@ public final class GraphBuilder {
         return node;
     }
 
-    // ── Map nodes ────────────────────────────────────────────────
-
-    /**
-     * Creates a MapNode for reporting/debugging.
-     * Uses default tolerance of 1e-9.
-     */
-    public MapNode mapNode(String name, MapComputeFn fn, String[] keys, Node<?>... inputs) {
-        return mapNode(name, 1e-9, fn, keys, inputs);
-    }
-
-    public MapNode mapNode(String name, double tolerance, MapComputeFn fn, String[] keys, Node<?>... inputs) {
-        checkNotBuilt();
-        var node = new MapNode(name, keys, inputs, fn, tolerance);
-        register(node);
-        for (Node<?> in : inputs)
-            addEdge(in.name(), name);
-        return node;
-    }
-
     // ── Conditionals / signals ───────────────────────────────────
 
     /**

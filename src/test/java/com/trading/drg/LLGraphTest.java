@@ -32,7 +32,6 @@ public class LLGraphTest {
         testBasic();
         testQuoter();
         testVector();
-        testMapNode();
         testSignals();
         testTemplate();
         testCutoff();
@@ -111,30 +110,6 @@ public class LLGraphTest {
         engine.stabilize();
         double expected = 1.0 / (1.0 + 0.045 * 0.25);
         check("DF(3m) correct", Math.abs(df0.doubleValue() - expected) < 1e-10);
-    }
-
-    static void testMapNode() {
-        System.out.println("\n── 4. MapNode (Greeks) ──");
-        var g = GraphBuilder.create("greeks");
-        var price = g.scalarSource("price", 100.0);
-        var vol = g.scalarSource("vol", 0.20);
-        var greeks = g.mapNode("greeks",
-                (inputs, out) -> {
-                    double p = ((ScalarSourceNode) inputs[0]).doubleValue();
-                    double v = ((ScalarSourceNode) inputs[1]).doubleValue();
-                    out.put("delta", 0.55);
-                    out.put("gamma", 0.02);
-                    out.put("vega", v * 0.5);
-                },
-                new String[] { "delta", "gamma", "vega" },
-                price, vol);
-        var engine = g.build();
-        engine.markDirty("price");
-        engine.markDirty("vol");
-        engine.stabilize();
-        check("delta = 0.55", Math.abs(greeks.get("delta") - 0.55) < 1e-10);
-        check("vega = 0.10", Math.abs(greeks.get("vega") - 0.10) < 1e-10);
-        check("3 keys", greeks.keyCount() == 3);
     }
 
     static void testSignals() {
