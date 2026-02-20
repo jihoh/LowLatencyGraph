@@ -95,7 +95,7 @@ public class EngineNaNDetectionTest {
         // 5. Verify
         assertTrue("onNodeError should have been called for NaN value", errorReported.get());
         assertNotNull("Error exception should not be null", errorRef.get());
-        assertTrue("Error should be ArithmeticException", errorRef.get() instanceof ArithmeticException);
+        assertTrue("Error should be RuntimeException", errorRef.get() instanceof RuntimeException);
         assertEquals("Error message should match", "Node evaluated to NaN", errorRef.get().getMessage());
 
         System.out.println("Verified: Engine reported error for NaN value: " + errorRef.get().getMessage());

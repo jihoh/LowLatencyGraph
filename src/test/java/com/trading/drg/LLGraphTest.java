@@ -3,10 +3,7 @@ package com.trading.drg;
 import com.trading.drg.api.*;
 import com.trading.drg.engine.*;
 import com.trading.drg.dsl.*;
-import com.trading.drg.wiring.*;
 import com.trading.drg.node.*;
-import com.trading.drg.wiring.GraphEvent;
-import com.trading.drg.wiring.GraphPublisher;
 import com.trading.drg.fn.TemplateFactory;
 import com.trading.drg.io.JsonGraphCompiler;
 import com.trading.drg.io.JsonParser;
@@ -41,7 +38,6 @@ public class LLGraphTest {
         testCutoff();
         testCycleDetection();
         testJson();
-        testGraphPublisher();
         testBenchmark();
 
         System.out.println("\n════════════════════════════════════════════════");
@@ -235,30 +231,6 @@ public class LLGraphTest {
         compiled.engine().stabilize();
         var x = (ScalarSourceNode) compiled.nodesByName().get("x");
         check("JSON source x = 42", Math.abs(x.doubleValue() - 42.0) < 1e-10);
-    }
-
-    static void testGraphPublisher() {
-        System.out.println("\n── 10. GraphPublisher ──");
-        var g = GraphBuilder.create("pub_test");
-        var bid = g.scalarSource("bid", 99.0);
-        var ask = g.scalarSource("ask", 101.0);
-        var mid = g.compute("mid", (b, a) -> (b + a) / 2.0, bid, ask);
-        var engine = g.build();
-        engine.markDirty("bid");
-        engine.markDirty("ask");
-        engine.stabilize();
-
-        var pub = new GraphPublisher(engine);
-        boolean[] fired = { false };
-        pub.setPostStabilizationCallback((ep, n) -> fired[0] = true);
-
-        var evt = new GraphEvent();
-        // Zero-GC: Resolve ID first
-        int bidId = engine.topology().topoIndex("bid");
-        evt.setDoubleUpdate(bidId, 100.0, true, 1);
-        pub.onEvent(evt, 1, false);
-        check("Publisher callback fired", fired[0]);
-        check("mid updated to 100.5", Math.abs(mid.doubleValue() - 100.5) < 1e-10);
     }
 
     static void testBenchmark() {

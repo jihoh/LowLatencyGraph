@@ -24,8 +24,8 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorValue
     private final String name;
     private final double tolerance;
     private final int size;
-    private final double[] currentValues;
-    private final double[] previousValues;
+    private double[] currentValues;
+    private double[] previousValues;
     private boolean initialized = false;
 
     public VectorSourceNode(String name, int size, double tolerance) {
@@ -66,8 +66,8 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorValue
                 throw new IllegalArgumentException("Invalid value in vector update: " + v + " for node: " + name);
             }
         }
-        // Only update current values. Do NOT touch previousValues until stabilize()
-        System.arraycopy(values, 0, currentValues, 0, size);
+        // Zero-Allocation Single-Threaded Update: Assign array reference directly.
+        this.currentValues = values;
     }
 
     /**
@@ -105,7 +105,7 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorValue
         }
 
         if (changed) {
-            // Commit new state
+            // Commit new state directly
             System.arraycopy(currentValues, 0, previousValues, 0, size);
         }
         return changed;
