@@ -11,7 +11,7 @@ Unlike traditional object-oriented systems where business logic is scattered acr
 *   **Ultra-Low Latency:** Optimized for ~1 microsecond stabilization latency on modern CPUs.
 *   **Predictability:** **Zero-GC** (Garbage Collection) on the hot path. All memory is pre-allocated.
 *   **Throughput:** Capable of processing millions of updates per second on a single thread.
-*   **Wait-Free Consumption:** A Triple-Buffered snapshot mechanism allows the main application thread to read consistent data without ever blocking the graph engine.
+*   **Zero-Overhead Read:** Direct node value access for the main application thread without GC pressure.
 *   **Safety:** Statically typed, cycle-free topology with explicit ownership.
 
 ### Use Cases
@@ -50,12 +50,12 @@ The system is designed as a **Passive** graph engine. The application thread dri
          ▼
  [Post-Stabilization]
          │
-         │ (5) AsyncGraphSnapshot.update() (Atomic Triple-Buffer Swap)
+         │ (wait-free direct access as engine is stable)
          ▼
  [Reader / UI / Risk System]
          │
-         │ (6) reader.refresh()
-         │ (7) Read Consistent State
+         │ (5) graph.getDouble("Node")
+         │ (6) Read Consistent State
 ```
 
 ### 2.2 Core Components
@@ -64,7 +64,6 @@ The system is designed as a **Passive** graph engine. The application thread dri
 |-----------|----------------|-----------------------|
 | `StabilizationEngine` | **Runtime Kernel**. Executes the graph logic. | **Zero-Allocation**. Uses `double[]` for values and flat `int[]` arrays for connectivity. Eliminates pointer chasing. |
 | `GraphBuilder` | **Compiler**. Defines the topology. | Compiles the graph description into **CSR (Compressed Sparse Row)** format - flattened integer arrays for maximum cache locality. |
-| `AsyncGraphSnapshot` | **Bridge**. Safe data access. | **Triple Buffering**. Ensures the writer never blocks waiting for a reader, and the reader never retries. |
 | `JsonGraphCompiler` | **Loader**. JSON -> Graph. | Allows defining topology in data, decoupling strategy configuration from code compilation. |
 
 ### 2.3 The "Epoch" Concept
@@ -365,27 +364,23 @@ Ensure your `Rsi` class has a constructor matching the properties map or a speci
 
 ---
 
-## 6. Advanced Mechanics & Performance Tuning
+### 6.2 The Two Performance Listeners
 
-### 6.1 Triple Buffering Deep Dive
+CoreGraph uses two distinct performance tracking mechanisms via `StabilizationListener` implementations. They are kept separated intentionally to manage runtime overhead:
 
-**The Three Buffers:**
-1.  **Dirty Buffer (Writer-local):** The Graph Thread writes new updates here. It is private to the writer.
-2.  **Clean Buffer (Shared Atomic):** The latest *complete* snapshot. This acts as the hand-off point.
-3.  **Snapshot Buffer (Reader-local):** The snapshot the reader is currently engaging with.
+1. **`LatencyTrackingListener` (O(1) Overhead):**
+   *   **What it tracks:** Global `stabilize()` latency (min/max/avg) and throughput.
+   *   **Mechanism:** Only captures `System.nanoTime()` at the very start and very end of the stabilization cycle. The per-node observation is an empty `no-op`.
+   *   **Use Case:** Safe for always-on production monitoring.
 
-**The Swap Protocol:**
-*   **On Stabilization (Application Thread):**
-    1.  Engine computes values into the `Dirty Buffer` (the working state).
-    2.  At the end of `stabilize()`, it atomically swaps `Dirty` and `Clean`.
-*   **On Refresh (Reader):**
-    1.  Atomically swap `Snapshot` and `Clean`. The old `Snapshot` becomes the new `Clean` (recycled).
+2. **`NodeProfileListener` (O(N) Overhead):**
+   *   **What it tracks:** The specific min/max/avg execution time of every single function node individually.
+   *   **Mechanism:** Looks up the `NodeStats` object in a `ConcurrentHashMap` for every node that successfully fires and updates the duration.
+   *   **Use Case:** Development and benchmarking only. Disable in production hot-paths to avoid map lookup overhead.
 
-**Why it matters:**
-*   **No Locks:** Neither thread ever waits on a `synchronized` block or `ReentrantLock`.
-*   **Consistency:** The reader always sees a full, valid snapshot of the *entire* graph at a specific epoch of time.
+*Note: You can safely attach both via the `CompositeStabilizationListener` managed within `CoreGraph`.*
 
-### 6.2 Profiling Best Practices
+### 6.3 Profiling Best Practices
 
 Use **Java Flight Recorder (JFR)** to verify the "Zero Allocation" promise.
 
@@ -401,7 +396,7 @@ Use **Java Flight Recorder (JFR)** to verify the "Zero Allocation" promise.
 
     *   **String Concatenation:** None.
 
-### 6.3 Performance Benchmarks
+### 6.4 Performance Benchmarks
 
 Sample latency statistics from `CoreGraphDemo` :
 
