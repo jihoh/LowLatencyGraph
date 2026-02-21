@@ -18,9 +18,7 @@ public class JsonTemplateDemo {
         // graph.start();
 
         // 2. Access nodes created from templates
-        var aIn = graph.<ScalarValue>getNode("A.in");
         var aOut = graph.<ScalarValue>getNode("A.out");
-        var bIn = graph.<ScalarValue>getNode("B.in");
         var bOut = graph.<ScalarValue>getNode("B.out");
 
         log.info("Initial Values: A.out={}, B.out={}", aOut.doubleValue(), bOut.doubleValue());

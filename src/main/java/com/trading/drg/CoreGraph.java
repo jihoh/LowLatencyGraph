@@ -8,9 +8,6 @@ import com.trading.drg.io.JsonGraphCompiler;
 import com.trading.drg.io.JsonParser;
 // Removed Wiring imports
 import com.trading.drg.api.ScalarValue;
-import com.trading.drg.util.GraphExplain;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -31,8 +28,6 @@ import java.util.Map;
  * </ul>
  */
 public class CoreGraph {
-    private static final Logger log = LogManager.getLogger(CoreGraph.class);
-
     private final StabilizationEngine engine;
     private final Map<String, Node<?>> nodes;
 

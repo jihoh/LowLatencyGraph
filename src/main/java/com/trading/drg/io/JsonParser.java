@@ -63,7 +63,9 @@ public final class JsonParser {
                 List<GraphDefinition.NodeDef> tNodeDefs = new ArrayList<>();
                 if (tNodesList != null) {
                     for (Object nodeObj : tNodesList) {
-                        tNodeDefs.add(parseNodeDef((Map<String, Object>) nodeObj));
+                        @SuppressWarnings("unchecked")
+                        var nm = (Map<String, Object>) nodeObj;
+                        tNodeDefs.add(parseNodeDef(nm));
                     }
                 }
                 td.setNodes(tNodeDefs);
@@ -77,7 +79,9 @@ public final class JsonParser {
         List<GraphDefinition.NodeDef> nodeDefs = new ArrayList<>();
         if (nodesList != null) {
             for (Object nodeObj : nodesList) {
-                nodeDefs.add(parseNodeDef((Map<String, Object>) nodeObj));
+                @SuppressWarnings("unchecked")
+                var nm = (Map<String, Object>) nodeObj;
+                nodeDefs.add(parseNodeDef(nm));
             }
         }
         info.setNodes(nodeDefs);
@@ -128,10 +132,14 @@ public final class JsonParser {
                 case 'n' -> parseNull();
                 default -> {
                     if (c == '-' || (c >= '0' && c <= '9'))
+
                         yield parseNumber();
-                    throw err("Unexpected: " + c);
+                    throw
+
+                    err("Unexpected: " + c);
                 }
             };
+
         }
 
         private String parseString() {

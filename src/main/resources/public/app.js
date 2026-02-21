@@ -27,6 +27,14 @@ let graphRouting = {};
 const messageTimes = [];
 let panZoomInstance = null;
 
+// Lightweight Charts Globals
+const nodeHistory = new Map(); // Maps NodeID -> Array of {time: timestamp, value: number}
+const epochToRealTime = new Map(); // Maps integer epochs -> actual JS millisecond timestamps
+let oldestEpochTracker = -1; // O(1) tracking for cleaning up old epochs
+let chartInstance = null;
+let chartSeries = null;
+let activeChartNodeId = null;
+
 // The UI Zoom buttons bridge over to the active instance
 document.getElementById('zoom-in').addEventListener('click', () => {
     if (panZoomInstance) panZoomInstance.zoomIn();
@@ -94,9 +102,6 @@ function connect() {
             if (payload.metrics.profile) {
                 updateProfileTable(payload.metrics.profile);
             }
-            if (payload.metrics.nanStats) {
-                updateNanTable(payload.metrics.nanStats);
-            }
         }
 
         if (!isGraphRendered) {
@@ -142,6 +147,49 @@ function connect() {
         } else {
             // Hot Path: Do NOT re-render Mermaid. Just manipulate the DOM.
             updateGraphDOM(payload.values);
+        }
+
+        // Map epoch to real world time
+        if (!epochToRealTime.has(payload.epoch)) {
+            epochToRealTime.set(payload.epoch, Date.now());
+            if (oldestEpochTracker === -1) {
+                oldestEpochTracker = payload.epoch;
+            }
+            // Cleanup old mappings
+            while (payload.epoch - oldestEpochTracker > 1000) {
+                epochToRealTime.delete(oldestEpochTracker);
+                oldestEpochTracker++;
+            }
+        }
+
+        // Live History Tracking & Chart Updating
+        // The Java backend pushes updates every epoch.
+        for (const [key, val] of Object.entries(payload.values)) {
+            // We only trace double values, skip NaN
+            if (val !== 'NaN' && typeof val === 'number') {
+                if (!nodeHistory.has(key)) {
+                    nodeHistory.set(key, []);
+                }
+                const historyArr = nodeHistory.get(key);
+                // Use raw epoch integers for Lightweight Charts X-coords to ensure strictly increasing UTCTimestamps. 
+                // We fake the real time inside the tickMarkFormatter and timeframe locators!
+                const point = { time: payload.epoch, value: val };
+                historyArr.push(point);
+
+                // Cap memory buffer to 500 sliding window ticks
+                if (historyArr.length > 500) {
+                    historyArr.shift();
+                }
+
+                // If this is the node currently being charted, explicitly push the live tick
+                if (activeChartNodeId === key && chartSeries) {
+                    try {
+                        chartSeries.update(point);
+                    } catch (e) {
+                        document.getElementById('chart-title').textContent = "UPD ERR: " + e.message;
+                    }
+                }
+            }
         }
     };
 }
@@ -195,32 +243,12 @@ function updateProfileTable(profileArray) {
                 <td title="${node.name}">${displayName}</td>
                 <td class="right">${formatVal(node.latest, 2)}</td>
                 <td class="right">${formatVal(node.avg, 2)}</td>
+                <td class="right">${node.evaluations}</td>
+                <td class="right">${node.nans}</td>
             </tr>
         `;
     }
     profileBody.innerHTML = html;
-}
-
-// Update the Top NaN Stats table dynamically
-function updateNanTable(nanArray) {
-    if (!nanArray || nanArray.length === 0) {
-        nanBody.innerHTML = '<tr><td colspan="2" style="text-align: center; color: var(--text-muted); font-style: italic;">No NaN occurrences</td></tr>';
-        return;
-    }
-    let html = '';
-    for (const stat of nanArray) {
-        let displayName = stat.name;
-        if (displayName.length > 20) {
-            displayName = displayName.substring(0, 17) + '...';
-        }
-        html += `
-            <tr>
-                <td title="${stat.name}">${displayName}</td>
-                <td class="right">${stat.count}</td>
-            </tr>
-        `;
-    }
-    nanBody.innerHTML = html;
 }
 
 // Sanitize name to match Mermaid's internal ID generator
@@ -321,9 +349,217 @@ function attachHoverListeners() {
                 const downstream = getDownstreamNodes(nodeName);
                 highlightNodes(downstream, false);
             });
+            nodeGroup.addEventListener('click', () => {
+                openChart(nodeName);
+            });
+            // Make it obviously clickable
+            nodeGroup.style.cursor = 'pointer';
         }
     }
 }
+
+// ============================================================================
+// Lightweight Charts Logic
+// ============================================================================
+
+function initChart() {
+    const chartContainer = document.getElementById('tv-chart');
+    if (!chartContainer) return;
+
+    chartInstance = LightweightCharts.createChart(chartContainer, {
+        layout: {
+            background: { type: 'solid', color: 'transparent' },
+            textColor: '#94a3b8',
+        },
+        grid: {
+            vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
+            horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
+        },
+        crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+        },
+        rightPriceScale: {
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            visible: true,
+            autoScale: true,
+        },
+        timeScale: {
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            visible: true,
+            timeVisible: true,
+            secondsVisible: true,
+            fixLeftEdge: true,
+            fixRightEdge: true,
+            tickMarkFormatter: (time, tickMarkType, locale) => {
+                const realTimeMs = epochToRealTime.get(time) || Date.now();
+                const d = new Date(realTimeMs);
+                const hh = d.getHours().toString().padStart(2, '0');
+                const mm = d.getMinutes().toString().padStart(2, '0');
+                const ss = d.getSeconds().toString().padStart(2, '0');
+                return `${hh}:${mm}:${ss}`;
+            }
+        },
+        localization: {
+            timeFormatter: (time) => {
+                const realTimeMs = epochToRealTime.get(time) || Date.now();
+                const d = new Date(realTimeMs);
+                const hh = d.getHours().toString().padStart(2, '0');
+                const mm = d.getMinutes().toString().padStart(2, '0');
+                const ss = d.getSeconds().toString().padStart(2, '0');
+                return `${hh}:${mm}:${ss}`;
+            }
+        }
+    });
+
+    document.getElementById('close-chart').addEventListener('click', closeChart);
+
+    document.getElementById('toggle-chart').addEventListener('click', (e) => {
+        const panel = document.getElementById('chart-panel');
+        panel.classList.toggle('minimized');
+        e.target.textContent = panel.classList.contains('minimized') ? '+' : '-';
+    });
+
+    // Dynamic Resizing Observer
+    const chartPanel = document.getElementById('chart-panel');
+    const resizeObserver = new ResizeObserver(entries => {
+        if (chartInstance && chartContainer.clientWidth > 0 && chartContainer.clientHeight > 0) {
+            chartInstance.resize(chartContainer.clientWidth, chartContainer.clientHeight);
+        }
+    });
+    resizeObserver.observe(chartContainer);
+
+    // Draggable Logic
+    const chartHeader = document.querySelector('.chart-header');
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let initialLeft = 0;
+    let initialTop = 0;
+
+    chartHeader.addEventListener('mousedown', (e) => {
+        if (e.target.id === 'close-chart') return; // Ignore close button
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+
+        const rect = chartPanel.getBoundingClientRect();
+        initialLeft = rect.left;
+        initialTop = rect.top;
+
+        // Strip transition animation so dragging is 1-to-1 crisp
+        chartPanel.style.transition = 'none';
+        chartPanel.style.transform = 'none';
+        chartPanel.style.left = `${initialLeft}px`;
+        chartPanel.style.top = `${initialTop}px`;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        chartPanel.style.left = `${initialLeft + dx}px`;
+        chartPanel.style.top = `${initialTop + dy}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isDragging) {
+            isDragging = false;
+            chartPanel.style.transition = 'opacity 0.3s ease';
+        }
+    });
+}
+
+function openChart(nodeId) {
+    activeChartNodeId = nodeId;
+    document.getElementById('chart-title').textContent = `${nodeId} - History`;
+
+    if (chartSeries) {
+        chartInstance.removeSeries(chartSeries);
+    }
+
+    chartSeries = chartInstance.addLineSeries({
+        color: '#3b82f6',
+        lineWidth: 2,
+        crosshairMarkerVisible: true,
+        lastValueVisible: true,
+        priceLineVisible: true,
+    });
+
+    // Populate the existing history buffer instantly
+    try {
+        if (nodeHistory.has(nodeId)) {
+            chartSeries.setData(nodeHistory.get(nodeId));
+        } else {
+            chartSeries.setData([]);
+        }
+    } catch (e) {
+        document.getElementById('chart-title').textContent = "SET ERR: " + e.message;
+    }
+
+    document.getElementById('chart-panel').classList.remove('hidden');
+    chartInstance.timeScale().fitContent();
+}
+
+function closeChart() {
+    document.getElementById('chart-panel').classList.add('hidden');
+    activeChartNodeId = null;
+    if (chartSeries) {
+        chartInstance.removeSeries(chartSeries);
+        chartSeries = null;
+    }
+}
+
+function setupMetricsPanelDrag() {
+    const metricsPanel = document.getElementById('metrics-panel');
+    const metricsHeader = document.getElementById('metrics-header');
+
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let initialLeft = 0;
+    let initialTop = 0;
+
+    metricsHeader.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+
+        const rect = metricsPanel.getBoundingClientRect();
+        initialLeft = rect.left;
+        initialTop = rect.top;
+
+        metricsPanel.style.transition = 'none';
+        metricsPanel.style.right = 'auto'; // Break the right-docking
+        metricsPanel.style.left = `${initialLeft}px`;
+        metricsPanel.style.top = `${initialTop}px`;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        metricsPanel.style.left = `${initialLeft + dx}px`;
+        metricsPanel.style.top = `${initialTop + dy}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isDragging) {
+            isDragging = false;
+            metricsPanel.style.transition = 'opacity 0.3s ease';
+        }
+    });
+
+    document.getElementById('toggle-metrics').addEventListener('click', (e) => {
+        metricsPanel.classList.toggle('minimized');
+        e.target.textContent = metricsPanel.classList.contains('minimized') ? '+' : '-';
+    });
+}
+
+// Init Chart Context
+window.addEventListener('DOMContentLoaded', () => {
+    initChart();
+    setupMetricsPanelDrag();
+});
 
 // Boot
 connect();

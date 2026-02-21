@@ -16,9 +16,6 @@ public class NodeProfileDemo {
         System.out.println("Profiling enabled.");
 
         // 3. Optimize Sources
-        int eurUsdId = graph.getEngine().topology().topoIndex("EURUSD");
-        int usdJpyId = graph.getEngine().topology().topoIndex("USDJPY");
-
         // 4. Run Simulation
         System.out.println("Running simulation for 2 seconds...");
         Random rng = new Random();

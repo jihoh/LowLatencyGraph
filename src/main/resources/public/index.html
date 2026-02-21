@@ -33,78 +33,84 @@
             </div>
         </div>
 
-        <div class="metrics-panel">
-            <h3>Graph Metrics</h3>
-            <div class="metric-row">
-                <div class="metric-small">
-                    <span class="label">Epoch</span>
-                    <span class="value" id="epoch-value">0</span>
-                </div>
-                <div class="metric-small">
-                    <span class="label">Events</span>
-                    <span class="value" id="events-value">0</span>
-                </div>
-                <div class="metric-small">
-                    <span class="label">Evaluated</span>
-                    <span class="value" id="reactive-eff">0 / 0</span>
-                </div>
+        <div class="metrics-panel" id="metrics-panel">
+            <div class="metrics-header" id="metrics-header">
+                <h2>Live Dashboard</h2>
+                <button class="panel-btn" id="toggle-metrics" title="Minimize">-</button>
             </div>
-
-            <h3>Stabilization Metrics</h3>
-            <div class="metric-row">
-                <div class="metric-small">
-                    <span class="label">Latest Latency (μs)</span>
-                    <span class="value" id="lat-latest">0.00</span>
+            <div class="panel-content" id="metrics-content">
+                <h3>Graph Metrics</h3>
+                <div class="metric-row">
+                    <div class="metric-small">
+                        <span class="label">Epoch</span>
+                        <span class="value" id="epoch-value">0</span>
+                    </div>
+                    <div class="metric-small">
+                        <span class="label">Events</span>
+                        <span class="value" id="events-value">0</span>
+                    </div>
+                    <div class="metric-small">
+                        <span class="label">Evaluated</span>
+                        <span class="value" id="reactive-eff">0 / 0</span>
+                    </div>
                 </div>
-                <div class="metric-small">
-                    <span class="label">Avg Latency (μs)</span>
-                    <span class="value" id="lat-avg">0.00</span>
-                </div>
-                <div class="metric-small">
-                    <span class="label">Rate (Hz)</span>
-                    <span class="value" id="stab-rate">0</span>
-                </div>
-            </div>
 
-            <h3>Node Performance Profile</h3>
-            <div class="profile-table-container">
-                <table id="profile-table">
-                    <thead>
-                        <tr>
-                            <th>NODE</th>
-                            <th style="text-align: right;">LATEST (μs)</th>
-                            <th style="text-align: right;">AVG (μs)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="profile-body">
-                        <!-- Populated by JS -->
-                    </tbody>
-                </table>
-            </div>
+                <h3>Stabilization Metrics</h3>
+                <div class="metric-row">
+                    <div class="metric-small">
+                        <span class="label">Latest Latency (μs)</span>
+                        <span class="value" id="lat-latest">0.00</span>
+                    </div>
+                    <div class="metric-small">
+                        <span class="label">Avg Latency (μs)</span>
+                        <span class="value" id="lat-avg">0.00</span>
+                    </div>
+                    <div class="metric-small">
+                        <span class="label">Rate (Hz)</span>
+                        <span class="value" id="stab-rate">0</span>
+                    </div>
+                </div>
 
-            <h3 style="margin-top: 15px;">Node NaN Stats</h3>
-            <div class="profile-table-container" style="max-height: 200px;">
-                <table id="nan-table">
-                    <thead>
-                        <tr>
-                            <th>NODE</th>
-                            <th style="text-align: right;">NaN COUNT</th>
-                        </tr>
-                    </thead>
-                    <tbody id="nan-body">
-                        <tr>
-                            <td colspan="2" style="text-align: center; color: var(--text-muted); font-style: italic;">
-                                Awaiting NaN metrics...</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <h3>Node Performance Profile</h3>
+                <div class="profile-table-container">
+                    <table id="profile-table">
+                        <thead>
+                            <tr>
+                                <th>NODE</th>
+                                <th style="text-align: right;">LATEST (μs)</th>
+                                <th style="text-align: right;">AVG (μs)</th>
+                                <th style="text-align: right;">UPDATES</th>
+                                <th style="text-align: right;">NaNs</th>
+                            </tr>
+                        </thead>
+                        <tbody id="profile-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </main>
 
+    <!-- Floating Interactive Charting Panel -->
+    <div id="chart-panel" class="chart-panel hidden">
+        <div class="chart-header">
+            <h3 id="chart-title">Node Metric</h3>
+            <div>
+                <button id="toggle-chart" class="panel-btn" title="Minimize">-</button>
+                <button id="close-chart" class="close-btn">&times;</button>
+            </div>
+        </div>
+        <div class="panel-content" id="chart-content">
+            <!-- TradingView container -->
+            <div id="tv-chart" class="tv-chart"></div>
+        </div>
+    </div>
+
     <!-- Load Mermaid & Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <script src="app.js"></script>
 </body>
 

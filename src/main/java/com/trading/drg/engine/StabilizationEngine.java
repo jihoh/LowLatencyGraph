@@ -2,9 +2,6 @@ package com.trading.drg.engine;
 
 import com.trading.drg.api.*;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 /**
  * The core engine that drives the graph stabilization process.
  *
@@ -48,8 +45,6 @@ import org.apache.logging.log4j.Logger;
  * The graph must be potentially reset or discarded after a critical failure.
  */
 public final class StabilizationEngine {
-    private static final Logger log = LogManager.getLogger(StabilizationEngine.class);
-
     private final TopologicalOrder topology;
 
     // The "seen set" or "work list" equivalent.

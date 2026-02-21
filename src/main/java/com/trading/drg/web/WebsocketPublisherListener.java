@@ -116,28 +116,11 @@ public class WebsocketPublisherListener implements StabilizationListener {
                 jsonBuilder.append("{")
                         .append("\"name\":\"").append(entry.getKey()).append("\",")
                         .append("\"latest\":").append(entry.getValue().lastDurationNanos / 1000.0).append(",")
-                        .append("\"avg\":").append(entry.getValue().avgMicros())
+                        .append("\"avg\":").append(entry.getValue().avgMicros()).append(",")
+                        .append("\"evaluations\":").append(entry.getValue().count).append(",")
+                        .append("\"nans\":").append(nanCounters.getOrDefault(entry.getKey(), 0L))
                         .append("}");
                 if (i < topNodes.size() - 1) {
-                    jsonBuilder.append(",");
-                }
-            }
-            jsonBuilder.append("]");
-        }
-
-        if (!nanCounters.isEmpty()) {
-            jsonBuilder.append(",\"nanStats\":[");
-            var topNanNodes = nanCounters.entrySet().stream()
-                    .sorted((e1, e2) -> Long.compare(e2.getValue(), e1.getValue()))
-                    .limit(5)
-                    .toList();
-            for (int i = 0; i < topNanNodes.size(); i++) {
-                var entry = topNanNodes.get(i);
-                jsonBuilder.append("{")
-                        .append("\"name\":\"").append(entry.getKey()).append("\",")
-                        .append("\"count\":").append(entry.getValue())
-                        .append("}");
-                if (i < topNanNodes.size() - 1) {
                     jsonBuilder.append(",");
                 }
             }
