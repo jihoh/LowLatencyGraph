@@ -1,14 +1,43 @@
 "use strict";
 
+window.addEventListener('error', function (e) {
+    const d = document.createElement('div');
+    d.style.cssText = "z-index:10000;position:fixed;color:white;background:red;font-size:24px;left:10px;top:200px;padding:10px;";
+    d.innerHTML = "GLOBAL ERROR:<br>" + e.message + "<br>" + e.filename + ":" + e.lineno;
+    document.body.appendChild(d);
+});
+
 mermaid.initialize({
     startOnLoad: false,
     theme: 'dark',
-    fontFamily: 'Inter'
+    fontFamily: 'Inter',
+    themeVariables: {
+        primaryColor: 'transparent',
+        primaryBorderColor: 'transparent',
+        lineColor: '#64748b',
+        fontFamily: 'Inter',
+        fontSize: '18px'
+    },
+    flowchart: {
+        padding: 24,
+        curve: 'basis',
+        htmlLabels: true
+    }
 });
 
 const graphContainer = document.getElementById('graph-view');
-const statusBadge = document.getElementById('connection-status');
+const tlStatus = document.getElementById('timeline-status');
 const epochValue = document.getElementById('epoch-value');
+
+document.getElementById('btn-auto-track').addEventListener('click', () => {
+    if (isScrubbing && tlStatus) {
+        tlStatus.click(); // re-uses the established return-to-LIVE logic
+    } else if (chartInstance) {
+        chartInstance.timeScale().scrollToRealTime();
+        const btnAutoTrack = document.getElementById('btn-auto-track');
+        if (btnAutoTrack) btnAutoTrack.style.display = 'none';
+    }
+});
 
 // Metrics DOM
 const latAvg = document.getElementById('lat-avg');
@@ -29,11 +58,18 @@ let panZoomInstance = null;
 
 // Lightweight Charts Globals
 const nodeHistory = new Map(); // Maps NodeID -> Array of {time: timestamp, value: number}
+const nodeNaNHistory = new Map(); // Tracks discrete NaN timestamps for red highlighting
 const epochToRealTime = new Map(); // Maps integer epochs -> actual JS millisecond timestamps
 let oldestEpochTracker = -1; // O(1) tracking for cleaning up old epochs
 let chartInstance = null;
-let chartSeries = null;
-let activeChartNodeId = null;
+const activeChartSeries = new Map(); // nodeId -> { lineSeries, nanSeries, color }
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308', '#ef4444'];
+let chartColorIndex = 0;
+
+// Global Z-Index tracker for draggable panels
+let highestZIndex = 1000;
+let isScrubbing = false;
+const snapshots = [];
 
 // The UI Zoom buttons bridge over to the active instance
 document.getElementById('zoom-in').addEventListener('click', () => {
@@ -45,151 +81,218 @@ document.getElementById('zoom-out').addEventListener('click', () => {
 });
 
 document.getElementById('zoom-reset').addEventListener('click', () => {
+    fitGraph();
+});
+
+// Helper for Graph Fit to zoom out slightly (2 clicks)
+function fitGraph() {
     if (panZoomInstance) {
-        panZoomInstance.resetZoom();
+        panZoomInstance.resize();
+        panZoomInstance.fit();
         panZoomInstance.center();
+        panZoomInstance.zoomOut();
+        panZoomInstance.zoomOut();
     }
+}
+
+// Text Scale controls
+let textScale = 1.0;
+// Set it immediately so it takes effect on load
+document.documentElement.style.setProperty('--node-text-scale', textScale);
+
+document.getElementById('text-in').addEventListener('click', () => {
+    textScale = Math.min(2.5, textScale + 0.1);
+    document.documentElement.style.setProperty('--node-text-scale', textScale);
+});
+
+document.getElementById('text-out').addEventListener('click', () => {
+    textScale = Math.max(0.4, textScale - 0.1);
+    document.documentElement.style.setProperty('--node-text-scale', textScale);
+});
+
+document.getElementById('text-reset').addEventListener('click', () => {
+    textScale = 1.0;
+    document.documentElement.style.setProperty('--node-text-scale', textScale);
 });
 
 function connect() {
     const ws = new WebSocket(`ws://${window.location.host}/ws/graph`);
 
     ws.onopen = () => {
-        statusBadge.textContent = 'Connected';
-        statusBadge.className = 'status connected';
+        tlStatus.textContent = isScrubbing ? 'REPLAY' : 'LIVE';
+        tlStatus.className = isScrubbing ? 'status-badge replay' : 'status-badge live';
     };
 
     ws.onclose = () => {
-        statusBadge.textContent = 'Disconnected';
-        statusBadge.className = 'status disconnected';
+        tlStatus.textContent = 'DISCONNECTED';
+        tlStatus.className = 'status-badge disconnected';
         isGraphRendered = false;
         setTimeout(connect, 2000); // Auto-reconnect
     };
 
     ws.onmessage = async (event) => {
-        const payload = JSON.parse(event.data);
+        try {
+            const payload = JSON.parse(event.data);
 
-        // Update epoch counter
-        epochValue.textContent = payload.epoch;
+            // Update epoch counter
+            epochValue.textContent = payload.epoch;
 
-        // Update Metrics (Latency, Profile, Throguput, Efficiency)
-        if (payload.metrics) {
-            if (payload.metrics.eventsProcessed !== undefined) {
-                document.getElementById('events-value').textContent = payload.metrics.eventsProcessed;
+            if (payload.graphName) {
+                document.getElementById('graph-title').textContent = payload.graphName;
             }
-            if (payload.metrics.totalNodes !== undefined) {
-                reactiveEff.textContent = `${payload.metrics.nodesUpdated} / ${payload.metrics.totalNodes}`;
-            }
-
-            // Real-time Stabilizations / sec using a sliding window
-            const now = performance.now();
-            messageTimes.push(now);
-            if (messageTimes.length > 50) {
-                messageTimes.shift();
-            }
-            if (messageTimes.length > 1) {
-                const elapsedSc = (now - messageTimes[0]) / 1000.0;
-                const hz = (messageTimes.length - 1) / elapsedSc;
-                stabRate.textContent = Math.round(hz);
+            if (payload.graphVersion) {
+                document.getElementById('graph-version').textContent = 'v' + payload.graphVersion;
             }
 
-            if (payload.metrics.latency) {
-                if (payload.metrics.latency.latest !== undefined) {
-                    latLatest.textContent = formatVal(payload.metrics.latency.latest, 2);
+            // Update Metrics (Latency, Profile, Throguput, Efficiency)
+            if (payload.metrics) {
+                if (payload.metrics.eventsProcessed !== undefined) {
+                    document.getElementById('events-value').textContent = payload.metrics.eventsProcessed;
                 }
-                latAvg.textContent = formatVal(payload.metrics.latency.avg, 2);
-            }
-            if (payload.metrics.profile) {
-                updateProfileTable(payload.metrics.profile);
-            }
-        }
-
-        if (!isGraphRendered) {
-            // First time: Read layout from server
-            if (payload.topology) {
-                const mermaidStr = payload.topology;
-                const { svg } = await mermaid.render('graph-svg', mermaidStr);
-                graphContainer.innerHTML = svg;
-                isGraphRendered = true;
-
-                // Hook into SVG and enable interactive vector tracking
-                const svgEl = graphContainer.querySelector('svg');
-                if (svgEl) {
-                    svgEl.removeAttribute('width');
-                    svgEl.removeAttribute('height');
-                    svgEl.style.width = '100%';
-                    svgEl.style.height = '100%';
-                    svgEl.style.maxWidth = 'none';
-
-                    panZoomInstance = svgPanZoom(svgEl, {
-                        zoomEnabled: true,
-                        controlIconsEnabled: false,
-                        fit: true,
-                        center: true,
-                        minZoom: 0.1,
-                        maxZoom: 50
-                    });
+                if (payload.metrics.totalNodes !== undefined) {
+                    reactiveEff.textContent = `${payload.metrics.nodesUpdated} / ${payload.metrics.totalNodes}`;
                 }
 
-                // Store routing map from backend
-                if (payload.routing) {
-                    graphRouting = payload.routing;
+                // Real-time Stabilizations / sec using a sliding window
+                const now = performance.now();
+                messageTimes.push(now);
+                if (messageTimes.length > 50) {
+                    messageTimes.shift();
+                }
+                if (messageTimes.length > 1) {
+                    const elapsedSc = (now - messageTimes[0]) / 1000.0;
+                    const hz = (messageTimes.length - 1) / elapsedSc;
+                    stabRate.textContent = Math.round(hz);
                 }
 
-                // Store initial values
-                for (const [key, val] of Object.entries(payload.values)) {
-                    prevValues.set(key, val);
+                if (payload.metrics.latency) {
+                    if (payload.metrics.latency.latest !== undefined) {
+                        latLatest.textContent = formatVal(payload.metrics.latency.latest, 2);
+                    }
+                    latAvg.textContent = formatVal(payload.metrics.latency.avg, 2);
                 }
-
-                // Attach our custom hover listeners
-                attachHoverListeners();
+                if (payload.metrics.profile) {
+                    updateProfileTable(payload.metrics.profile);
+                }
             }
-        } else {
-            // Hot Path: Do NOT re-render Mermaid. Just manipulate the DOM.
-            updateGraphDOM(payload.values);
-        }
 
-        // Map epoch to real world time
-        if (!epochToRealTime.has(payload.epoch)) {
-            epochToRealTime.set(payload.epoch, Date.now());
-            if (oldestEpochTracker === -1) {
-                oldestEpochTracker = payload.epoch;
-            }
-            // Cleanup old mappings
-            while (payload.epoch - oldestEpochTracker > 1000) {
-                epochToRealTime.delete(oldestEpochTracker);
-                oldestEpochTracker++;
-            }
-        }
+            if (!isGraphRendered) {
+                // First time: Read layout from server
+                if (payload.topology) {
+                    const mermaidStr = payload.topology;
+                    const { svg } = await mermaid.render('graph-svg', mermaidStr);
+                    graphContainer.innerHTML = svg;
+                    isGraphRendered = true;
 
-        // Live History Tracking & Chart Updating
-        // The Java backend pushes updates every epoch.
-        for (const [key, val] of Object.entries(payload.values)) {
-            // We only trace double values, skip NaN
-            if (val !== 'NaN' && typeof val === 'number') {
+                    // Hook into SVG and enable interactive vector tracking
+                    const svgEl = graphContainer.querySelector('svg');
+                    if (svgEl) {
+                        svgEl.removeAttribute('width');
+                        svgEl.removeAttribute('height');
+                        svgEl.style.width = '100%';
+                        svgEl.style.height = '100%';
+                        svgEl.style.maxWidth = 'none';
+
+                        panZoomInstance = svgPanZoom(svgEl, {
+                            zoomEnabled: true,
+                            controlIconsEnabled: false,
+                            fit: false,
+                            center: false,
+                            minZoom: 0.1,
+                            maxZoom: 50
+                        });
+                        setTimeout(fitGraph, 10);
+                    }
+
+                    // Store routing map from backend
+                    if (payload.routing) {
+                        graphRouting = payload.routing;
+                    }
+
+                    // Store initial values
+                    for (const [key, val] of Object.entries(payload.values)) {
+                        prevValues.set(key, val);
+                    }
+
+                    // Attach our custom hover listeners
+                    attachHoverListeners();
+                }
+            } else {
+                // Hot Path: Do NOT re-render Mermaid. Just manipulate the DOM.
+                if (!isScrubbing) {
+                    updateGraphDOM(payload.values);
+                }
+            }
+
+            // Map epoch to real world time
+            if (!epochToRealTime.has(payload.epoch)) {
+                epochToRealTime.set(payload.epoch, Date.now());
+                if (oldestEpochTracker === -1) {
+                    oldestEpochTracker = payload.epoch;
+                }
+                // Cleanup old mappings
+                while (payload.epoch - oldestEpochTracker > 1000) {
+                    epochToRealTime.delete(oldestEpochTracker);
+                    oldestEpochTracker++;
+                }
+            }
+
+            // Cache historical state uniformly ensuring precise 1:1 timeline matches
+            snapshots.push(payload);
+
+            if (!isScrubbing) {
+                const scrubber = document.getElementById('time-scrubber');
+                if (scrubber) {
+                    scrubber.max = snapshots.length - 1;
+                    scrubber.value = snapshots.length - 1;
+                }
+                const timelineEpoch = document.getElementById('timeline-epoch');
+                if (timelineEpoch) timelineEpoch.textContent = 'Epoch: ' + payload.epoch;
+            }
+
+            // Live History Tracking & Chart Updating
+            // The Java backend pushes updates every epoch.
+            for (const [key, val] of Object.entries(payload.values)) {
                 if (!nodeHistory.has(key)) {
                     nodeHistory.set(key, []);
+                    nodeNaNHistory.set(key, []);
                 }
                 const historyArr = nodeHistory.get(key);
-                // Use raw epoch integers for Lightweight Charts X-coords to ensure strictly increasing UTCTimestamps. 
-                // We fake the real time inside the tickMarkFormatter and timeframe locators!
-                const point = { time: payload.epoch, value: val };
+                const nanArr = nodeNaNHistory.get(key);
+
+                const isNaNVal = (val === 'NaN' || Number.isNaN(Number(val)));
+
+                // Bridge the graph using the last known good value if current payload is NaN
+                let plotVal = val;
+                if (isNaNVal) {
+                    plotVal = historyArr.length > 0 ? historyArr[historyArr.length - 1].value : 0;
+                }
+
+                const point = { time: payload.epoch, value: plotVal };
                 historyArr.push(point);
 
-                // Cap memory buffer to 500 sliding window ticks
-                if (historyArr.length > 500) {
-                    historyArr.shift();
+                // Track continuous NaN statuses for the chart's red overlay background
+                if (isNaNVal) {
+                    const nanPoint = { time: payload.epoch, value: 1 };
+                    nanArr.push(nanPoint);
                 }
 
                 // If this is the node currently being charted, explicitly push the live tick
-                if (activeChartNodeId === key && chartSeries) {
+                if (activeChartSeries.has(key)) {
                     try {
-                        chartSeries.update(point);
+                        if (!isScrubbing) {
+                            const cs = activeChartSeries.get(key);
+                            if (cs.lineSeries) cs.lineSeries.update(point);
+                            if (cs.nanSeries && isNaNVal) cs.nanSeries.update({ time: payload.epoch, value: 1 });
+                        }
                     } catch (e) {
                         document.getElementById('chart-title').textContent = "UPD ERR: " + e.message;
                     }
                 }
             }
+        } catch (error) {
+            console.error(error);
+            document.body.innerHTML += '<div style="color:red; background:white; font-size: 24px; position:fixed; z-index:9999; top:10px; left:10px;">ERROR: ' + error.message + ' <br/> ' + error.stack + '</div>';
         }
     };
 }
@@ -204,15 +307,15 @@ function buildMermaidString(values) {
 
     // Hardcoded Tri-Arb layout for absolute structural perfection
     str += `
-      USDJPY(["USDJPY<br/><b>${formatVal(values['USDJPY'])}</b>"]);
+      USDJPY["<div class='node-inner'><span class='node-title source-node'>USDJPY</span><b class='node-value'>${formatVal(values['USDJPY'])}</b></div>"];
       style USDJPY fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-      EURJPY(["EURJPY<br/><b>${formatVal(values['EURJPY'])}</b>"]);
+      EURJPY["<div class='node-inner'><span class='node-title source-node'>EURJPY</span><b class='node-value'>${formatVal(values['EURJPY'])}</b></div>"];
       style EURJPY fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-      EURUSD(["EURUSD<br/><b>${formatVal(values['EURUSD'])}</b>"]);
+      EURUSD["<div class='node-inner'><span class='node-title source-node'>EURUSD</span><b class='node-value'>${formatVal(values['EURUSD'])}</b></div>"];
       style EURUSD fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
       
-      Arb_Spread["Arb.Spread<br/><b>${formatVal(values['Arb.Spread'])}</b>"];
-      Arb_Spread_Ewma["Arb.Spread.Ewma<br/><b>${formatVal(values['Arb.Spread.Ewma'])}</b>"];
+      Arb_Spread["<div class='node-inner'><span class='node-title'>Arb.Spread</span><b class='node-value'>${formatVal(values['Arb.Spread'])}</b></div>"];
+      Arb_Spread_Ewma["<div class='node-inner'><span class='node-title'>Arb.Spread.Ewma</span><b class='node-value'>${formatVal(values['Arb.Spread.Ewma'])}</b></div>"];
       
       USDJPY --> Arb_Spread;
       EURJPY --> Arb_Spread;
@@ -276,17 +379,12 @@ function updateGraphDOM(newValues) {
                     nodeGroup.classList.remove('nan-node');
                 }
 
-                // Find the existing bold tag we injected via <br/><b>...</b> in the mermaid string
-                // Mermaid renders these inside a <foreignObject> or <text> group.
-                const htmlContainer = nodeGroup.querySelector('div, span');
                 const displayVal = isNaN ? "NaN" : formatVal(newVal);
 
-                // The easiest DOM trick is to replace the innerText of the exact matched string
-                if (htmlContainer) {
-                    htmlContainer.innerHTML = htmlContainer.innerHTML.replace(
-                        new RegExp(`<b>.*?</b>`),
-                        `<b>${displayVal}</b>`
-                    );
+                // Directly target the new semantic class we injected in GraphExplain.java
+                const valueEl = nodeGroup.querySelector('.node-value');
+                if (valueEl) {
+                    valueEl.textContent = displayVal;
                 } else {
                     // Fallback for strict SVG text nodes (if htmlLabels: false)
                     const textNodes = nodeGroup.querySelectorAll('tspan');
@@ -388,8 +486,8 @@ function initChart() {
             visible: true,
             timeVisible: true,
             secondsVisible: true,
-            fixLeftEdge: true,
-            fixRightEdge: true,
+            rightOffset: 12,
+            barSpacing: 15,
             tickMarkFormatter: (time, tickMarkType, locale) => {
                 const realTimeMs = epochToRealTime.get(time) || Date.now();
                 const d = new Date(realTimeMs);
@@ -411,12 +509,22 @@ function initChart() {
         }
     });
 
-    document.getElementById('close-chart').addEventListener('click', closeChart);
 
-    document.getElementById('toggle-chart').addEventListener('click', (e) => {
-        const panel = document.getElementById('chart-panel');
-        panel.classList.toggle('minimized');
-        e.target.textContent = panel.classList.contains('minimized') ? '+' : '-';
+
+
+    // Track manual panning
+    chartInstance.timeScale().subscribeVisibleTimeRangeChange(range => {
+        if (!range || isScrubbing) return;
+        const maxEpoch = snapshots.length > 0 ? snapshots[snapshots.length - 1].epoch : 0;
+        const btnAutoTrack = document.getElementById('btn-auto-track');
+        if (btnAutoTrack) {
+            // Show the button if the user has scrolled left such that the latest point is off screen
+            if (range.to < maxEpoch) {
+                btnAutoTrack.style.display = 'flex';
+            } else {
+                btnAutoTrack.style.display = 'none';
+            }
+        }
     });
 
     // Dynamic Resizing Observer
@@ -427,6 +535,12 @@ function initChart() {
         }
     });
     resizeObserver.observe(chartContainer);
+
+    // Bring to front on click
+    chartPanel.addEventListener('mousedown', () => {
+        highestZIndex++;
+        chartPanel.style.zIndex = highestZIndex;
+    });
 
     // Draggable Logic
     const chartHeader = document.querySelector('.chart-header');
@@ -470,96 +584,411 @@ function initChart() {
 }
 
 function openChart(nodeId) {
-    activeChartNodeId = nodeId;
-    document.getElementById('chart-title').textContent = `${nodeId} - History`;
-
-    if (chartSeries) {
-        chartInstance.removeSeries(chartSeries);
+    const chartPanel = document.getElementById('chart-panel');
+    const bottomDock = document.getElementById('bottom-dock');
+    const toggleBtn = document.getElementById('toggle-chart');
+    if (chartPanel && chartPanel.classList.contains('minimized')) {
+        chartPanel.classList.remove('minimized');
+        if (bottomDock) bottomDock.classList.remove('minimized');
+        if (toggleBtn) toggleBtn.textContent = '-';
+        setTimeout(() => {
+            if (chartInstance) chartInstance.timeScale().fitContent();
+        }, 50);
     }
 
-    chartSeries = chartInstance.addLineSeries({
-        color: '#3b82f6',
-        lineWidth: 2,
-        crosshairMarkerVisible: true,
-        lastValueVisible: true,
-        priceLineVisible: true,
-    });
+    if (activeChartSeries.has(nodeId)) {
+        // Toggle OFF if already active
+        const cs = activeChartSeries.get(nodeId);
+        if (cs.lineSeries) chartInstance.removeSeries(cs.lineSeries);
+        if (cs.nanSeries) chartInstance.removeSeries(cs.nanSeries);
+        activeChartSeries.delete(nodeId);
 
-    // Populate the existing history buffer instantly
-    try {
-        if (nodeHistory.has(nodeId)) {
-            chartSeries.setData(nodeHistory.get(nodeId));
-        } else {
-            chartSeries.setData([]);
+        if (activeChartSeries.size === 0) {
+            closeChart();
+            return;
         }
-    } catch (e) {
-        document.getElementById('chart-title').textContent = "SET ERR: " + e.message;
+    } else {
+        // Toggle ON
+        const color = CHART_COLORS[chartColorIndex % CHART_COLORS.length];
+        chartColorIndex++;
+
+        const nanS = chartInstance.addHistogramSeries({
+            color: 'rgba(239, 68, 68, 0.2)',
+            priceFormat: { type: 'volume' },
+            priceScaleId: '', // overlay without attaching to a visible scale
+            scaleMargins: { top: 0, bottom: 0 },
+        });
+
+        const lineS = chartInstance.addLineSeries({
+            color: color,
+            lineWidth: 2,
+            crosshairMarkerVisible: true,
+            lastValueVisible: true,
+            priceLineVisible: true,
+        });
+
+        activeChartSeries.set(nodeId, { lineSeries: lineS, nanSeries: nanS, color: color });
+
+        // Populate the existing history buffers instantly
+        try {
+            const arr = nodeHistory.get(nodeId) || [];
+            const nanArr = nodeNaNHistory.get(nodeId) || [];
+
+            if (isScrubbing) {
+                const scrubberIdx = parseInt(document.getElementById('time-scrubber').value);
+                lineS.setData(arr.slice(0, scrubberIdx + 1));
+                if (snapshots[scrubberIdx]) {
+                    const maxEpoch = snapshots[scrubberIdx].epoch;
+                    nanS.setData(nanArr.filter(p => p.time <= maxEpoch));
+                }
+            } else {
+                lineS.setData(arr);
+                nanS.setData(nanArr);
+            }
+        } catch (e) {
+            document.getElementById('chart-title').textContent = "SET ERR: " + e.message;
+        }
     }
+
+    // Update title to show all active charts (with colored blocks)
+    let titleHtml = Array.from(activeChartSeries.entries()).map(([id, cs]) =>
+        `<span style="color:${cs.color}; margin-right: 10px;">&#9632; ${id}</span>`
+    ).join('');
+    document.getElementById('chart-title').innerHTML = titleHtml;
 
     document.getElementById('chart-panel').classList.remove('hidden');
     chartInstance.timeScale().fitContent();
+    if (panZoomInstance) {
+        setTimeout(fitGraph, 10);
+    }
 }
 
 function closeChart() {
     document.getElementById('chart-panel').classList.add('hidden');
-    activeChartNodeId = null;
-    if (chartSeries) {
-        chartInstance.removeSeries(chartSeries);
-        chartSeries = null;
+    for (const [id, cs] of activeChartSeries.entries()) {
+        if (cs.lineSeries) chartInstance.removeSeries(cs.lineSeries);
+        if (cs.nanSeries) chartInstance.removeSeries(cs.nanSeries);
+    }
+    activeChartSeries.clear();
+    document.getElementById('chart-title').innerHTML = '';
+}
+
+// ============================================================================
+// Historical Scrubbing Logic
+// ============================================================================
+
+if (tlStatus) {
+    tlStatus.addEventListener('click', () => {
+        if (!isScrubbing || snapshots.length === 0) return;
+
+        // Jump back to Live unconditionally
+        isScrubbing = false;
+        tlStatus.textContent = "LIVE";
+        tlStatus.className = "status-badge live";
+        const btnAutoTrack = document.getElementById('btn-auto-track');
+        if (btnAutoTrack) btnAutoTrack.style.display = 'none';
+
+        const scrubber = document.getElementById('time-scrubber');
+        if (scrubber) {
+            scrubber.value = snapshots.length - 1;
+        }
+
+        const lastPayload = snapshots[snapshots.length - 1];
+        document.getElementById('timeline-epoch').textContent = 'Epoch: ' + lastPayload.epoch;
+        updateGraphDOM(lastPayload.values);
+        renderScrubbedChartLive();
+    });
+}
+
+const timeScrub = document.getElementById('time-scrubber');
+if (timeScrub) {
+    timeScrub.addEventListener('input', (e) => {
+        isScrubbing = true;
+        const idx = parseInt(e.target.value);
+
+        if (idx >= snapshots.length - 1) {
+            // Returned to Live
+            isScrubbing = false;
+            if (tlStatus) {
+                tlStatus.textContent = "LIVE";
+                tlStatus.className = "status-badge live";
+            }
+            const btnAutoTrack = document.getElementById('btn-auto-track');
+            if (btnAutoTrack) btnAutoTrack.style.display = 'none';
+
+            const lastPayload = snapshots[snapshots.length - 1];
+            if (lastPayload) {
+                document.getElementById('timeline-epoch').textContent = 'Epoch: ' + lastPayload.epoch;
+                updateGraphDOM(lastPayload.values);
+                renderScrubbedChartLive();
+            }
+        } else {
+            // Scrubbing Mode
+            document.getElementById('timeline-status').textContent = "REPLAY";
+            document.getElementById('timeline-status').className = "status-badge replay";
+            const btnAutoTrack = document.getElementById('btn-auto-track');
+            if (btnAutoTrack) btnAutoTrack.style.display = 'flex';
+
+            const targetPayload = snapshots[idx];
+            if (targetPayload) {
+                document.getElementById('timeline-epoch').textContent = 'Epoch: ' + targetPayload.epoch;
+                updateGraphDOM(targetPayload.values);
+                renderScrubbedChartScrubbed(idx);
+            }
+        }
+    });
+}
+
+function renderScrubbedChartScrubbed(idx) {
+    if (activeChartSeries.size === 0) return;
+    for (const [nodeId, cs] of activeChartSeries.entries()) {
+        const historyArr = nodeHistory.get(nodeId);
+        if (historyArr && cs.lineSeries) {
+            cs.lineSeries.setData(historyArr.slice(0, idx + 1));
+        }
+        const nanArr = nodeNaNHistory.get(nodeId);
+        if (cs.nanSeries && nanArr && snapshots[idx]) {
+            const maxEpoch = snapshots[idx].epoch;
+            cs.nanSeries.setData(nanArr.filter(p => p.time <= maxEpoch));
+        }
     }
 }
 
-function setupMetricsPanelDrag() {
-    const metricsPanel = document.getElementById('metrics-panel');
-    const metricsHeader = document.getElementById('metrics-header');
-
-    let isDragging = false;
-    let dragStartX = 0;
-    let dragStartY = 0;
-    let initialLeft = 0;
-    let initialTop = 0;
-
-    metricsHeader.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        dragStartX = e.clientX;
-        dragStartY = e.clientY;
-
-        const rect = metricsPanel.getBoundingClientRect();
-        initialLeft = rect.left;
-        initialTop = rect.top;
-
-        metricsPanel.style.transition = 'none';
-        metricsPanel.style.right = 'auto'; // Break the right-docking
-        metricsPanel.style.left = `${initialLeft}px`;
-        metricsPanel.style.top = `${initialTop}px`;
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        const dx = e.clientX - dragStartX;
-        const dy = e.clientY - dragStartY;
-        metricsPanel.style.left = `${initialLeft + dx}px`;
-        metricsPanel.style.top = `${initialTop + dy}px`;
-    });
-
-    document.addEventListener('mouseup', () => {
-        if (isDragging) {
-            isDragging = false;
-            metricsPanel.style.transition = 'opacity 0.3s ease';
+function renderScrubbedChartLive() {
+    if (activeChartSeries.size === 0) return;
+    for (const [nodeId, cs] of activeChartSeries.entries()) {
+        const historyArr = nodeHistory.get(nodeId);
+        if (historyArr && cs.lineSeries) {
+            cs.lineSeries.setData(historyArr);
         }
-    });
+        const nanArr = nodeNaNHistory.get(nodeId);
+        if (cs.nanSeries && nanArr) {
+            cs.nanSeries.setData(nanArr);
+        }
+    }
+}
 
-    document.getElementById('toggle-metrics').addEventListener('click', (e) => {
-        metricsPanel.classList.toggle('minimized');
-        e.target.textContent = metricsPanel.classList.contains('minimized') ? '+' : '-';
+// --- Omnidirectional Resizing Hook ---
+function setupOmnidirectionalResize(panelId) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+
+    const resizers = ['top', 'right', 'bottom', 'left', 'top-left', 'top-right', 'bottom-left', 'bottom-right'];
+
+    resizers.forEach(pos => {
+        const resizer = document.createElement('div');
+        resizer.className = `resizer resizer-${pos}`;
+        panel.appendChild(resizer);
+
+        resizer.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+
+            // Pop to front natively on drag start
+            highestZIndex++;
+            panel.style.zIndex = highestZIndex;
+
+            // Lock dimensions and absolute positions
+            const rect = panel.getBoundingClientRect();
+            panel.style.transition = 'none';
+            panel.style.transform = 'none'; // Overrides centered transform safely during JS tracking
+
+            if (panel.style.right !== 'auto') panel.style.right = 'auto'; // Break CSS relative constraints
+            if (panel.style.bottom !== 'auto') panel.style.bottom = 'auto';
+
+            // Set explicit pixels
+            panel.style.left = rect.left + 'px';
+            panel.style.top = rect.top + 'px';
+            panel.style.width = rect.width + 'px';
+            panel.style.height = rect.height + 'px';
+
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startWidth = rect.width;
+            const startHeight = rect.height;
+            const startLeft = rect.left;
+            const startTop = rect.top;
+
+            // Compute actual current minimum bounds securely from computed CSS
+            const computedStyle = window.getComputedStyle(panel);
+            const minWidth = parseInt(computedStyle.minWidth, 10) || 200;
+            const minHeight = parseInt(computedStyle.minHeight, 10) || 150;
+
+            function onMouseMove(moveEvent) {
+                const dx = moveEvent.clientX - startX;
+                const dy = moveEvent.clientY - startY;
+
+                let newWidth = startWidth;
+                let newHeight = startHeight;
+                let newLeft = startLeft;
+                let newTop = startTop;
+
+                // Evaluate mapped offset calculations based on handle dragged natively
+                if (pos.includes('right')) newWidth = startWidth + dx;
+                if (pos.includes('left')) {
+                    newWidth = startWidth - dx;
+                    newLeft = startLeft + dx;
+                }
+
+                if (pos.includes('bottom')) newHeight = startHeight + dy;
+                if (pos.includes('top')) {
+                    newHeight = startHeight - dy;
+                    newTop = startTop + dy;
+                }
+
+                // Minimum constraint anchoring mapping algorithms bounding the drag behavior natively
+                if (newWidth < minWidth) {
+                    if (pos.includes('left')) newLeft = startLeft + (startWidth - minWidth);
+                    newWidth = minWidth;
+                }
+
+                if (newHeight < minHeight) {
+                    if (pos.includes('top')) newTop = startTop + (startHeight - minHeight);
+                    newHeight = minHeight;
+                }
+
+                panel.style.width = newWidth + 'px';
+                panel.style.height = newHeight + 'px';
+                panel.style.left = newLeft + 'px';
+                panel.style.top = newTop + 'px';
+            }
+
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                panel.style.transition = 'opacity 0.3s ease';
+            }
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
     });
 }
 
-// Init Chart Context
+// --- IDE Split-Pane Docking Logic ---
+function setupDockingControls() {
+    const metricsPanel = document.getElementById('metrics-panel');
+    const chartPanel = document.getElementById('chart-panel');
+    const rightDock = document.getElementById('right-dock');
+    const bottomDock = document.getElementById('bottom-dock');
+    const workspace = document.querySelector('.workspace');
+
+    // Dashboard Toggle Hook
+    document.getElementById('toggle-metrics').addEventListener('click', (e) => {
+        const isMinimized = metricsPanel.classList.toggle('minimized');
+
+        if (metricsPanel.classList.contains('docked')) {
+            rightDock.classList.toggle('minimized', isMinimized);
+            // Clear explicit drag-resizer boundaries so CSS !important collapse kicks in natively
+            if (isMinimized) {
+                rightDock.style.width = '';
+            }
+        }
+
+        e.target.textContent = isMinimized ? '+' : '-';
+        if (panZoomInstance) {
+            setTimeout(fitGraph, 10);
+        }
+    });
+
+    // Chart VSCode Terminal Minimization Hook
+    document.getElementById('toggle-chart').addEventListener('click', (e) => {
+        chartPanel.classList.toggle('minimized');
+        const isMinimized = chartPanel.classList.contains('minimized');
+        bottomDock.classList.toggle('minimized', isMinimized);
+
+        // Clear explicit drag-resizer boundaries 
+        if (isMinimized) {
+            bottomDock.style.height = '';
+        }
+
+        e.target.textContent = isMinimized ? '+' : '-';
+        if (chartInstance && !isMinimized) {
+            setTimeout(() => chartInstance.timeScale().fitContent(), 10);
+        }
+        if (panZoomInstance) {
+            setTimeout(fitGraph, 10);
+        }
+    });
+}
+
+function setupDockResizers() {
+    const rightDock = document.getElementById('right-dock');
+    const rightResizer = document.getElementById('right-dock-resizer');
+    const bottomDock = document.getElementById('bottom-dock');
+    const bottomResizer = document.getElementById('bottom-dock-resizer');
+
+    // Right Dock Resizing (Left Edge drag)
+    if (rightResizer && rightDock) {
+        let isResizingRight = false;
+        rightResizer.addEventListener('mousedown', (e) => {
+            if (rightDock.classList.contains('minimized')) return;
+            isResizingRight = true;
+            rightResizer.classList.add('active');
+            document.body.style.cursor = 'col-resize';
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizingRight) return;
+            const containerRect = document.body.getBoundingClientRect();
+            let newWidth = containerRect.right - e.clientX;
+            if (newWidth < 200) newWidth = 200;
+            if (newWidth > 800) newWidth = 800;
+            rightDock.style.width = newWidth + 'px';
+        });
+        document.addEventListener('mouseup', () => {
+            if (isResizingRight) {
+                isResizingRight = false;
+                rightResizer.classList.remove('active');
+                document.body.style.cursor = '';
+                if (chartInstance) chartInstance.timeScale().fitContent();
+                if (panZoomInstance) {
+                    setTimeout(fitGraph, 10);
+                }
+            }
+        });
+    }
+
+    // Bottom Dock Resizing (Top Edge drag)
+    if (bottomResizer && bottomDock) {
+        let isResizingBottom = false;
+        bottomResizer.addEventListener('mousedown', (e) => {
+            if (bottomDock.classList.contains('minimized')) return;
+            isResizingBottom = true;
+            bottomResizer.classList.add('active');
+            document.body.style.cursor = 'row-resize';
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizingBottom) return;
+            const dockRect = bottomDock.getBoundingClientRect();
+            // Since bottom dock pushes up, height bounds equals its current bottom edge minus clientY.
+            let newHeight = dockRect.bottom - e.clientY;
+            if (newHeight < 100) newHeight = 100;
+            if (newHeight > window.innerHeight * 0.8) newHeight = window.innerHeight * 0.8;
+            bottomDock.style.height = newHeight + 'px';
+        });
+        document.addEventListener('mouseup', () => {
+            if (isResizingBottom) {
+                isResizingBottom = false;
+                bottomResizer.classList.remove('active');
+                document.body.style.cursor = '';
+                if (chartInstance) chartInstance.timeScale().fitContent();
+                if (panZoomInstance) {
+                    setTimeout(fitGraph, 10);
+                }
+            }
+        });
+    }
+}
+
+// Init Context
 window.addEventListener('DOMContentLoaded', () => {
     initChart();
-    setupMetricsPanelDrag();
-});
+    setupOmnidirectionalResize('chart-panel');
+    setupOmnidirectionalResize('metrics-panel');
+    setupDockingControls();
+    setupDockResizers();
 
-// Boot
-connect();
+    // Boot WebSocket strictly after DOM stabilizes
+    connect();
+});

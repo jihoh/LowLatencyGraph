@@ -31,6 +31,9 @@ public class CoreGraph {
     private final StabilizationEngine engine;
     private final Map<String, Node<?>> nodes;
 
+    private final String name;
+    private final String version;
+
     private final com.trading.drg.util.CompositeStabilizationListener compositeListener;
 
     // Cache source nodes for O(1) updates
@@ -60,6 +63,10 @@ public class CoreGraph {
         }
         var compiler = new JsonGraphCompiler().registerBuiltIns();
         var compiled = compiler.compile(graphDef);
+
+        var info = graphDef.getGraph();
+        this.name = info != null ? info.getName() : "Unknown";
+        this.version = info != null ? info.getVersion() : "1.0";
 
         this.engine = compiled.engine();
         this.nodes = compiled.nodesByName();
@@ -98,6 +105,14 @@ public class CoreGraph {
      */
     public StabilizationEngine getEngine() {
         return engine;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getVersion() {
+        return version;
     }
 
     /**

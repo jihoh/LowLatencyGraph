@@ -25,7 +25,8 @@ public class ComplexWebDemo {
         var dashboardServer = new com.trading.drg.web.GraphDashboardServer();
         dashboardServer.start(7077);
 
-        var wsListener = new com.trading.drg.web.WebsocketPublisherListener(graph.getEngine(), dashboardServer);
+        var wsListener = new com.trading.drg.web.WebsocketPublisherListener(graph.getEngine(), dashboardServer,
+                graph.getName(), graph.getVersion());
         wsListener.setLatencyListener(latencyListener);
         wsListener.setProfileListener(profiler);
         graph.setListener(wsListener);

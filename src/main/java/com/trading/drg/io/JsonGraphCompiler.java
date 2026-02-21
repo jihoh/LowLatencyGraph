@@ -141,12 +141,12 @@ public final class JsonGraphCompiler {
         });
 
         registerFactory("scalar_source", (name, props, deps) -> {
-            double init = getDouble(props, "initial_value", 0.0);
+            double init = getDouble(props, "initial_value", Double.NaN);
             ScalarCutoff cutoff = parseCutoff(props);
             return new ScalarSourceNode(name, init, cutoff);
         });
         registerFactory("double_source", (name, props, deps) -> {
-            double init = getDouble(props, "initial_value", 0.0);
+            double init = getDouble(props, "initial_value", Double.NaN);
             ScalarCutoff cutoff = parseCutoff(props);
             return new ScalarSourceNode(name, init, cutoff);
         });

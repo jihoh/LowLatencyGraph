@@ -1,28 +1,19 @@
 {
     "graph": {
-        "name": "tri_arb",
+        "name": "FX Arbitrage",
         "version": "1.0",
         "nodes": [
             {
                 "name": "EURUSD",
-                "type": "scalar_source",
-                "properties": {
-                    "initial_value": 1.0850
-                }
+                "type": "scalar_source"
             },
             {
                 "name": "USDJPY",
-                "type": "scalar_source",
-                "properties": {
-                    "initial_value": 145.20
-                }
+                "type": "scalar_source"
             },
             {
                 "name": "EURJPY",
-                "type": "scalar_source",
-                "properties": {
-                    "initial_value": 157.55
-                }
+                "type": "scalar_source"
             },
             {
                 "name": "Arb.Spread",

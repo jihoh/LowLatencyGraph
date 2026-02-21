@@ -4,107 +4,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CoreGraph Live Dashboard</title>
+    <title>Core Graph</title>
     <!-- Modern Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
-    <header>
-        <div class="header-content">
-            <h1>CoreGraph</h1>
-            <div id="connection-status" class="status disconnected">Disconnected</div>
-        </div>
-        <p class="subtitle">High Performance Graph Engine</p>
-    </header>
 
-    <main>
-        <div class="graph-container">
-            <div class="zoom-controls">
-                <button id="zoom-in" title="Zoom In">+</button>
-                <button id="zoom-reset" title="Reset Zoom">Fit</button>
-                <button id="zoom-out" title="Zoom Out">-</button>
-            </div>
-            <div class="graph-scroll-area">
-                <!-- Mermaid.js will mount here -->
-                <pre class="mermaid" id="graph-view">
-                </pre>
-            </div>
-        </div>
 
-        <div class="metrics-panel" id="metrics-panel">
-            <div class="metrics-header" id="metrics-header">
-                <h2>Live Dashboard</h2>
-                <button class="panel-btn" id="toggle-metrics" title="Minimize">-</button>
-            </div>
-            <div class="panel-content" id="metrics-content">
-                <h3>Graph Metrics</h3>
-                <div class="metric-row">
-                    <div class="metric-small">
-                        <span class="label">Epoch</span>
-                        <span class="value" id="epoch-value">0</span>
+    <div class="workspace">
+        <div class="main-column">
+            <div class="graph-container">
+                <div class="graph-header-overlay">
+                    <h1 id="graph-title">Loading Graph...</h1>
+                    <span id="graph-version" class="badge">v--</span>
+                </div>
+                <div class="graph-footer-left control-stack">
+                    <div class="zoom-controls">
+                        <span class="control-label">Text</span>
+                        <button id="text-out" title="Decrease Text">-</button>
+                        <button id="text-reset" title="Reset Text">Fit</button>
+                        <button id="text-in" title="Increase Text">+</button>
                     </div>
-                    <div class="metric-small">
-                        <span class="label">Events</span>
-                        <span class="value" id="events-value">0</span>
-                    </div>
-                    <div class="metric-small">
-                        <span class="label">Evaluated</span>
-                        <span class="value" id="reactive-eff">0 / 0</span>
+                    <div class="zoom-controls">
+                        <span class="control-label">Graph</span>
+                        <button id="zoom-out" title="Zoom Out">-</button>
+                        <button id="zoom-reset" title="Reset Zoom">Fit</button>
+                        <button id="zoom-in" title="Zoom In">+</button>
                     </div>
                 </div>
-
-                <h3>Stabilization Metrics</h3>
-                <div class="metric-row">
-                    <div class="metric-small">
-                        <span class="label">Latest Latency (μs)</span>
-                        <span class="value" id="lat-latest">0.00</span>
-                    </div>
-                    <div class="metric-small">
-                        <span class="label">Avg Latency (μs)</span>
-                        <span class="value" id="lat-avg">0.00</span>
-                    </div>
-                    <div class="metric-small">
-                        <span class="label">Rate (Hz)</span>
-                        <span class="value" id="stab-rate">0</span>
-                    </div>
+                <div class="graph-footer-right">
+                    Powered by Core Strats
                 </div>
+                <div class="graph-scroll-area">
+                    <!-- Mermaid.js will mount here -->
+                    <pre class="mermaid" id="graph-view">
+                    </pre>
+                </div>
+            </div>
 
-                <h3>Node Performance Profile</h3>
-                <div class="profile-table-container">
-                    <table id="profile-table">
-                        <thead>
-                            <tr>
-                                <th>NODE</th>
-                                <th style="text-align: right;">LATEST (μs)</th>
-                                <th style="text-align: right;">AVG (μs)</th>
-                                <th style="text-align: right;">UPDATES</th>
-                                <th style="text-align: right;">NaNs</th>
-                            </tr>
-                        </thead>
-                        <tbody id="profile-body">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
+            <!-- Bottom Dock -->
+            <div id="bottom-dock" class="dock-container bottom-dock minimized">
+                <div id="bottom-dock-resizer" class="edge-resizer top-edge"></div>
+                <!-- Floating Interactive Charting Panel -->
+                <div id="chart-panel" class="chart-panel docked minimized">
+                    <div class="chart-header">
+                        <h3 id="chart-title"></h3>
+                        <div class="header-controls" style="display:flex; align-items:center;">
+                            <button id="toggle-chart" class="panel-btn" title="Minimize">+</button>
+                        </div>
+                    </div>
+                    <div class="panel-content" id="chart-content" style="position: relative;">
+                        <!-- TradingView container -->
+                        <div id="tv-chart" class="tv-chart"></div>
+                        <button id="btn-auto-track" class="chart-overlay-btn" title="Auto track latest"
+                            style="display: none;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M5 12h14M12 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-    </main>
 
-    <!-- Floating Interactive Charting Panel -->
-    <div id="chart-panel" class="chart-panel hidden">
-        <div class="chart-header">
-            <h3 id="chart-title">Node Metric</h3>
-            <div>
-                <button id="toggle-chart" class="panel-btn" title="Minimize">-</button>
-                <button id="close-chart" class="close-btn">&times;</button>
+        <!-- Right Dock -->
+        <div id="right-dock" class="dock-container right-dock">
+            <div id="right-dock-resizer" class="edge-resizer left-edge"></div>
+            <div class="metrics-panel docked" id="metrics-panel">
+                <div class="metrics-header" id="metrics-header">
+                    <h2>Dashboard</h2>
+                    <div class="header-controls" style="display:flex; align-items:center; gap:4px;">
+                        <button class="panel-btn" id="toggle-metrics" title="Minimize">-</button>
+                    </div>
+                </div>
+                <div class="panel-content" id="metrics-content">
+                    <h3>Graph Metrics</h3>
+                    <div class="metric-row">
+                        <div class="metric-small">
+                            <span class="label">Epoch</span>
+                            <span class="value" id="epoch-value">0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Events</span>
+                            <span class="value" id="events-value">0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Evaluated</span>
+                            <span class="value" id="reactive-eff">0 / 0</span>
+                        </div>
+                    </div>
+
+                    <h3>Stabilization Metrics</h3>
+                    <div class="metric-row">
+                        <div class="metric-small">
+                            <span class="label">Latest Latency (μs)</span>
+                            <span class="value" id="lat-latest">0.00</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Avg Latency (μs)</span>
+                            <span class="value" id="lat-avg">0.00</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Rate (Hz)</span>
+                            <span class="value" id="stab-rate">0</span>
+                        </div>
+                    </div>
+
+                    <h3>Node Metrics</h3>
+                    <div class="profile-table-container">
+                        <table id="profile-table">
+                            <thead>
+                                <tr>
+                                    <th>NODE</th>
+                                    <th style="text-align: right;">LATEST (μs)</th>
+                                    <th style="text-align: right;">AVG (μs)</th>
+                                    <th style="text-align: right;">UPDATES</th>
+                                    <th style="text-align: right;">NaNs</th>
+                                </tr>
+                            </thead>
+                            <tbody id="profile-body">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="panel-content" id="chart-content">
-            <!-- TradingView container -->
-            <div id="tv-chart" class="tv-chart"></div>
+    </div>
+
+    <!-- Historical Scrubbing Footer -->
+    <div class="timeline-container">
+        <div class="timeline-controls">
+            <div id="timeline-status" class="status-badge disconnected">DISCONNECTED</div>
+            <span id="timeline-epoch"
+                style="font-family: monospace; font-size: 11px; color: var(--text-secondary); width: 80px;">Epoch:
+                0</span>
         </div>
+        <input type="range" id="time-scrubber" class="scrubber-slider" min="0" max="0" value="0" step="1">
     </div>
 
     <!-- Load Mermaid & Dependencies -->

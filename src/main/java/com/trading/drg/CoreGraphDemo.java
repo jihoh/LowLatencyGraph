@@ -23,50 +23,79 @@ public class CoreGraphDemo {
         var dashboardServer = new com.trading.drg.web.GraphDashboardServer();
         dashboardServer.start(8080);
 
-        // Attach the WebSocket broadcster to the engine
-        var wsListener = new com.trading.drg.web.WebsocketPublisherListener(graph.getEngine(), dashboardServer);
+        var wsListener = new com.trading.drg.web.WebsocketPublisherListener(graph.getEngine(), dashboardServer,
+                graph.getName(), graph.getVersion());
         wsListener.setLatencyListener(latencyListener);
         wsListener.setProfileListener(profiler);
         graph.setListener(wsListener);
 
-        // Simulation Loop
+        // Advanced Simulation Loop
         Random rng = new Random(42);
-        int updates = 10_000;
+        int updates = 100_000;
 
-        log.info("Publishing updates...");
+        String[] nodes = { "EURUSD", "USDJPY", "EURJPY" };
+        int nanCountdown = 0;
+        String nanNode = null;
+
+        log.info("Publishing updates (1 tick/sec, with 5s NaN faults)...");
         for (int i = 0; i < updates; i++) {
-            double shock = (rng.nextDouble() - 0.5) * 0.01;
-
-            // Use direct values for the next step of the random walk
-            double currentEurUsd = graph.getDouble("EURUSD");
-            double currentUsdJpy = graph.getDouble("USDJPY");
-            double currentEurJpy = graph.getDouble("EURJPY");
-
-            if (i % 500 == 0) {
-                graph.update("EURJPY", 158.0);
-                graph.stabilize();
-            } else {
-                graph.update("EURUSD", currentEurUsd + shock);
-                graph.update("USDJPY", currentUsdJpy + shock * 100);
-                graph.update("EURJPY", currentEurJpy + shock * 100);
-                // Trigger stabilization manually
-                graph.stabilize();
+            // Priority 1: Manage NaN Fault Injection Phase
+            if (nanCountdown > 0) {
+                // Keep the faulted node at NaN for the duration of the countdown
+                graph.update(nanNode, Double.NaN);
+                nanCountdown--;
+                if (nanCountdown == 0) {
+                    // Recover the node with a sensible baseline so it doesn't stay NaN forever.
+                    double recoveryValue = nanNode.equals("USDJPY") ? 154.9 : (nanNode.equals("EURJPY") ? 182.8 : 1.18);
+                    graph.update(nanNode, recoveryValue);
+                    log.info("Recovered " + nanNode + " from NaN fault.");
+                    nanNode = null;
+                }
+            } else if (i > 0 && i % 500 == 0) {
+                // Trigger a new 100-second NaN fault every 500 ticks
+                nanNode = nodes[rng.nextInt(nodes.length)];
+                nanCountdown = 100;
+                graph.update(nanNode, Double.NaN);
+                log.info("Injected NaN fault into " + nanNode + " for 100 seconds.");
             }
 
-            if (i % 1000 == 0) {
+            // Normal Random Walk for exactly ONE OTHER random node
+            String targetNode = nodes[rng.nextInt(nodes.length)];
+
+            // Loop until we find a node that is NOT currently the active NaN fault
+            while (nanNode != null && targetNode.equals(nanNode)) {
+                targetNode = nodes[rng.nextInt(nodes.length)];
+            }
+
+            double shock = (rng.nextDouble() - 0.5) * 0.05; // Slightly larger shock for 1s ticks
+            double currentValue = graph.getDouble(targetNode);
+
+            // Cold start: The graph now defaults to NaN. Seed it on the first tick.
+            if (Double.isNaN(currentValue)) {
+                currentValue = targetNode.equals("USDJPY") ? 154.9 : (targetNode.equals("EURJPY") ? 182.8 : 1.18);
+            }
+
+            if (targetNode.contains("JPY")) {
+                shock *= 100;
+            }
+            graph.update(targetNode, currentValue + shock);
+
+            // Always stabilize to propagate whatever state (good or NaN) exists
+            graph.stabilize();
+
+            if (i % 5 == 0) {
                 double spread = graph.getDouble("Arb.Spread");
-                if (Math.abs(spread) > 0.05) {
+                if (!Double.isNaN(spread) && Math.abs(spread) > 0.05) {
                     log.info(String.format(
                             "[Arb Opportunity] Spread: %.4f | EWMA: %.4f | EURUSD: %.4f | USDJPY: %.2f | EURJPY: %.2f",
                             spread,
                             graph.getDouble("Arb.Spread.Ewma"),
-                            currentEurUsd,
-                            currentUsdJpy,
-                            currentEurJpy));
+                            graph.getDouble("EURUSD"),
+                            graph.getDouble("USDJPY"),
+                            graph.getDouble("EURJPY")));
                 }
             }
 
-            // Sleep so the human watching the dashboard can see the updates
             Thread.sleep(100);
         }
 

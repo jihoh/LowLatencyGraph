@@ -111,14 +111,15 @@ public final class GraphExplain {
             }
             String valueStr = String.format("%.4f", val);
 
-            // Stylize nodes based on type/role with HTML labels for bold values
+            // Stylize nodes with semantic span classes for CSS isolation
             if (topology.isSource(i)) {
-                sb.append("  ").append(safeName).append("([\"").append(node.name())
-                        .append("<br/><b>").append(valueStr).append("</b>\"]);\n");
-                sb.append("  style ").append(safeName).append(" fill:#e1f5fe,stroke:#01579b,stroke-width:2px;\n");
+                sb.append("  ").append(safeName)
+                        .append("[\"<div class='node-inner'><span class='node-title source-node'>").append(node.name())
+                        .append("</span><b class='node-value'>").append(valueStr).append("</b></div>\"];\n");
             } else {
-                sb.append("  ").append(safeName).append("[\"").append(node.name())
-                        .append("<br/><b>").append(valueStr).append("</b>\"];\n");
+                sb.append("  ").append(safeName).append("[\"<div class='node-inner'><span class='node-title'>")
+                        .append(node.name())
+                        .append("</span><b class='node-value'>").append(valueStr).append("</b></div>\"];\n");
             }
 
             int cc = topology.childCount(i);

@@ -21,6 +21,8 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
     private final StabilizationEngine engine;
     private final GraphDashboardServer server;
+    private final String graphName;
+    private final String graphVersion;
     private final String initialMermaid;
     private final com.trading.drg.util.ErrorRateLimiter errLimiter = new com.trading.drg.util.ErrorRateLimiter(log,
             1000);
@@ -36,9 +38,12 @@ public class WebsocketPublisherListener implements StabilizationListener {
     // Note: Since StabilizationEngine is single-threaded, this is safe.
     private final StringBuilder jsonBuilder = new StringBuilder(1024);
 
-    public WebsocketPublisherListener(StabilizationEngine engine, GraphDashboardServer server) {
+    public WebsocketPublisherListener(StabilizationEngine engine, GraphDashboardServer server, String graphName,
+            String graphVersion) {
         this.engine = engine;
         this.server = server;
+        this.graphName = graphName;
+        this.graphVersion = graphVersion;
         this.initialMermaid = new com.trading.drg.util.GraphExplain(engine).toMermaid()
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n");
@@ -61,7 +66,10 @@ public class WebsocketPublisherListener implements StabilizationListener {
     public void onStabilizationEnd(long epoch, int nodesStabilized) {
         // 1. Build a compact JSON payload representing the current state
         jsonBuilder.setLength(0);
-        jsonBuilder.append("{\"epoch\":").append(epoch).append(",\"values\":{");
+        jsonBuilder.append("{\"epoch\":").append(epoch)
+                .append(",\"graphName\":\"").append(graphName).append("\"")
+                .append(",\"graphVersion\":\"").append(graphVersion).append("\"")
+                .append(",\"values\":{");
 
         TopologicalOrder topology = engine.topology();
         int nodeCount = topology.nodeCount();
