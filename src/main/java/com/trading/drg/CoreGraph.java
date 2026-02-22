@@ -36,6 +36,12 @@ public class CoreGraph {
 
     private final com.trading.drg.util.CompositeStabilizationListener compositeListener;
 
+    // Optional trackers
+    // Optional trackers
+    private com.trading.drg.util.LatencyTrackingListener latencyListener;
+    private com.trading.drg.util.NodeProfileListener profileListener;
+    private com.trading.drg.web.GraphDashboardServer dashboardServer;
+
     // Cache source nodes for O(1) updates
     private final Node<?>[] sourceNodes;
 
@@ -117,22 +123,62 @@ public class CoreGraph {
 
     /**
      * Enables latency tracking.
-     * If already enabled, returns the existing listener.
+     * If already enabled, it does nothing.
      */
-    public com.trading.drg.util.LatencyTrackingListener enableLatencyTracking() {
-        var latencyListener = new com.trading.drg.util.LatencyTrackingListener();
-        compositeListener.addForComposite(latencyListener);
-        return latencyListener;
+    public CoreGraph enableLatencyTracking() {
+        if (this.latencyListener == null) {
+            this.latencyListener = new com.trading.drg.util.LatencyTrackingListener();
+            compositeListener.addForComposite(this.latencyListener);
+        }
+        return this;
     }
 
     /**
      * Enables detailed per-node profiling.
-     * Use the returned listener to dump statistics.
      */
-    public com.trading.drg.util.NodeProfileListener enableNodeProfiling() {
-        var profileListener = new com.trading.drg.util.NodeProfileListener();
-        compositeListener.addForComposite(profileListener);
-        return profileListener;
+    public CoreGraph enableNodeProfiling() {
+        if (this.profileListener == null) {
+            this.profileListener = new com.trading.drg.util.NodeProfileListener();
+            compositeListener.addForComposite(this.profileListener);
+        }
+        return this;
+    }
+
+    /**
+     * Boots a Live Dashboard Server and wires it to the graph.
+     *
+     * @param port the port to bind to (e.g., 8080)
+     */
+    public CoreGraph enableDashboardServer(int port) {
+        if (this.dashboardServer == null) {
+            this.dashboardServer = new com.trading.drg.web.GraphDashboardServer();
+            this.dashboardServer.start(port);
+
+            var wsListener = new com.trading.drg.web.WebsocketPublisherListener(
+                    this.engine, this.dashboardServer, this.name, this.version);
+
+            if (this.latencyListener != null) {
+                wsListener.setLatencyListener(this.latencyListener);
+            }
+            if (this.profileListener != null) {
+                wsListener.setProfileListener(this.profileListener);
+            }
+
+            setListener(wsListener);
+        }
+        return this;
+    }
+
+    public com.trading.drg.util.LatencyTrackingListener getLatencyListener() {
+        return this.latencyListener;
+    }
+
+    public com.trading.drg.util.NodeProfileListener getProfileListener() {
+        return this.profileListener;
+    }
+
+    public com.trading.drg.web.GraphDashboardServer getDashboardServer() {
+        return this.dashboardServer;
     }
 
     /**

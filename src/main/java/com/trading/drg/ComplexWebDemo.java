@@ -16,20 +16,10 @@ public class ComplexWebDemo {
     public static void main(String[] args) throws Exception {
         log.info("Starting Complex Web Demo...");
 
-        var graph = new CoreGraph("src/main/resources/complex_demo.json");
-        var profiler = graph.enableNodeProfiling();
-        var latencyListener = graph.enableLatencyTracking();
-
-        // Ensure the server port is clear
-        log.info("Booting Live Dashboard Server on 7077...");
-        var dashboardServer = new com.trading.drg.web.GraphDashboardServer();
-        dashboardServer.start(7077);
-
-        var wsListener = new com.trading.drg.web.WebsocketPublisherListener(graph.getEngine(), dashboardServer,
-                graph.getName(), graph.getVersion());
-        wsListener.setLatencyListener(latencyListener);
-        wsListener.setProfileListener(profiler);
-        graph.setListener(wsListener);
+        var graph = new CoreGraph("src/main/resources/complex_demo.json")
+                .enableNodeProfiling()
+                .enableLatencyTracking()
+                .enableDashboardServer(7077);
 
         String[] tickers = { "AAPL", "MSFT", "GOOG", "AMZN" };
         Random rng = new Random(100);
@@ -70,10 +60,12 @@ public class ComplexWebDemo {
                         graph.getDouble("AAPL_Standalone_Risk")));
             }
 
-            Thread.sleep(50);
+            Thread.sleep(100);
         }
 
-        dashboardServer.stop();
+        if (graph.getDashboardServer() != null) {
+            graph.getDashboardServer().stop();
+        }
         log.info("Complex web demo finished.");
     }
 }

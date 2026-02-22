@@ -167,21 +167,18 @@
                     <div id="content-alert-engine">
                         <div class="alert-controls"
                             style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
-                            <div style="display: flex; gap: 8px; align-items: center;">
-                                <select id="alert-node" class="alert-input">
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <select id="alert-node" class="alert-input" style="width: 100%;">
                                     <option value="">Select Node</option>
-                                    <option value="EURJPY">EURJPY</option>
-                                    <option value="USDJPY">USDJPY</option>
-                                    <option value="EURUSD">EURUSD</option>
-                                    <option value="Arb.Spread">Arb.Spread</option>
                                 </select>
-                                <select id="alert-condition" class="alert-input">
+                                <select id="alert-condition" class="alert-input" style="width: 100%;">
                                     <option value="<">drops below</option>
                                     <option value=">">goes above</option>
+                                    <option value="=">equals</option>
                                 </select>
                                 <input type="number" id="alert-threshold" class="alert-input" placeholder="Value"
-                                    step="any" style="width: 80px;">
-                                <select id="alert-mode" class="alert-input">
+                                    step="any" style="width: 100%;">
+                                <select id="alert-mode" class="alert-input" style="width: 100%;">
                                     <option value="ONCE">ONCE</option>
                                     <option value="CONTINUOUS">CONT</option>
                                 </select>

@@ -113,10 +113,21 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
         if (profileListener != null) {
             jsonBuilder.append(",\"profile\":[");
-            var topNodes = profileListener.getStats().entrySet().stream()
+
+            // Build comprehensive list of all nodes, using zero-stats if they haven't
+            // stabilized yet
+            java.util.List<java.util.Map.Entry<String, NodeProfileListener.NodeStats>> allNodes = new java.util.ArrayList<>(
+                    nodeCount);
+            for (int i = 0; i < nodeCount; i++) {
+                String nodeName = topology.node(i).name();
+                var stats = profileListener.getStats().getOrDefault(nodeName, new NodeProfileListener.NodeStats());
+                allNodes.add(new java.util.AbstractMap.SimpleEntry<>(nodeName, stats));
+            }
+
+            var topNodes = allNodes.stream()
                     .sorted((e1, e2) -> Long.compare(e2.getValue().totalDurationNanos,
                             e1.getValue().totalDurationNanos))
-                    .limit(5)
+                    .limit(50)
                     .toList();
 
             for (int i = 0; i < topNodes.size(); i++) {

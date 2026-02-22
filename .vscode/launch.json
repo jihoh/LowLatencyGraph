@@ -1,0 +1,49 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Current File",
+            "request": "launch",
+            "mainClass": "${file}"
+        },
+        {
+            "type": "java",
+            "name": "ComplexWebDemo",
+            "request": "launch",
+            "mainClass": "com.trading.drg.ComplexWebDemo",
+            "projectName": "claude-graph"
+        },
+        {
+            "type": "java",
+            "name": "CoreGraphDemo",
+            "request": "launch",
+            "mainClass": "com.trading.drg.CoreGraphDemo",
+            "projectName": "claude-graph"
+        },
+        {
+            "type": "java",
+            "name": "JsonTemplateDemo",
+            "request": "launch",
+            "mainClass": "com.trading.drg.JsonTemplateDemo",
+            "projectName": "claude-graph"
+        },
+        {
+            "type": "java",
+            "name": "LLGraphTest",
+            "request": "launch",
+            "mainClass": "com.trading.drg.LLGraphTest",
+            "projectName": "claude-graph"
+        },
+        {
+            "type": "java",
+            "name": "NodeProfileDemo",
+            "request": "launch",
+            "mainClass": "com.trading.drg.NodeProfileDemo",
+            "projectName": "claude-graph"
+        }
+    ]
+}

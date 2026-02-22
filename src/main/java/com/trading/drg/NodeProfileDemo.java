@@ -1,6 +1,5 @@
 package com.trading.drg;
 
-import com.trading.drg.util.NodeProfileListener;
 import java.util.Random;
 
 public class NodeProfileDemo {
@@ -12,7 +11,7 @@ public class NodeProfileDemo {
         // graph.start();
 
         // 2. Enable Profiling
-        NodeProfileListener profiler = graph.enableNodeProfiling();
+        graph.enableNodeProfiling();
         System.out.println("Profiling enabled.");
 
         // 3. Optimize Sources
@@ -33,9 +32,9 @@ public class NodeProfileDemo {
 
         // 5. Dump Stats
         System.out.println("\n--- Node Performance Profile ---");
-        System.out.println(profiler.dump());
+        System.out.println(graph.getProfileListener().dump());
 
-        System.out.println(profiler.dump());
+        System.out.println(graph.getProfileListener().dump());
 
         // graph.stop();
         System.exit(0);

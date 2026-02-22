@@ -216,8 +216,22 @@ function connect() {
                     }
 
                     // Store initial values
+                    const alertNodeSelect = document.getElementById('alert-node');
+                    let sortedNodes = [];
                     for (const [key, val] of Object.entries(payload.values)) {
                         prevValues.set(key, val);
+                        sortedNodes.push(key);
+                    }
+
+                    // Populate Select Node dropdown dynamically
+                    if (alertNodeSelect) {
+                        alertNodeSelect.innerHTML = '<option value="">Select Node</option>';
+                        sortedNodes.sort().forEach(nodeName => {
+                            const opt = document.createElement('option');
+                            opt.value = nodeName;
+                            opt.textContent = nodeName;
+                            alertNodeSelect.appendChild(opt);
+                        });
                     }
 
                     // Attach our custom hover listeners
@@ -445,6 +459,12 @@ function updateProfileTable(profileArray) {
         `;
     }
     profileBody.innerHTML = html;
+
+    // Recalculate accordion height so rows aren't clipped visually if it's open
+    const content = document.getElementById('content-node-metrics');
+    if (content.style.maxHeight && content.style.maxHeight !== '0px') {
+        content.style.maxHeight = content.scrollHeight + 'px';
+    }
 }
 
 // Sanitize name to match Mermaid's internal ID generator

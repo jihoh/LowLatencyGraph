@@ -14,20 +14,10 @@ public class CoreGraphDemo {
     public static void main(String[] args) throws Exception {
         log.info("Starting CoreGraph Demo...");
 
-        var graph = new CoreGraph("src/main/resources/tri_arb.json");
-        var profiler = graph.enableNodeProfiling();
-        var latencyListener = graph.enableLatencyTracking();
-
-        // --- Start Dashboard Server ---
-        log.info("Booting Live Dashboard Server...");
-        var dashboardServer = new com.trading.drg.web.GraphDashboardServer();
-        dashboardServer.start(8080);
-
-        var wsListener = new com.trading.drg.web.WebsocketPublisherListener(graph.getEngine(), dashboardServer,
-                graph.getName(), graph.getVersion());
-        wsListener.setLatencyListener(latencyListener);
-        wsListener.setProfileListener(profiler);
-        graph.setListener(wsListener);
+        var graph = new CoreGraph("src/main/resources/tri_arb.json")
+                .enableNodeProfiling()
+                .enableLatencyTracking()
+                .enableDashboardServer(8080);
 
         // Advanced Simulation Loop
         Random rng = new Random(42);
@@ -103,13 +93,19 @@ public class CoreGraphDemo {
         System.out.println(new com.trading.drg.util.GraphExplain(graph.getEngine()).toMermaid());
 
         // Stop the dashboard server after demo
-        dashboardServer.stop();
+        if (graph.getDashboardServer() != null) {
+            graph.getDashboardServer().stop();
+        }
 
         // Get Latency Stats
         log.info("Demo complete.");
         System.out.println("\n--- Global Latency Stats ---");
-        System.out.println(latencyListener.dump());
+        if (graph.getLatencyListener() != null) {
+            System.out.println(graph.getLatencyListener().dump());
+        }
         System.out.println("\n--- Node Performance Profile ---");
-        System.out.println(profiler.dump());
+        if (graph.getProfileListener() != null) {
+            System.out.println(graph.getProfileListener().dump());
+        }
     }
 }
