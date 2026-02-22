@@ -439,44 +439,20 @@ td.right {
     }
 }
 
-/* NaN Node Styling */
-.nan-node rect,
-.nan-node circle,
-.nan-node polygon,
-.nan-node path {
-    fill: #2c0b0e !important;
-    stroke: #dc3545 !important;
-    stroke-width: 2px !important;
+/* Explicit text color protection for Highlight/NaN (stops SVG from cascading shapes to text) */
+.node-hover-highlight .node-value,
+.nan-node .node-value {
+    fill: #e2e8f0 !important;
+    color: #e2e8f0 !important;
 }
 
-.nan-node text,
-.nan-node tspan,
-.nan-node div,
-.nan-node span,
-.nan-node b {
-    color: #ffb3b8 !important;
-    fill: #ffb3b8 !important;
+.node-hover-highlight .node-title,
+.nan-node .node-title {
+    fill: #8b92a5 !important;
+    color: #8b92a5 !important;
 }
 
-/* Hover Highlight Styling for Dependent Nodes */
-.node-hover-highlight rect,
-.node-hover-highlight circle,
-.node-hover-highlight polygon,
-.node-hover-highlight path {
-    fill: rgba(35, 134, 54, 0.4) !important;
-    stroke: var(--accent-green) !important;
-    stroke-width: 2px !important;
-    transition: all 0.1s ease;
-}
 
-.node-hover-highlight text,
-.node-hover-highlight tspan,
-.node-hover-highlight div,
-.node-hover-highlight span,
-.node-hover-highlight b {
-    color: #4ade80 !important;
-    fill: #4ade80 !important;
-}
 
 /* =========================================================================
    Professional Trading Graph Aesthetics
@@ -530,6 +506,33 @@ td.right {
     gap: 2px;
 }
 
+/* 
+ * NOTE: State Overrides for NaN and Hover MUST be placed AFTER generic .node:hover rules
+ * to ensure they win the CSS specificity tie-breakers!
+ */
+
+/* NaN Node Styling */
+.node.nan-node rect,
+.node.nan-node circle,
+.node.nan-node polygon,
+.node.nan-node path {
+    fill: #2c0b0e !important;
+    stroke: #dc3545 !important;
+    stroke-width: 2px !important;
+}
+
+/* Hover Highlight Styling for Dependent Nodes */
+.node.node-hover-highlight rect,
+.node.node-hover-highlight circle,
+.node.node-hover-highlight polygon,
+.node.node-hover-highlight path {
+    fill: #194d25 !important;
+    /* Changed from transparent rgba to solid dark green to prevent muddy blending */
+    stroke: var(--accent-green) !important;
+    stroke-width: 2px !important;
+    transition: all 0.1s ease;
+}
+
 /* Graph Edge Paths & Arrows */
 .edgePath .path {
     stroke: #363c4e !important;
@@ -544,7 +547,22 @@ td.right {
 
 .marker,
 marker path {
-    fill: #363c4e !important;
+    /* Make arrowheads inherit the color of their path */
+    fill: context-stroke !important;
+}
+
+/* NaN Edge Styling (Red to match NaN node borders) */
+path.flowchart-link[data-source-nan="true"] {
+    stroke: #dc3545 !important;
+    stroke-width: 3px !important;
+    transition: stroke 0.15s ease;
+}
+
+/* Hover Highlight Edge Styling (Bright green to match node borders) */
+path.flowchart-link[data-source-hover="true"] {
+    stroke: var(--accent-green) !important;
+    stroke-width: 3px !important;
+    transition: stroke 0.15s ease;
 }
 
 /* Modern Typography Mapping */

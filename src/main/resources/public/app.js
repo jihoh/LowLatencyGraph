@@ -375,8 +375,12 @@ function updateGraphDOM(newValues) {
                 const isNaN = newVal === "NaN";
                 if (isNaN) {
                     nodeGroup.classList.add('nan-node');
+                    document.querySelectorAll(`.LS-${svgNodeId}`).forEach(e => e.dataset.sourceNan = "true");
+                    document.querySelectorAll(`.LE-${svgNodeId}`).forEach(e => e.dataset.targetNan = "true");
                 } else {
                     nodeGroup.classList.remove('nan-node');
+                    document.querySelectorAll(`.LS-${svgNodeId}`).forEach(e => e.dataset.sourceNan = "false");
+                    document.querySelectorAll(`.LE-${svgNodeId}`).forEach(e => e.dataset.targetNan = "false");
                 }
 
                 const displayVal = isNaN ? "NaN" : formatVal(newVal);
@@ -429,6 +433,13 @@ function highlightNodes(nodeNames, isHovered) {
                 nodeGroup.classList.remove('node-hover-highlight');
             }
         }
+
+        document.querySelectorAll(`.LS-${svgNodeId}`).forEach(e => {
+            e.dataset.sourceHover = isHovered ? "true" : "false";
+        });
+        document.querySelectorAll(`.LE-${svgNodeId}`).forEach(e => {
+            e.dataset.targetHover = isHovered ? "true" : "false";
+        });
     }
 }
 
