@@ -12159,3 +12159,331 @@
 22:16:30.984 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - Injected NaN fault into EURUSD for 100 seconds.
 22:16:30.984 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURUSD': Node evaluated to NaN (Throttled)
 22:16:30.984 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURUSD: Node evaluated to NaN (Throttled)
+22:16:32.026 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURUSD': Node evaluated to NaN (Throttled)
+22:16:32.026 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURUSD: Node evaluated to NaN (Throttled)
+22:16:33.068 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURUSD': Node evaluated to NaN (Throttled)
+22:16:33.068 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURUSD: Node evaluated to NaN (Throttled)
+22:16:34.099 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURUSD': Node evaluated to NaN (Throttled)
+22:16:34.099 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURUSD: Node evaluated to NaN (Throttled)
+22:16:35.141 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURUSD': Node evaluated to NaN (Throttled)
+22:16:35.141 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURUSD: Node evaluated to NaN (Throttled)
+22:16:36.182 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURUSD': Node evaluated to NaN (Throttled)
+22:16:36.182 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURUSD: Node evaluated to NaN (Throttled)
+22:16:37.218 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURUSD': Node evaluated to NaN (Throttled)
+22:16:37.218 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURUSD: Node evaluated to NaN (Throttled)
+22:16:38.257 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURUSD': Node evaluated to NaN (Throttled)
+22:16:38.257 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURUSD: Node evaluated to NaN (Throttled)
+22:16:39.297 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURUSD': Node evaluated to NaN (Throttled)
+22:16:39.297 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURUSD: Node evaluated to NaN (Throttled)
+22:16:40.335 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURUSD': Node evaluated to NaN (Throttled)
+22:16:40.335 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURUSD: Node evaluated to NaN (Throttled)
+22:16:41.382 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - Recovered EURUSD from NaN fault.
+22:16:41.383 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -22.9535 | EWMA: -56.1699 | EURUSD: 1.1800 | USDJPY: 183.75 | EURJPY: 193.87
+22:16:41.904 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -23.1806 | EWMA: -43.1110 | EURUSD: 1.1800 | USDJPY: 185.45 | EURJPY: 195.65
+22:16:42.425 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -18.2306 | EWMA: -34.2575 | EURUSD: 1.1535 | USDJPY: 185.42 | EURJPY: 195.65
+22:16:42.947 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -17.3635 | EWMA: -26.9891 | EURUSD: 1.1539 | USDJPY: 184.08 | EURJPY: 195.06
+22:16:43.468 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -23.9806 | EWMA: -24.6890 | EURUSD: 1.1699 | USDJPY: 184.08 | EURJPY: 191.38
+22:16:43.994 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -24.2326 | EWMA: -24.5463 | EURUSD: 1.1709 | USDJPY: 183.33 | EURJPY: 190.42
+22:16:44.508 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -14.1000 | EWMA: -21.5874 | EURUSD: 1.1395 | USDJPY: 181.26 | EURJPY: 192.44
+22:16:45.028 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -9.2159 | EWMA: -18.3809 | EURUSD: 1.1030 | USDJPY: 181.26 | EURJPY: 190.71
+22:16:45.544 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -6.1991 | EWMA: -14.0201 | EURUSD: 1.1030 | USDJPY: 179.67 | EURJPY: 191.97
+22:16:46.065 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -1.8878 | EWMA: -10.0329 | EURUSD: 1.0734 | USDJPY: 179.67 | EURJPY: 190.96
+22:16:46.590 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -3.4406 | EWMA: -7.2938 | EURUSD: 1.0823 | USDJPY: 179.09 | EURJPY: 190.38
+22:16:47.117 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 2.1103 | EWMA: -4.0234 | EURUSD: 1.0719 | USDJPY: 179.82 | EURJPY: 194.86
+22:16:47.641 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 0.7550 | EWMA: -2.0994 | EURUSD: 1.0831 | USDJPY: 179.97 | EURJPY: 195.69
+22:16:48.159 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -7.4855 | EWMA: -3.0119 | EURUSD: 1.1193 | USDJPY: 179.97 | EURJPY: 193.95
+22:16:48.684 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -5.7129 | EWMA: -5.0326 | EURUSD: 1.1187 | USDJPY: 180.24 | EURJPY: 195.91
+22:16:49.204 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -5.1473 | EWMA: -5.3155 | EURUSD: 1.1270 | USDJPY: 177.33 | EURJPY: 194.70
+22:16:49.724 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -3.5231 | EWMA: -4.5613 | EURUSD: 1.1249 | USDJPY: 177.86 | EURJPY: 196.56
+22:16:50.242 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -8.1314 | EWMA: -4.5280 | EURUSD: 1.1425 | USDJPY: 177.44 | EURJPY: 194.59
+22:16:50.757 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -5.1521 | EWMA: -5.0294 | EURUSD: 1.1273 | USDJPY: 177.44 | EURJPY: 194.88
+22:16:51.273 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -4.8316 | EWMA: -5.6772 | EURUSD: 1.1031 | USDJPY: 177.44 | EURJPY: 190.89
+22:16:51.797 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -3.9020 | EWMA: -5.5938 | EURUSD: 1.0929 | USDJPY: 181.24 | EURJPY: 194.18
+22:16:52.838 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -6.6953 | EWMA: -3.9896 | EURUSD: 1.1305 | USDJPY: 176.13 | EURJPY: 192.42
+22:16:53.358 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -12.1242 | EWMA: -6.1930 | EURUSD: 1.1567 | USDJPY: 176.13 | EURJPY: 191.61
+22:16:53.879 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -9.6822 | EWMA: -7.1261 | EURUSD: 1.1377 | USDJPY: 176.93 | EURJPY: 191.61
+22:16:54.402 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -9.5319 | EWMA: -8.4091 | EURUSD: 1.1377 | USDJPY: 174.16 | EURJPY: 188.61
+22:16:54.914 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -7.2872 | EWMA: -8.5505 | EURUSD: 1.1377 | USDJPY: 174.36 | EURJPY: 191.08
+22:16:55.436 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -5.2426 | EWMA: -7.7968 | EURUSD: 1.1106 | USDJPY: 175.17 | EURJPY: 189.30
+22:16:55.955 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -11.8786 | EWMA: -7.7890 | EURUSD: 1.1364 | USDJPY: 175.83 | EURJPY: 187.93
+22:16:56.468 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -10.6270 | EWMA: -9.2977 | EURUSD: 1.1304 | USDJPY: 174.19 | EURJPY: 186.27
+22:16:56.987 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -3.7703 | EWMA: -7.9125 | EURUSD: 1.1138 | USDJPY: 172.36 | EURJPY: 188.21
+22:16:57.504 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -0.4822 | EWMA: -5.5213 | EURUSD: 1.1110 | USDJPY: 169.83 | EURJPY: 188.21
+22:16:58.024 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -0.4297 | EWMA: -2.7418 | EURUSD: 1.1110 | USDJPY: 169.82 | EURJPY: 188.25
+22:16:58.545 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 5.7694 | EWMA: 0.6917 | EURUSD: 1.0699 | USDJPY: 171.64 | EURJPY: 189.40
+22:16:59.066 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 5.5737 | EWMA: 3.5163 | EURUSD: 1.0471 | USDJPY: 174.89 | EURJPY: 188.70
+22:16:59.585 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 4.8528 | EWMA: 4.8516 | EURUSD: 1.0467 | USDJPY: 173.53 | EURJPY: 186.49
+22:17:00.104 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 0.3997 | EWMA: 3.8509 | EURUSD: 1.0676 | USDJPY: 174.31 | EURJPY: 186.49
+22:17:00.619 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 3.6402 | EWMA: 3.8214 | EURUSD: 1.0881 | USDJPY: 170.55 | EURJPY: 189.21
+22:17:01.134 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -1.4203 | EWMA: 1.9721 | EURUSD: 1.1177 | USDJPY: 170.55 | EURJPY: 189.20
+22:17:01.654 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 1.8432 | EWMA: 0.5105 | EURUSD: 1.1397 | USDJPY: 164.39 | EURJPY: 189.20
+22:17:02.179 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -4.3581 | EWMA: -0.7770 | EURUSD: 1.1697 | USDJPY: 164.39 | EURJPY: 187.93
+22:17:02.700 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -1.2016 | EWMA: -1.2807 | EURUSD: 1.1618 | USDJPY: 164.39 | EURJPY: 189.79
+22:17:03.222 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 0.4747 | EWMA: -1.2411 | EURUSD: 1.1618 | USDJPY: 162.46 | EURJPY: 189.22
+22:17:03.740 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -3.0467 | EWMA: -1.3674 | EURUSD: 1.1789 | USDJPY: 160.99 | EURJPY: 186.75
+22:17:04.261 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -2.9754 | EWMA: -0.7223 | EURUSD: 1.1776 | USDJPY: 162.43 | EURJPY: 188.30
+22:17:04.783 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -1.4225 | EWMA: -0.8064 | EURUSD: 1.1767 | USDJPY: 164.20 | EURJPY: 191.80
+22:17:05.300 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 1.0513 | EWMA: -0.6999 | EURUSD: 1.1731 | USDJPY: 162.66 | EURJPY: 191.87
+22:17:05.812 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 4.8538 | EWMA: 0.6485 | EURUSD: 1.1397 | USDJPY: 165.57 | EURJPY: 193.55
+22:17:06.324 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 0.3820 | EWMA: 0.9041 | EURUSD: 1.1616 | USDJPY: 164.67 | EURJPY: 191.67
+22:17:06.847 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -4.1325 | EWMA: -0.7980 | EURUSD: 1.1824 | USDJPY: 166.21 | EURJPY: 192.39
+22:17:07.363 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -6.9091 | EWMA: -2.7916 | EURUSD: 1.2088 | USDJPY: 166.30 | EURJPY: 194.12
+22:17:07.884 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -1.7290 | EWMA: -2.9370 | EURUSD: 1.2062 | USDJPY: 162.36 | EURJPY: 194.12
+22:17:08.398 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -0.2069 | EWMA: -2.2799 | EURUSD: 1.2062 | USDJPY: 161.55 | EURJPY: 194.67
+22:17:08.915 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -5.2837 | EWMA: -2.4335 | EURUSD: 1.2062 | USDJPY: 163.31 | EURJPY: 191.71
+22:17:09.434 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -10.7539 | EWMA: -5.2352 | EURUSD: 1.2305 | USDJPY: 163.95 | EURJPY: 190.98
+22:17:09.957 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -1.3940 | EWMA: -5.1698 | EURUSD: 1.1728 | USDJPY: 163.95 | EURJPY: 190.89
+22:17:10.475 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 3.1263 | EWMA: -3.1614 | EURUSD: 1.1404 | USDJPY: 163.16 | EURJPY: 189.20
+22:17:10.999 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -0.3377 | EWMA: -1.4438 | EURUSD: 1.1515 | USDJPY: 163.20 | EURJPY: 187.58
+22:17:11.510 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -5.6660 | EWMA: -3.1225 | EURUSD: 1.1792 | USDJPY: 163.20 | EURJPY: 186.78
+22:17:12.027 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -3.0033 | EWMA: -2.7271 | EURUSD: 1.1544 | USDJPY: 163.20 | EURJPY: 185.39
+22:17:12.546 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -2.8803 | EWMA: -2.3300 | EURUSD: 1.1544 | USDJPY: 161.01 | EURJPY: 182.99
+22:17:13.068 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -10.3937 | EWMA: -4.6307 | EURUSD: 1.1735 | USDJPY: 164.79 | EURJPY: 182.99
+22:17:13.585 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -7.0254 | EWMA: -5.8374 | EURUSD: 1.1632 | USDJPY: 163.14 | EURJPY: 182.74
+22:17:14.109 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -7.4845 | EWMA: -6.4239 | EURUSD: 1.1628 | USDJPY: 163.59 | EURJPY: 182.74
+22:17:14.627 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -11.0264 | EWMA: -7.3771 | EURUSD: 1.1659 | USDJPY: 164.48 | EURJPY: 180.74
+22:17:15.141 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -11.5811 | EWMA: -8.7371 | EURUSD: 1.1788 | USDJPY: 163.15 | EURJPY: 180.74
+22:17:15.659 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -11.5851 | EWMA: -9.9234 | EURUSD: 1.1826 | USDJPY: 163.18 | EURJPY: 181.39
+22:17:16.171 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -0.2526 | EWMA: -7.6682 | EURUSD: 1.1096 | USDJPY: 163.71 | EURJPY: 181.39
+22:17:16.690 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -1.0546 | EWMA: -4.9991 | EURUSD: 1.1129 | USDJPY: 163.71 | EURJPY: 181.13
+22:17:17.214 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -0.8835 | EWMA: -3.2780 | EURUSD: 1.1129 | USDJPY: 163.13 | EURJPY: 180.66
+22:17:17.735 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -5.2536 | EWMA: -4.1108 | EURUSD: 1.1278 | USDJPY: 163.13 | EURJPY: 178.72
+22:17:18.250 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -1.7394 | EWMA: -3.3771 | EURUSD: 1.1058 | USDJPY: 162.46 | EURJPY: 177.92
+22:17:18.773 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -2.3190 | EWMA: -1.9585 | EURUSD: 1.1086 | USDJPY: 164.26 | EURJPY: 179.78
+22:17:19.291 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -7.8064 | EWMA: -2.7395 | EURUSD: 1.1113 | USDJPY: 167.67 | EURJPY: 178.53
+22:17:19.811 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -10.2115 | EWMA: -5.1998 | EURUSD: 1.1097 | USDJPY: 170.09 | EURJPY: 178.53
+22:17:20.335 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -5.6162 | EWMA: -6.4020 | EURUSD: 1.0965 | USDJPY: 168.89 | EURJPY: 179.57
+22:17:20.848 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -7.3695 | EWMA: -6.3230 | EURUSD: 1.0863 | USDJPY: 171.54 | EURJPY: 178.96
+22:17:21.368 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -5.1805 | EWMA: -6.3672 | EURUSD: 1.0579 | USDJPY: 172.79 | EURJPY: 177.61
+22:17:21.886 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -7.0643 | EWMA: -6.5932 | EURUSD: 1.0649 | USDJPY: 172.79 | EURJPY: 176.95
+22:17:22.410 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 0.8191 | EWMA: -4.8382 | EURUSD: 1.0462 | USDJPY: 170.60 | EURJPY: 179.31
+22:17:22.937 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - Injected NaN fault into EURJPY for 100 seconds.
+22:17:22.937 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:17:22.937 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:17:23.975 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:17:23.975 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:17:25.010 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:17:25.010 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:17:26.046 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:17:26.046 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:17:27.082 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:17:27.082 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:17:28.125 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:17:28.125 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:17:29.156 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:17:29.156 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:17:30.195 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:17:30.195 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:17:31.235 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:17:31.235 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:17:32.264 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:17:32.264 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:17:33.305 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - Recovered EURJPY from NaN fault.
+22:17:33.305 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 20.9488 | EWMA: 0.4018 | EURUSD: 0.9022 | USDJPY: 179.41 | EURJPY: 182.80
+22:17:33.824 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 18.7546 | EWMA: 8.4292 | EURUSD: 0.8901 | USDJPY: 180.79 | EURJPY: 179.68
+22:17:34.342 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 19.6767 | EWMA: 12.6772 | EURUSD: 0.8835 | USDJPY: 182.40 | EURJPY: 180.83
+22:17:34.859 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 14.4802 | EWMA: 14.1630 | EURUSD: 0.8892 | USDJPY: 183.78 | EURJPY: 177.90
+22:17:35.377 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 16.9958 | EWMA: 14.6166 | EURUSD: 0.8753 | USDJPY: 184.16 | EURJPY: 178.19
+22:17:35.893 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 11.2491 | EWMA: 14.5547 | EURUSD: 0.8956 | USDJPY: 184.35 | EURJPY: 176.35
+22:17:36.407 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 16.5433 | EWMA: 14.2052 | EURUSD: 0.8906 | USDJPY: 182.09 | EURJPY: 178.71
+22:17:36.929 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 16.2097 | EWMA: 15.1662 | EURUSD: 0.8906 | USDJPY: 179.68 | EURJPY: 176.23
+22:17:37.455 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 8.9853 | EWMA: 14.4806 | EURUSD: 0.9208 | USDJPY: 181.64 | EURJPY: 176.23
+22:17:37.978 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 13.8604 | EWMA: 13.5286 | EURUSD: 0.9251 | USDJPY: 181.07 | EURJPY: 181.36
+22:17:38.497 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 12.1161 | EWMA: 12.3858 | EURUSD: 0.9497 | USDJPY: 178.22 | EURJPY: 181.36
+22:17:39.023 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 7.0200 | EWMA: 10.6918 | EURUSD: 0.9589 | USDJPY: 180.79 | EURJPY: 180.38
+22:17:39.548 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 1.1427 | EWMA: 8.1447 | EURUSD: 0.9868 | USDJPY: 183.46 | EURJPY: 182.18
+22:17:40.058 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 1.6665 | EWMA: 5.4970 | EURUSD: 0.9881 | USDJPY: 183.95 | EURJPY: 183.42
+22:17:40.574 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -1.0189 | EWMA: 2.9192 | EURUSD: 0.9956 | USDJPY: 184.43 | EURJPY: 182.61
+22:17:41.090 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 7.2948 | EWMA: 2.6880 | EURUSD: 0.9573 | USDJPY: 183.14 | EURJPY: 182.61
+22:17:41.609 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 7.8369 | EWMA: 5.5312 | EURUSD: 0.9474 | USDJPY: 184.48 | EURJPY: 182.61
+22:17:42.123 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 9.2325 | EWMA: 6.8244 | EURUSD: 0.9412 | USDJPY: 185.30 | EURJPY: 183.63
+22:17:42.634 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 3.8891 | EWMA: 5.8942 | EURUSD: 0.9616 | USDJPY: 185.30 | EURJPY: 182.08
+22:17:43.157 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 4.7417 | EWMA: 5.1927 | EURUSD: 0.9616 | USDJPY: 185.04 | EURJPY: 182.68
+22:17:43.679 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 4.4038 | EWMA: 4.3820 | EURUSD: 0.9509 | USDJPY: 187.20 | EURJPY: 182.43
+22:17:44.204 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 6.3095 | EWMA: 4.7718 | EURUSD: 0.9462 | USDJPY: 188.64 | EURJPY: 184.81
+22:17:44.725 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 15.8666 | EWMA: 7.8562 | EURUSD: 0.9204 | USDJPY: 186.38 | EURJPY: 187.42
+22:17:45.243 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 21.4240 | EWMA: 12.5984 | EURUSD: 0.9051 | USDJPY: 184.44 | EURJPY: 188.36
+22:17:45.759 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 24.3793 | EWMA: 16.8499 | EURUSD: 0.9051 | USDJPY: 182.60 | EURJPY: 189.65
+22:17:46.278 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 29.7124 | EWMA: 21.7003 | EURUSD: 0.8643 | USDJPY: 182.60 | EURJPY: 187.53
+22:17:46.791 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 32.1766 | EWMA: 25.3377 | EURUSD: 0.8397 | USDJPY: 185.45 | EURJPY: 187.90
+22:17:47.307 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 36.2854 | EWMA: 28.8669 | EURUSD: 0.8221 | USDJPY: 185.45 | EURJPY: 188.74
+22:17:47.830 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 41.9220 | EWMA: 33.8990 | EURUSD: 0.8039 | USDJPY: 185.45 | EURJPY: 191.01
+22:17:48.352 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 44.7668 | EWMA: 37.9640 | EURUSD: 0.7839 | USDJPY: 185.74 | EURJPY: 190.36
+22:17:48.878 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 49.3628 | EWMA: 41.8393 | EURUSD: 0.7648 | USDJPY: 186.22 | EURJPY: 191.79
+22:17:49.398 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 54.5318 | EWMA: 46.1146 | EURUSD: 0.7507 | USDJPY: 185.11 | EURJPY: 193.50
+22:17:49.917 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 48.2432 | EWMA: 48.4789 | EURUSD: 0.7928 | USDJPY: 182.62 | EURJPY: 193.02
+22:17:50.427 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 45.8528 | EWMA: 46.8460 | EURUSD: 0.7997 | USDJPY: 184.03 | EURJPY: 193.02
+22:17:50.951 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 42.1758 | EWMA: 45.4189 | EURUSD: 0.8109 | USDJPY: 186.00 | EURJPY: 193.01
+22:17:51.464 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 39.4746 | EWMA: 43.3272 | EURUSD: 0.8157 | USDJPY: 186.91 | EURJPY: 191.95
+22:17:51.985 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 47.7016 | EWMA: 43.5526 | EURUSD: 0.7962 | USDJPY: 183.95 | EURJPY: 194.17
+22:17:52.501 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 53.4849 | EWMA: 46.7967 | EURUSD: 0.7694 | USDJPY: 183.95 | EURJPY: 195.02
+22:17:53.019 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 47.7770 | EWMA: 47.5300 | EURUSD: 0.7985 | USDJPY: 186.62 | EURJPY: 196.80
+22:17:53.535 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 38.7397 | EWMA: 45.2483 | EURUSD: 0.8289 | USDJPY: 190.68 | EURJPY: 196.80
+22:17:54.058 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 41.8962 | EWMA: 43.2535 | EURUSD: 0.8289 | USDJPY: 191.29 | EURJPY: 200.47
+22:17:54.577 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 39.9767 | EWMA: 42.5486 | EURUSD: 0.8396 | USDJPY: 193.51 | EURJPY: 202.44
+22:17:55.091 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 40.2825 | EWMA: 40.6238 | EURUSD: 0.8546 | USDJPY: 191.78 | EURJPY: 204.17
+22:17:55.605 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 44.1837 | EWMA: 41.9498 | EURUSD: 0.8433 | USDJPY: 191.98 | EURJPY: 206.08
+22:17:56.124 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 36.3209 | EWMA: 40.7647 | EURUSD: 0.8631 | USDJPY: 192.75 | EURJPY: 202.69
+22:17:56.646 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 32.9226 | EWMA: 37.4017 | EURUSD: 0.8861 | USDJPY: 191.59 | EURJPY: 202.69
+22:17:57.161 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 28.6248 | EWMA: 34.6030 | EURUSD: 0.8863 | USDJPY: 194.69 | EURJPY: 201.18
+22:17:57.679 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 30.1863 | EWMA: 33.0151 | EURUSD: 0.8700 | USDJPY: 193.34 | EURJPY: 198.39
+22:17:58.198 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 35.9226 | EWMA: 33.5849 | EURUSD: 0.8449 | USDJPY: 192.29 | EURJPY: 198.39
+22:17:58.716 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 37.7131 | EWMA: 35.0301 | EURUSD: 0.8501 | USDJPY: 186.55 | EURJPY: 196.29
+22:17:59.232 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 34.8352 | EWMA: 36.2280 | EURUSD: 0.8829 | USDJPY: 182.87 | EURJPY: 196.29
+22:17:59.754 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 40.6494 | EWMA: 37.9567 | EURUSD: 0.8496 | USDJPY: 181.15 | EURJPY: 194.55
+22:18:00.269 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 40.5397 | EWMA: 38.6029 | EURUSD: 0.8603 | USDJPY: 181.45 | EURJPY: 196.64
+22:18:00.786 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 44.3132 | EWMA: 40.6372 | EURUSD: 0.8638 | USDJPY: 177.69 | EURJPY: 197.79
+22:18:01.301 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 52.8164 | EWMA: 44.6276 | EURUSD: 0.8434 | USDJPY: 171.89 | EURJPY: 197.79
+22:18:01.820 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 47.5094 | EWMA: 46.5143 | EURUSD: 0.8537 | USDJPY: 171.89 | EURJPY: 194.25
+22:18:02.340 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 55.2676 | EWMA: 49.6251 | EURUSD: 0.8179 | USDJPY: 169.93 | EURJPY: 194.25
+22:18:02.858 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 60.7306 | EWMA: 52.7537 | EURUSD: 0.7950 | USDJPY: 169.78 | EURJPY: 195.70
+22:18:03.382 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 65.5069 | EWMA: 58.2340 | EURUSD: 0.7774 | USDJPY: 169.77 | EURJPY: 197.49
+22:18:03.906 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 57.4786 | EWMA: 58.5385 | EURUSD: 0.8217 | USDJPY: 171.05 | EURJPY: 198.03
+22:18:04.426 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 61.9995 | EWMA: 58.5300 | EURUSD: 0.7971 | USDJPY: 170.67 | EURJPY: 198.03
+22:18:04.945 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 67.1748 | EWMA: 61.4865 | EURUSD: 0.7934 | USDJPY: 167.61 | EURJPY: 200.17
+22:18:05.464 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 65.6986 | EWMA: 62.5563 | EURUSD: 0.7934 | USDJPY: 166.81 | EURJPY: 198.05
+22:18:05.975 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 58.7888 | EWMA: 61.9369 | EURUSD: 0.8270 | USDJPY: 166.59 | EURJPY: 196.56
+22:18:06.489 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 59.9486 | EWMA: 60.4430 | EURUSD: 0.8161 | USDJPY: 169.09 | EURJPY: 197.95
+22:18:07.008 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 59.1505 | EWMA: 60.0025 | EURUSD: 0.8309 | USDJPY: 167.89 | EURJPY: 198.65
+22:18:07.532 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 66.5022 | EWMA: 62.3090 | EURUSD: 0.8083 | USDJPY: 166.87 | EURJPY: 201.38
+22:18:08.054 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 63.5770 | EWMA: 62.8223 | EURUSD: 0.8179 | USDJPY: 168.50 | EURJPY: 201.38
+22:18:08.570 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 67.2514 | EWMA: 63.7950 | EURUSD: 0.8082 | USDJPY: 166.79 | EURJPY: 202.06
+22:18:09.091 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 65.3855 | EWMA: 65.0297 | EURUSD: 0.8117 | USDJPY: 168.84 | EURJPY: 202.43
+22:18:09.606 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 56.7171 | EWMA: 63.1878 | EURUSD: 0.8483 | USDJPY: 170.67 | EURJPY: 201.50
+22:18:10.127 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 52.6137 | EWMA: 59.2364 | EURUSD: 0.8683 | USDJPY: 170.45 | EURJPY: 200.61
+22:18:10.647 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 59.7901 | EWMA: 57.9689 | EURUSD: 0.8402 | USDJPY: 168.23 | EURJPY: 201.15
+22:18:11.168 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 61.3040 | EWMA: 59.2391 | EURUSD: 0.8375 | USDJPY: 168.23 | EURJPY: 202.20
+22:18:11.692 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 61.0805 | EWMA: 59.9504 | EURUSD: 0.8530 | USDJPY: 168.23 | EURJPY: 204.59
+22:18:12.217 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 65.5924 | EWMA: 61.0063 | EURUSD: 0.8355 | USDJPY: 168.59 | EURJPY: 206.46
+22:18:12.741 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 74.2669 | EWMA: 65.1019 | EURUSD: 0.8133 | USDJPY: 166.02 | EURJPY: 209.30
+22:18:13.262 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 71.6140 | EWMA: 68.0854 | EURUSD: 0.8159 | USDJPY: 166.02 | EURJPY: 207.07
+22:18:13.784 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 71.4379 | EWMA: 68.9826 | EURUSD: 0.8072 | USDJPY: 168.04 | EURJPY: 207.07
+22:18:14.304 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 62.9134 | EWMA: 68.0995 | EURUSD: 0.8328 | USDJPY: 173.10 | EURJPY: 207.07
+22:18:14.824 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - Injected NaN fault into EURJPY for 100 seconds.
+22:18:14.824 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:18:14.824 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:18:15.867 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:18:15.867 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:18:16.897 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:18:16.897 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:18:17.934 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:18:17.934 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:18:18.975 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:18:18.975 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:18:20.015 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:18:20.015 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:18:21.058 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:18:21.058 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:18:22.097 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:18:22.097 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:18:23.129 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:18:23.129 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:18:24.164 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'EURJPY': Node evaluated to NaN (Throttled)
+22:18:24.164 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in EURJPY: Node evaluated to NaN (Throttled)
+22:18:25.205 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - Recovered EURJPY from NaN fault.
+22:18:25.205 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 53.9480 | EWMA: 64.0282 | EURUSD: 0.7401 | USDJPY: 174.09 | EURJPY: 182.80
+22:18:25.731 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 51.8000 | EWMA: 59.7926 | EURUSD: 0.7514 | USDJPY: 174.09 | EURJPY: 182.62
+22:18:26.247 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 55.1566 | EWMA: 57.4512 | EURUSD: 0.7367 | USDJPY: 173.63 | EURJPY: 183.06
+22:18:26.770 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 57.8026 | EWMA: 56.8198 | EURUSD: 0.7316 | USDJPY: 173.63 | EURJPY: 184.84
+22:18:27.286 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 48.1057 | EWMA: 54.7031 | EURUSD: 0.7726 | USDJPY: 176.98 | EURJPY: 184.84
+22:18:27.806 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 33.8373 | EWMA: 48.2526 | EURUSD: 0.8395 | USDJPY: 176.98 | EURJPY: 182.41
+22:18:28.324 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 34.0533 | EWMA: 42.5655 | EURUSD: 0.8395 | USDJPY: 177.88 | EURJPY: 183.38
+22:18:28.842 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 35.6568 | EWMA: 39.5186 | EURUSD: 0.8256 | USDJPY: 177.25 | EURJPY: 182.00
+22:18:29.363 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 38.2268 | EWMA: 38.3293 | EURUSD: 0.8228 | USDJPY: 176.32 | EURJPY: 183.31
+22:18:29.886 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 36.8328 | EWMA: 37.9612 | EURUSD: 0.8474 | USDJPY: 174.69 | EURJPY: 184.87
+22:18:30.405 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 29.1859 | EWMA: 35.1329 | EURUSD: 0.8589 | USDJPY: 174.69 | EURJPY: 179.23
+22:18:30.927 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 29.0047 | EWMA: 33.1834 | EURUSD: 0.8693 | USDJPY: 172.56 | EURJPY: 179.02
+22:18:31.439 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 32.8604 | EWMA: 32.9332 | EURUSD: 0.8518 | USDJPY: 171.66 | EURJPY: 179.07
+22:18:31.962 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 28.4266 | EWMA: 31.9853 | EURUSD: 0.8518 | USDJPY: 173.05 | EURJPY: 175.82
+22:18:32.469 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 34.1315 | EWMA: 31.6267 | EURUSD: 0.8388 | USDJPY: 170.95 | EURJPY: 177.52
+22:18:32.991 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 39.9938 | EWMA: 34.3327 | EURUSD: 0.8165 | USDJPY: 171.59 | EURJPY: 180.10
+22:18:33.507 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 44.7335 | EWMA: 37.1490 | EURUSD: 0.7834 | USDJPY: 172.79 | EURJPY: 180.10
+22:18:34.027 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 42.5579 | EWMA: 38.9744 | EURUSD: 0.8029 | USDJPY: 171.30 | EURJPY: 180.10
+22:18:34.545 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 40.8048 | EWMA: 39.9971 | EURUSD: 0.8196 | USDJPY: 172.86 | EURJPY: 182.49
+22:18:35.066 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 38.3116 | EWMA: 39.9046 | EURUSD: 0.8326 | USDJPY: 172.86 | EURJPY: 182.24
+22:18:35.583 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 32.8727 | EWMA: 38.1749 | EURUSD: 0.8444 | USDJPY: 172.71 | EURJPY: 178.70
+22:18:36.103 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 29.3640 | EWMA: 35.6718 | EURUSD: 0.8383 | USDJPY: 173.77 | EURJPY: 175.04
+22:18:36.610 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 28.3701 | EWMA: 32.6446 | EURUSD: 0.8368 | USDJPY: 176.19 | EURJPY: 175.81
+22:18:37.124 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 26.5258 | EWMA: 29.9970 | EURUSD: 0.8143 | USDJPY: 179.41 | EURJPY: 172.62
+22:18:37.638 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 29.0940 | EWMA: 28.3266 | EURUSD: 0.7963 | USDJPY: 177.45 | EURJPY: 170.39
+22:18:38.156 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 29.4762 | EWMA: 28.4198 | EURUSD: 0.7963 | USDJPY: 178.25 | EURJPY: 171.41
+22:18:38.670 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 32.3828 | EWMA: 29.1144 | EURUSD: 0.7889 | USDJPY: 176.55 | EURJPY: 171.66
+22:18:39.184 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 29.9624 | EWMA: 29.7217 | EURUSD: 0.7889 | USDJPY: 179.62 | EURJPY: 171.66
+22:18:39.697 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 26.6017 | EWMA: 29.1363 | EURUSD: 0.8105 | USDJPY: 176.95 | EURJPY: 170.02
+22:18:40.209 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 31.2957 | EWMA: 29.1877 | EURUSD: 0.7952 | USDJPY: 176.05 | EURJPY: 171.28
+22:18:40.720 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 29.4702 | EWMA: 29.9854 | EURUSD: 0.7819 | USDJPY: 179.81 | EURJPY: 170.06
+22:18:41.238 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 29.8520 | EWMA: 29.6190 | EURUSD: 0.7715 | USDJPY: 181.74 | EURJPY: 170.06
+22:18:41.755 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 23.0609 | EWMA: 27.5084 | EURUSD: 0.8036 | USDJPY: 181.74 | EURJPY: 169.11
+22:18:42.267 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 29.5322 | EWMA: 27.8905 | EURUSD: 0.7759 | USDJPY: 177.38 | EURJPY: 167.16
+22:18:42.785 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 33.6244 | EWMA: 28.7883 | EURUSD: 0.7618 | USDJPY: 179.87 | EURJPY: 170.64
+22:18:43.299 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 40.2096 | EWMA: 33.1141 | EURUSD: 0.7271 | USDJPY: 179.38 | EURJPY: 170.64
+22:18:43.813 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 38.7950 | EWMA: 35.7981 | EURUSD: 0.7234 | USDJPY: 182.10 | EURJPY: 170.53
+22:18:44.328 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 37.6871 | EWMA: 36.1208 | EURUSD: 0.7030 | USDJPY: 182.94 | EURJPY: 166.29
+22:18:44.843 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 36.0261 | EWMA: 36.8696 | EURUSD: 0.7241 | USDJPY: 183.28 | EURJPY: 168.75
+22:18:45.360 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 34.5183 | EWMA: 35.8892 | EURUSD: 0.7310 | USDJPY: 181.52 | EURJPY: 167.21
+22:18:45.883 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 31.2682 | EWMA: 34.0906 | EURUSD: 0.7446 | USDJPY: 182.28 | EURJPY: 167.00
+22:18:46.393 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 25.2681 | EWMA: 31.3555 | EURUSD: 0.7671 | USDJPY: 179.87 | EURJPY: 163.25
+22:18:46.912 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 25.9126 | EWMA: 28.7728 | EURUSD: 0.7810 | USDJPY: 178.87 | EURJPY: 165.60
+22:18:47.427 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 24.9408 | EWMA: 28.2921 | EURUSD: 0.8065 | USDJPY: 176.44 | EURJPY: 167.24
+22:18:47.940 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 19.6453 | EWMA: 25.8057 | EURUSD: 0.8169 | USDJPY: 178.89 | EURJPY: 165.79
+22:18:48.454 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 21.4841 | EWMA: 23.5350 | EURUSD: 0.8088 | USDJPY: 178.89 | EURJPY: 166.17
+22:18:48.970 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 24.0597 | EWMA: 23.8797 | EURUSD: 0.7958 | USDJPY: 177.22 | EURJPY: 165.09
+22:18:49.482 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 16.7726 | EWMA: 22.2758 | EURUSD: 0.8143 | USDJPY: 177.22 | EURJPY: 161.08
+22:18:50.002 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 22.1574 | EWMA: 22.0831 | EURUSD: 0.7909 | USDJPY: 176.04 | EURJPY: 161.38
+22:18:50.514 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 23.2326 | EWMA: 21.7089 | EURUSD: 0.8019 | USDJPY: 172.27 | EURJPY: 161.38
+22:18:51.023 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 20.3065 | EWMA: 20.6883 | EURUSD: 0.8295 | USDJPY: 173.57 | EURJPY: 164.28
+22:18:51.535 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 19.6108 | EWMA: 19.8240 | EURUSD: 0.8232 | USDJPY: 176.04 | EURJPY: 164.52
+22:18:52.059 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 19.9470 | EWMA: 19.5418 | EURUSD: 0.8391 | USDJPY: 172.29 | EURJPY: 164.52
+22:18:52.571 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 14.2429 | EWMA: 17.6698 | EURUSD: 0.8520 | USDJPY: 175.74 | EURJPY: 163.98
+22:18:53.091 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 12.6046 | EWMA: 17.0334 | EURUSD: 0.8745 | USDJPY: 175.74 | EURJPY: 166.29
+22:18:53.611 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 18.2510 | EWMA: 17.0705 | EURUSD: 0.8523 | USDJPY: 173.69 | EURJPY: 166.29
+22:18:54.122 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 21.3017 | EWMA: 18.5453 | EURUSD: 0.8327 | USDJPY: 173.42 | EURJPY: 165.71
+22:18:54.641 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 12.4158 | EWMA: 17.8155 | EURUSD: 0.8755 | USDJPY: 173.42 | EURJPY: 164.25
+22:18:55.159 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 13.2232 | EWMA: 16.1655 | EURUSD: 0.8520 | USDJPY: 173.42 | EURJPY: 160.97
+22:18:55.678 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 7.3657 | EWMA: 14.2702 | EURUSD: 0.8746 | USDJPY: 175.63 | EURJPY: 160.97
+22:18:56.191 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 14.5585 | EWMA: 13.9275 | EURUSD: 0.8323 | USDJPY: 175.63 | EURJPY: 160.73
+22:18:56.714 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 15.3557 | EWMA: 13.6983 | EURUSD: 0.8317 | USDJPY: 175.68 | EURJPY: 161.47
+22:18:57.235 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 16.8791 | EWMA: 15.2522 | EURUSD: 0.8274 | USDJPY: 177.08 | EURJPY: 163.39
+22:18:57.751 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 16.2149 | EWMA: 15.4438 | EURUSD: 0.8262 | USDJPY: 178.58 | EURJPY: 163.76
+22:18:58.266 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 16.0007 | EWMA: 16.1098 | EURUSD: 0.7995 | USDJPY: 180.27 | EURJPY: 160.11
+22:18:58.787 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 12.1555 | EWMA: 15.0260 | EURUSD: 0.8192 | USDJPY: 182.47 | EURJPY: 161.63
+22:18:59.308 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 7.7850 | EWMA: 13.1590 | EURUSD: 0.8356 | USDJPY: 182.62 | EURJPY: 160.39
+22:18:59.828 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 8.6418 | EWMA: 11.2754 | EURUSD: 0.8417 | USDJPY: 183.23 | EURJPY: 162.87
+22:19:00.351 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 11.1444 | EWMA: 11.3474 | EURUSD: 0.8331 | USDJPY: 183.55 | EURJPY: 164.07
+22:19:00.871 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 7.7571 | EWMA: 9.9849 | EURUSD: 0.8548 | USDJPY: 184.40 | EURJPY: 165.38
+22:19:01.385 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 8.7365 | EWMA: 8.9003 | EURUSD: 0.8489 | USDJPY: 184.40 | EURJPY: 165.27
+22:19:01.901 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 10.1301 | EWMA: 9.2063 | EURUSD: 0.8373 | USDJPY: 184.68 | EURJPY: 164.77
+22:19:02.422 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 8.0006 | EWMA: 9.5245 | EURUSD: 0.8358 | USDJPY: 184.37 | EURJPY: 162.09
+22:19:02.938 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 13.9647 | EWMA: 10.7492 | EURUSD: 0.8257 | USDJPY: 182.15 | EURJPY: 164.37
+22:19:03.458 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 8.2046 | EWMA: 9.7901 | EURUSD: 0.8681 | USDJPY: 182.15 | EURJPY: 166.33
+22:19:03.979 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 5.3599 | EWMA: 8.3873 | EURUSD: 0.8681 | USDJPY: 183.38 | EURJPY: 164.55
+22:19:04.496 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 1.1788 | EWMA: 5.7227 | EURUSD: 0.8797 | USDJPY: 183.54 | EURJPY: 162.64
+22:19:05.014 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -1.9808 | EWMA: 2.9381 | EURUSD: 0.8916 | USDJPY: 183.99 | EURJPY: 162.06
+22:19:05.530 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -13.4060 | EWMA: -2.3074 | EURUSD: 0.9387 | USDJPY: 185.89 | EURJPY: 161.10
+22:19:06.052 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: -14.3934 | EWMA: -6.6762 | EURUSD: 0.9326 | USDJPY: 189.20 | EURJPY: 162.06
+22:19:06.567 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - Injected NaN fault into USDJPY for 100 seconds.
+22:19:06.567 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'USDJPY': Node evaluated to NaN (Throttled)
+22:19:06.567 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in USDJPY: Node evaluated to NaN (Throttled)
+22:19:07.598 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'USDJPY': Node evaluated to NaN (Throttled)
+22:19:07.598 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in USDJPY: Node evaluated to NaN (Throttled)
+22:19:08.633 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'USDJPY': Node evaluated to NaN (Throttled)
+22:19:08.633 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in USDJPY: Node evaluated to NaN (Throttled)
+22:19:09.668 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'USDJPY': Node evaluated to NaN (Throttled)
+22:19:09.668 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in USDJPY: Node evaluated to NaN (Throttled)
+22:19:10.711 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'USDJPY': Node evaluated to NaN (Throttled)
+22:19:10.711 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in USDJPY: Node evaluated to NaN (Throttled)
+22:19:11.742 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'USDJPY': Node evaluated to NaN (Throttled)
+22:19:11.742 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in USDJPY: Node evaluated to NaN (Throttled)
+22:19:12.777 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'USDJPY': Node evaluated to NaN (Throttled)
+22:19:12.777 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in USDJPY: Node evaluated to NaN (Throttled)
+22:19:13.817 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'USDJPY': Node evaluated to NaN (Throttled)
+22:19:13.818 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in USDJPY: Node evaluated to NaN (Throttled)
+22:19:14.855 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'USDJPY': Node evaluated to NaN (Throttled)
+22:19:14.855 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in USDJPY: Node evaluated to NaN (Throttled)
+22:19:15.894 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.util.LatencyTrackingListener - Graph Failure at Node 'USDJPY': Node evaluated to NaN (Throttled)
+22:19:15.894 [com.trading.drg.CoreGraphDemo.main()] ERROR com.trading.drg.web.WebsocketPublisherListener - Dashboard Publisher observed Node Error in USDJPY: Node evaluated to NaN (Throttled)
+22:19:16.928 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - Recovered USDJPY from NaN fault.
+22:19:16.929 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 9.5827 | EWMA: -5.7073 | EURUSD: 1.0290 | USDJPY: 154.90 | EURJPY: 168.97
+22:19:17.445 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 8.6111 | EWMA: 0.4919 | EURUSD: 1.0447 | USDJPY: 152.79 | EURJPY: 168.22
+22:19:17.967 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 11.3657 | EWMA: 4.1641 | EURUSD: 1.0236 | USDJPY: 154.55 | EURJPY: 169.56
+22:19:18.479 [com.trading.drg.CoreGraphDemo.main()] INFO  com.trading.drg.CoreGraphDemo - [Arb Opportunity] Spread: 15.4993 | EWMA: 9.4167 | EURUSD: 1.0260 | USDJPY: 154.55 | EURJPY: 174.07
