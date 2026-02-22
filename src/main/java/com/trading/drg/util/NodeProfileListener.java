@@ -1,9 +1,7 @@
 package com.trading.drg.util;
 
 import com.trading.drg.api.StabilizationListener;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Arrays;
 
 /**
  * A listener that aggregates performance statistics per node.
@@ -12,11 +10,16 @@ import java.util.stream.Collectors;
 public class NodeProfileListener implements StabilizationListener {
 
     public static class NodeStats {
+        public final String name;
         public long count;
         public long totalDurationNanos;
         public long minDurationNanos = Long.MAX_VALUE;
         public long maxDurationNanos = Long.MIN_VALUE;
         public long lastDurationNanos;
+
+        public NodeStats(String name) {
+            this.name = name;
+        }
 
         void update(long duration) {
             count++;
@@ -33,13 +36,13 @@ public class NodeProfileListener implements StabilizationListener {
         }
     }
 
-    // Map from Node Name -> Stats
-    // Using HashMap for zero-overhead on the hot path (single-threaded).
-    // Access in dump() is synchronized for safety if called from another thread.
-    private final Map<String, NodeStats> stats = new HashMap<>();
+    // Flat array mapping topoIndex -> Stats
+    // Completely eliminates Map hashing overhead from the hot path.
+    private NodeStats[] statsArray = new NodeStats[0];
 
-    public Map<String, NodeStats> getStats() {
-        return stats;
+    // Read by external telemetry threads. Returns a safe snapshot reference.
+    public NodeStats[] getStatsArray() {
+        return statsArray;
     }
 
     @Override
@@ -49,7 +52,16 @@ public class NodeProfileListener implements StabilizationListener {
 
     @Override
     public void onNodeStabilized(long epoch, int topoIndex, String nodeName, boolean changed, long durationNanos) {
-        stats.computeIfAbsent(nodeName, k -> new NodeStats()).update(durationNanos);
+        if (topoIndex >= statsArray.length) {
+            // Lazy resize for initial graph boot or hot-reload expansion
+            NodeStats[] newArr = new NodeStats[Math.max(topoIndex + 1, statsArray.length * 2)];
+            System.arraycopy(statsArray, 0, newArr, 0, statsArray.length);
+            statsArray = newArr;
+        }
+        if (statsArray[topoIndex] == null) {
+            statsArray[topoIndex] = new NodeStats(nodeName);
+        }
+        statsArray[topoIndex].update(durationNanos);
     }
 
     @Override
@@ -66,7 +78,15 @@ public class NodeProfileListener implements StabilizationListener {
      * Resets all collected statistics.
      */
     public void reset() {
-        stats.clear();
+        for (int i = 0; i < statsArray.length; i++) {
+            if (statsArray[i] != null) {
+                statsArray[i].count = 0;
+                statsArray[i].totalDurationNanos = 0;
+                statsArray[i].lastDurationNanos = 0;
+                statsArray[i].minDurationNanos = Long.MAX_VALUE;
+                statsArray[i].maxDurationNanos = Long.MIN_VALUE;
+            }
+        }
     }
 
     /**
@@ -82,23 +102,21 @@ public class NodeProfileListener implements StabilizationListener {
         sb.append(
                 "------------------------------------------------------------------------------------------------------\n");
 
-        stats.entrySet().stream()
-                .sorted((e1, e2) -> Long.compare(e2.getValue().totalDurationNanos, e1.getValue().totalDurationNanos)) // Sort
-                                                                                                                      // by
-                                                                                                                      // total
-                                                                                                                      // time
-                                                                                                                      // desc
-                .forEach(e -> {
-                    String name = e.getKey();
-                    NodeStats s = e.getValue();
-                    sb.append(String.format("%-30s | %10d | %10.2f | %10.2f | %10.2f | %10.2f%n",
-                            truncate(name, 30),
-                            s.count,
-                            s.lastDurationNanos / 1000.0,
-                            s.avgMicros(),
-                            s.minDurationNanos / 1000.0,
-                            s.maxDurationNanos / 1000.0));
-                });
+        NodeStats[] validStats = Arrays.stream(statsArray)
+                .filter(s -> s != null && s.count > 0)
+                .toArray(NodeStats[]::new);
+
+        Arrays.sort(validStats, (s1, s2) -> Long.compare(s2.totalDurationNanos, s1.totalDurationNanos));
+
+        for (NodeStats s : validStats) {
+            sb.append(String.format("%-30s | %10d | %10.2f | %10.2f | %10.2f | %10.2f%n",
+                    truncate(s.name, 30),
+                    s.count,
+                    s.lastDurationNanos / 1000.0,
+                    s.avgMicros(),
+                    s.minDurationNanos / 1000.0,
+                    s.maxDurationNanos / 1000.0));
+        }
 
         return sb.toString();
     }

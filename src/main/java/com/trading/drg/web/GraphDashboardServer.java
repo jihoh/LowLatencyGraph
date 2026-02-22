@@ -21,6 +21,17 @@ public class GraphDashboardServer {
     private final Set<WsContext> sessions = ConcurrentHashMap.newKeySet();
     private Javalin app;
 
+    // Cached heavy structural JSON sent strictly upon connection
+    private volatile String initialGraphConfig = null;
+
+    /**
+     * Injects the heavy static Graph Configuration payload (Topology and Routing)
+     * which only needs to be sent once per client connection.
+     */
+    public void setInitialGraphConfig(String jsonPayload) {
+        this.initialGraphConfig = jsonPayload;
+    }
+
     /**
      * Starts the dashboard server on the specified port.
      * Starts serving static files from src/main/resources/public.
@@ -39,6 +50,12 @@ public class GraphDashboardServer {
             ws.onConnect(ctx -> {
                 log.info("WebSocket Client Connected: {}", ctx.sessionId());
                 sessions.add(ctx);
+
+                // Immediately flush the heavy structural payload dynamically.
+                // The frontend relies on this specific 'init' structured response.
+                if (initialGraphConfig != null && ctx.session.isOpen()) {
+                    ctx.send(initialGraphConfig);
+                }
             });
             ws.onClose(ctx -> {
                 log.info("WebSocket Client Disconnected: {}", ctx.sessionId());

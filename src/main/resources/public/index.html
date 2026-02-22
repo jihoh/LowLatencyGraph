@@ -89,6 +89,17 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Historical Scrubbing Footer -->
+            <div class="timeline-container">
+                <div class="timeline-controls">
+                    <div id="timeline-status" class="status-badge disconnected">DISCONNECTED</div>
+                    <span id="timeline-epoch"
+                        style="font-family: monospace; font-size: 11px; color: var(--text-secondary); width: 80px;">Epoch:
+                        0</span>
+                </div>
+                <input type="range" id="time-scrubber" class="scrubber-slider" min="0" max="0" value="0" step="1">
+            </div>
         </div>
 
         <!-- Right Dock -->
@@ -143,11 +154,11 @@
                             <span class="value" id="stab-rate">0</span>
                         </div>
                         <div class="metric-small">
-                            <span class="label">Latest (μs)</span>
+                            <span class="label">Latency (μs)</span>
                             <span class="value" id="lat-latest">0.00</span>
                         </div>
                         <div class="metric-small">
-                            <span class="label">Avg (μs)</span>
+                            <span class="label">Avg Latency (μs)</span>
                             <span class="value" id="lat-avg">0.00</span>
                         </div>
                     </div>
@@ -158,11 +169,11 @@
                         <table id="profile-table">
                             <thead>
                                 <tr>
-                                    <th data-col="name">NODE</th>
-                                    <th data-col="latest" style="text-align: right;">LATEST (μs)</th>
-                                    <th data-col="avg" style="text-align: right;">AVG (μs)</th>
-                                    <th data-col="updates" style="text-align: right;">UPDATES</th>
-                                    <th data-col="nans" style="text-align: right;">NaNs</th>
+                                    <th data-col="name">Node</th>
+                                    <th data-col="updates" style="text-align: right;">Update</th>
+                                    <th data-col="latest" style="text-align: right;">Latest (μs)</th>
+                                    <th data-col="avg" style="text-align: right;">Avg (μs)</th>
+                                    <th data-col="nans" style="text-align: right;">NaN</th>
                                 </tr>
                             </thead>
                             <tbody id="profile-body">
@@ -241,16 +252,6 @@
         </div>
     </div>
 
-    <!-- Historical Scrubbing Footer -->
-    <div class="timeline-container">
-        <div class="timeline-controls">
-            <div id="timeline-status" class="status-badge disconnected">DISCONNECTED</div>
-            <span id="timeline-epoch"
-                style="font-family: monospace; font-size: 11px; color: var(--text-secondary); width: 80px;">Epoch:
-                0</span>
-        </div>
-        <input type="range" id="time-scrubber" class="scrubber-slider" min="0" max="0" value="0" step="1">
-    </div>
 
     <!-- Load Mermaid & Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js" crossorigin="anonymous"></script>

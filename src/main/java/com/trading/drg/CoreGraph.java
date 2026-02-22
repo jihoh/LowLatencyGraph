@@ -152,7 +152,6 @@ public class CoreGraph {
     public CoreGraph enableDashboardServer(int port) {
         if (this.dashboardServer == null) {
             this.dashboardServer = new com.trading.drg.web.GraphDashboardServer();
-            this.dashboardServer.start(port);
 
             var wsListener = new com.trading.drg.web.WebsocketPublisherListener(
                     this.engine, this.dashboardServer, this.name, this.version);
@@ -165,6 +164,10 @@ public class CoreGraph {
             }
 
             setListener(wsListener);
+
+            // Open the socket only AFTER the server has the required initial configuration
+            // payloads cached.
+            this.dashboardServer.start(port);
         }
         return this;
     }

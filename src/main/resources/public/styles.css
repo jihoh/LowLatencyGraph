@@ -54,7 +54,8 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    padding-bottom: 50px;
+    padding-bottom: 0;
+    overflow: hidden;
 }
 
 .graph-header-overlay {
@@ -377,7 +378,7 @@ body {
     max-height: 240px;
     /* Fits header + 5 rows cleanly */
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
 }
 
 table {
@@ -979,11 +980,8 @@ path.flowchart-link[data-source-hover-self="true"] {
    ========================================================================== */
 
 .timeline-container {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100vw;
     height: 44px;
+    flex-shrink: 0;
     background: #1e2433;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;

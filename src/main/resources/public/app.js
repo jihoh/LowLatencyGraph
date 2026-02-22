@@ -127,7 +127,7 @@ function updateMetricsDOM(payload) {
         epochValue.textContent = payload.epoch;
     }
     if (payload.graphName) {
-        document.getElementById('graph-title').textContent = payload.graphName;
+        // Updated via init block now
     }
     if (payload.graphVersion) {
         document.getElementById('graph-version').textContent = 'v' + payload.graphVersion;
@@ -180,88 +180,99 @@ function connect() {
         try {
             const payload = JSON.parse(event.data);
 
-            // Real-time Stabilizations / sec using a sliding window
-            let currentHz = 0;
-            const now = performance.now();
-            messageTimes.push(now);
-            if (messageTimes.length > 50) {
-                messageTimes.shift();
-            }
-            if (messageTimes.length > 1) {
-                const elapsedSc = (now - messageTimes[0]) / 1000.0;
-                currentHz = Math.round((messageTimes.length - 1) / elapsedSc);
-            }
+            // Branch 1: Heavy Static Initializer Payload
+            if (payload.type === 'init') {
+                if (!isGraphRendered) {
+                    document.getElementById('graph-title').textContent = payload.graphName;
+                    document.getElementById('graph-version').textContent = "v" + payload.graphVersion;
+                    // Render layout from server once
+                    if (payload.topology) {
+                        const mermaidStr = payload.topology;
+                        const { svg } = await mermaid.render('graph-svg', mermaidStr);
+                        graphContainer.innerHTML = svg;
+                        isGraphRendered = true;
 
-            if (!payload.metrics) payload.metrics = {};
-            payload.metrics.frontendHz = currentHz;
+                        // Hook into SVG and enable interactive vector tracking
+                        const svgEl = graphContainer.querySelector('svg');
+                        if (svgEl) {
+                            svgEl.removeAttribute('width');
+                            svgEl.removeAttribute('height');
+                            svgEl.style.width = '100%';
+                            svgEl.style.height = '100%';
+                            svgEl.style.maxWidth = 'none';
 
-            if (!isScrubbing) {
-                updateMetricsDOM(payload);
-            }
+                            panZoomInstance = svgPanZoom(svgEl, {
+                                zoomEnabled: true,
+                                controlIconsEnabled: false,
+                                fit: false,
+                                center: false,
+                                minZoom: 0.1,
+                                maxZoom: 50
+                            });
+                            setTimeout(fitGraph, 10);
+                        }
 
-            if (!isGraphRendered) {
-                // First time: Read layout from server
-                if (payload.topology) {
-                    const mermaidStr = payload.topology;
-                    const { svg } = await mermaid.render('graph-svg', mermaidStr);
-                    graphContainer.innerHTML = svg;
-                    isGraphRendered = true;
-
-                    // Hook into SVG and enable interactive vector tracking
-                    const svgEl = graphContainer.querySelector('svg');
-                    if (svgEl) {
-                        svgEl.removeAttribute('width');
-                        svgEl.removeAttribute('height');
-                        svgEl.style.width = '100%';
-                        svgEl.style.height = '100%';
-                        svgEl.style.maxWidth = 'none';
-
-                        panZoomInstance = svgPanZoom(svgEl, {
-                            zoomEnabled: true,
-                            controlIconsEnabled: false,
-                            fit: false,
-                            center: false,
-                            minZoom: 0.1,
-                            maxZoom: 50
-                        });
-                        setTimeout(fitGraph, 10);
-                    }
-
-                    // Store routing map from backend
-                    if (payload.routing) {
-                        graphRouting = payload.routing;
-                        reverseGraphRouting = {};
-                        for (const [parent, children] of Object.entries(graphRouting)) {
-                            for (const child of children) {
-                                if (!reverseGraphRouting[child]) reverseGraphRouting[child] = [];
-                                reverseGraphRouting[child].push(parent);
+                        // Store routing map from backend
+                        if (payload.routing) {
+                            graphRouting = payload.routing;
+                            reverseGraphRouting = {};
+                            for (const [parent, children] of Object.entries(graphRouting)) {
+                                for (const child of children) {
+                                    if (!reverseGraphRouting[child]) reverseGraphRouting[child] = [];
+                                    reverseGraphRouting[child].push(parent);
+                                }
                             }
                         }
-                    }
 
-                    // Store initial values
-                    const alertNodeSelect = document.getElementById('alert-node');
-                    let sortedNodes = [];
-                    for (const [key, val] of Object.entries(payload.values)) {
-                        prevValues.set(key, val);
-                        sortedNodes.push(key);
-                    }
+                        // Populate Select Node dropdown dynamically
+                        const alertNodeSelect = document.getElementById('alert-node');
+                        let sortedNodes = Object.keys(graphRouting);
 
-                    // Populate Select Node dropdown dynamically
-                    if (alertNodeSelect) {
-                        alertNodeSelect.innerHTML = '<option value="">Select Node</option>';
-                        sortedNodes.sort().forEach(nodeName => {
-                            const opt = document.createElement('option');
-                            opt.value = nodeName;
-                            opt.textContent = nodeName;
-                            alertNodeSelect.appendChild(opt);
+                        // Prefill prevValues so partial tick streams don't shatter the tracked struct
+                        sortedNodes.forEach(nodeName => {
+                            if (!prevValues.has(nodeName)) prevValues.set(nodeName, 'NaN');
                         });
-                    }
 
-                    // Attach our custom hover listeners
-                    attachHoverListeners();
+                        if (alertNodeSelect) {
+                            alertNodeSelect.innerHTML = '<option value="">Select Node</option>';
+                            sortedNodes.sort().forEach(nodeName => {
+                                const opt = document.createElement('option');
+                                opt.value = nodeName;
+                                opt.textContent = nodeName;
+                                alertNodeSelect.appendChild(opt);
+                            });
+                        }
+
+                        // Attach custom CSS hover bindings safely post SVG ingestion
+                        attachHoverListeners();
+                    }
                 }
-            } else {
+                return; // Initialization payload processed. Do not pass to tick logic.
+            }
+
+            // Branch 2: High Frequency Tick Logic (10Hz+)
+            if (payload.type === 'tick' && isGraphRendered) {
+
+                // Real-time Stabilizations / sec using a sliding window
+                let currentHz = 0;
+                const now = performance.now();
+                messageTimes.push(now);
+                if (messageTimes.length > 50) {
+                    messageTimes.shift();
+                }
+                if (messageTimes.length > 1) {
+                    const elapsedSc = (now - messageTimes[0]) / 1000.0;
+                    currentHz = Math.round((messageTimes.length - 1) / elapsedSc);
+                }
+
+                if (!payload.metrics) payload.metrics = {};
+                payload.metrics.frontendHz = currentHz;
+
+                // Ensure updateMetricsDOM runs smoothly without `prevValues` locking
+                if (!isScrubbing) {
+                    updateMetricsDOM(payload);
+                }
+
                 // Hot Path: Do NOT re-render Mermaid. Just manipulate the DOM.
                 if (!isScrubbing) {
                     updateGraphDOM(payload.values);
@@ -521,9 +532,9 @@ function renderProfileTable() {
         html += `
             <tr>
                 <td title="${node.name}">${displayName}</td>
+                <td class="right">${node.evaluations}</td>
                 <td class="right">${formatVal(node.latest, 2)}</td>
                 <td class="right">${formatVal(node.avg, 2)}</td>
-                <td class="right">${node.evaluations}</td>
                 <td class="right">${node.nans}</td>
             </tr>
         `;

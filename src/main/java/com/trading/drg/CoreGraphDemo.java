@@ -17,7 +17,7 @@ public class CoreGraphDemo {
         var graph = new CoreGraph("src/main/resources/tri_arb.json")
                 .enableNodeProfiling()
                 .enableLatencyTracking()
-                .enableDashboardServer(8080);
+                .enableDashboardServer(8088);
 
         // Advanced Simulation Loop
         Random rng = new Random(42);

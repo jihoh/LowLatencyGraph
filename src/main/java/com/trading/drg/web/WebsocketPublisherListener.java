@@ -27,7 +27,11 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final com.trading.drg.util.ErrorRateLimiter errLimiter = new com.trading.drg.util.ErrorRateLimiter(log,
             1000);
 
-    private final java.util.Map<String, Long> nanCounters = new java.util.HashMap<>();
+    // Track NaNs natively via topoIndex without Object boxing
+    private long[] nanCounters = new long[0];
+
+    // Pre-allocated buffer for in-place sorting
+    private NodeProfileListener.NodeStats[] sortBuffer = new NodeProfileListener.NodeStats[0];
 
     // Optional metrics listeners
     private LatencyTrackingListener latencyListener;
@@ -47,6 +51,40 @@ public class WebsocketPublisherListener implements StabilizationListener {
         this.initialMermaid = new com.trading.drg.util.GraphExplain(engine).toMermaid()
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n");
+
+        // Construct and push the Heavy Static Config directly into the WebServer cache
+        // This completely eliminates generating and broadcasting JSON routing data
+        // every 100ms tick.
+        cacheInitialGraphConfig();
+    }
+
+    private void cacheInitialGraphConfig() {
+        StringBuilder initBuilder = new StringBuilder(2048);
+        TopologicalOrder topology = engine.topology();
+        int nodeCount = topology.nodeCount();
+
+        initBuilder.append("{\"type\":\"init\",")
+                .append("\"graphName\":\"").append(graphName).append("\",")
+                .append("\"graphVersion\":\"").append(graphVersion).append("\",")
+                .append("\"topology\":\"").append(initialMermaid).append("\",")
+                .append("\"routing\":{");
+
+        for (int i = 0; i < nodeCount; i++) {
+            initBuilder.append("\"").append(topology.node(i).name()).append("\":[");
+            int childCount = topology.childCount(i);
+            for (int j = 0; j < childCount; j++) {
+                int childId = topology.child(i, j);
+                initBuilder.append("\"").append(topology.node(childId).name()).append("\"");
+                if (j < childCount - 1)
+                    initBuilder.append(",");
+            }
+            initBuilder.append("]");
+            if (i < nodeCount - 1)
+                initBuilder.append(",");
+        }
+        initBuilder.append("}}");
+
+        server.setInitialGraphConfig(initBuilder.toString());
     }
 
     public void setLatencyListener(LatencyTrackingListener latencyListener) {
@@ -64,16 +102,20 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
     @Override
     public void onStabilizationEnd(long epoch, int nodesStabilized) {
-        // 1. Build a compact JSON payload representing the current state
+        // 1. Build a compact JSON payload representing the high-frequency tick state
         jsonBuilder.setLength(0);
-        jsonBuilder.append("{\"epoch\":").append(epoch)
-                .append(",\"graphName\":\"").append(graphName).append("\"")
-                .append(",\"graphVersion\":\"").append(graphVersion).append("\"")
+        jsonBuilder.append("{\"type\":\"tick\",")
+                .append("\"epoch\":").append(epoch)
                 .append(",\"values\":{");
 
         TopologicalOrder topology = engine.topology();
         int nodeCount = topology.nodeCount();
         int sourceCount = 0;
+
+        // Ensure static array capacity dynamically expands if the graph loads hot
+        if (nanCounters.length < nodeCount) {
+            nanCounters = new long[nodeCount];
+        }
 
         for (int i = 0; i < nodeCount; i++) {
             if (topology.isSource(i))
@@ -89,7 +131,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
             }
 
             if (Double.isNaN(val)) {
-                nanCounters.put(node.name(), nanCounters.getOrDefault(node.name(), 0L) + 1);
+                nanCounters[i]++;
                 jsonBuilder.append("\"").append(node.name()).append("\":\"NaN\"");
             } else {
                 jsonBuilder.append("\"").append(node.name()).append("\":").append(val);
@@ -119,62 +161,67 @@ public class WebsocketPublisherListener implements StabilizationListener {
         if (profileListener != null) {
             jsonBuilder.append(",\"profile\":[");
 
-            // Build comprehensive list of all nodes, using zero-stats if they haven't
-            // stabilized yet
-            java.util.List<java.util.Map.Entry<String, NodeProfileListener.NodeStats>> allNodes = new java.util.ArrayList<>(
-                    nodeCount);
-            for (int i = 0; i < nodeCount; i++) {
-                String nodeName = topology.node(i).name();
-                var stats = profileListener.getStats().getOrDefault(nodeName, new NodeProfileListener.NodeStats());
-                allNodes.add(new java.util.AbstractMap.SimpleEntry<>(nodeName, stats));
+            // Build snapshot from the native array without Streams or Boxing
+            NodeProfileListener.NodeStats[] rawStats = profileListener.getStatsArray();
+            int limit = Math.min(rawStats.length, nodeCount);
+
+            if (sortBuffer.length < limit) {
+                sortBuffer = new NodeProfileListener.NodeStats[limit * 2];
             }
 
-            var topNodes = allNodes.stream()
-                    .sorted((e1, e2) -> Long.compare(e2.getValue().totalDurationNanos,
-                            e1.getValue().totalDurationNanos))
-                    .limit(50)
-                    .toList();
+            // Collect valid non-null stats up to node count
+            int validCount = 0;
+            for (int i = 0; i < limit; i++) {
+                if (rawStats[i] != null && rawStats[i].count > 0) {
+                    sortBuffer[validCount++] = rawStats[i];
+                }
+            }
 
-            for (int i = 0; i < topNodes.size(); i++) {
-                var entry = topNodes.get(i);
+            java.util.Arrays.sort(sortBuffer, 0, validCount,
+                    (s1, s2) -> Long.compare(s2.totalDurationNanos, s1.totalDurationNanos));
+            int topK = Math.min(validCount, 50);
+
+            for (int i = 0; i < topK; i++) {
+                NodeProfileListener.NodeStats s = sortBuffer[i];
+
+                // Lookup index generically based on object equality to grab the NaN array
+                // counter
+                int localTopoId = -1;
+                for (int t = 0; t < rawStats.length; t++) {
+                    if (rawStats[t] == s) {
+                        localTopoId = t;
+                        break;
+                    }
+                }
+
+                long nanCount = localTopoId != -1 && localTopoId < nanCounters.length ? nanCounters[localTopoId] : 0;
+
                 jsonBuilder.append("{")
-                        .append("\"name\":\"").append(entry.getKey()).append("\",")
-                        .append("\"latest\":").append(entry.getValue().lastDurationNanos / 1000.0).append(",")
-                        .append("\"avg\":").append(entry.getValue().avgMicros()).append(",")
-                        .append("\"evaluations\":").append(entry.getValue().count).append(",")
-                        .append("\"nans\":").append(nanCounters.getOrDefault(entry.getKey(), 0L))
+                        .append("\"name\":\"").append(s.name).append("\",")
+                        .append("\"latest\":").append(s.lastDurationNanos / 1000.0).append(",")
+                        .append("\"avg\":").append(s.avgMicros()).append(",")
+                        .append("\"evaluations\":").append(s.count).append(",")
+                        .append("\"nans\":").append(nanCount)
                         .append("}");
-                if (i < topNodes.size() - 1) {
+
+                if (i < topK - 1) {
                     jsonBuilder.append(",");
                 }
             }
             jsonBuilder.append("]");
-        }
 
-        jsonBuilder.append("}");
-
-        jsonBuilder.append(",\"topology\":\"").append(initialMermaid).append("\"");
-
-        jsonBuilder.append(",\"routing\":{");
-        for (int i = 0; i < nodeCount; i++) {
-            jsonBuilder.append("\"").append(topology.node(i).name()).append("\":[");
-            int childCount = topology.childCount(i);
-            for (int j = 0; j < childCount; j++) {
-                int childId = topology.child(i, j);
-                jsonBuilder.append("\"").append(topology.node(childId).name()).append("\"");
-                if (j < childCount - 1)
-                    jsonBuilder.append(",");
+            // Clean up buffer references
+            for (int i = 0; i < validCount; i++) {
+                sortBuffer[i] = null;
             }
-            jsonBuilder.append("]");
-            if (i < nodeCount - 1)
-                jsonBuilder.append(",");
         }
-        jsonBuilder.append("}");
 
-        jsonBuilder.append("}");
+        jsonBuilder.append("}"); // close metrics
+        jsonBuilder.append("}"); // close tick object
 
         // 3. Broadcast to all connected web clients
-        server.broadcast(jsonBuilder.toString());
+        String payload = jsonBuilder.toString();
+        server.broadcast(payload);
     }
 
     @Override
