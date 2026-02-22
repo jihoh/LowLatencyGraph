@@ -1,1 +1,4 @@
 /target
+backend.log
+server.pid
+backend.log

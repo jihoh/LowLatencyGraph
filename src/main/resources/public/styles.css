@@ -238,7 +238,9 @@ body {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(100vh - 40px);
 }
 
 .metrics-header {
@@ -635,7 +637,7 @@ path.flowchart-link[data-source-hover="true"] {
 }
 
 .right-dock {
-    width: 430px;
+    width: 470px;
     border-left: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
@@ -915,6 +917,99 @@ path.flowchart-link[data-source-hover="true"] {
 }
 
 /* =========================================================================
+   Alerting Engine
+   ========================================================================= */
+.alert-input {
+    background: #242938;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.alert-input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
+
+.alert-table-container {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.alert-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+
+.alert-table th {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 6px 10px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.alert-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.alert-table tr:last-child td {
+    border-bottom: none;
+}
+
+.delete-alert-btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+}
+
+.delete-alert-btn:hover {
+    color: var(--accent-red);
+}
+
+/* Severe Visual Warning Overlay */
+#severe-alert-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(218, 54, 51, 0.4);
+    pointer-events: none;
+    z-index: 9999;
+    display: none;
+    animation: severe-flash 0.3s infinite alternate;
+}
+
+body.severe-alert #severe-alert-overlay {
+    display: block;
+}
+
+@keyframes severe-flash {
+    from {
+        background-color: rgba(218, 54, 51, 0.1);
+    }
+
+    to {
+        background-color: rgba(218, 54, 51, 0.6);
+    }
+}
+
+/* =========================================================================
    Minimized Output State Overrides (Placed last for highest priority)
    ========================================================================= */
 .metrics-panel.minimized {
@@ -956,9 +1051,10 @@ path.flowchart-link[data-source-hover="true"] {
 
 .metrics-panel.minimized .header-controls {
     flex-direction: column;
-    margin: 0;
+    margin: 16px 0 0 0;
     gap: 8px;
-    padding-bottom: 20px;
+    padding-bottom: 0;
+    order: -1;
 }
 
 .chart-panel.minimized {

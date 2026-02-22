@@ -7,10 +7,13 @@
     <title>Core Graph</title>
     <!-- Modern Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="stylesheet" href="styles.css?v=9">
 </head>
 
 <body>
+    <!-- Severe Visual Warning Overlay -->
+    <div id="severe-alert-overlay"></div>
+    <div id="fixed-overlay"></div>
 
 
     <div class="workspace">
@@ -45,14 +48,19 @@
             </div>
 
             <!-- Bottom Dock -->
-            <div id="bottom-dock" class="dock-container bottom-dock minimized">
+            <div id="bottom-dock" class="dock-container bottom-dock">
                 <div id="bottom-dock-resizer" class="edge-resizer top-edge"></div>
                 <!-- Floating Interactive Charting Panel -->
-                <div id="chart-panel" class="chart-panel docked minimized">
+                <div id="chart-panel" class="chart-panel docked">
                     <div class="chart-header">
                         <h3 id="chart-title"></h3>
                         <div class="header-controls" style="display:flex; align-items:center;">
-                            <button id="toggle-chart" class="panel-btn" title="Minimize">+</button>
+                            <button id="toggle-chart" class="panel-btn" title="Minimize">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="18 15 12 9 6 15"></polyline>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                     <div class="panel-content" id="chart-content" style="position: relative;">
@@ -77,12 +85,19 @@
                 <div class="metrics-header" id="metrics-header">
                     <h2>Dashboard</h2>
                     <div class="header-controls" style="display:flex; align-items:center; gap:4px;">
-                        <button class="panel-btn" id="toggle-metrics" title="Minimize">-</button>
+                        <button class="panel-btn" id="toggle-metrics" title="Minimize">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
                     </div>
                 </div>
                 <div class="panel-content" id="metrics-content">
-                    <h3>Graph Metrics</h3>
-                    <div class="metric-row">
+                    <h3 id="header-graph-metrics" style="cursor: pointer; user-select: none;">Graph Metrics
+                        <span>▼</span>
+                    </h3>
+                    <div id="content-graph-metrics" class="metric-row">
                         <div class="metric-small">
                             <span class="label">Epoch</span>
                             <span class="value" id="epoch-value">0</span>
@@ -97,14 +112,16 @@
                         </div>
                     </div>
 
-                    <h3>Stabilization Metrics</h3>
-                    <div class="metric-row">
+                    <h3 id="header-stab-metrics" style="cursor: pointer; user-select: none;">Stabilization Metrics
+                        <span>▼</span>
+                    </h3>
+                    <div id="content-stab-metrics" class="metric-row">
                         <div class="metric-small">
-                            <span class="label">Latest Latency (μs)</span>
+                            <span class="label">Latest (μs)</span>
                             <span class="value" id="lat-latest">0.00</span>
                         </div>
                         <div class="metric-small">
-                            <span class="label">Avg Latency (μs)</span>
+                            <span class="label">Avg (μs)</span>
                             <span class="value" id="lat-avg">0.00</span>
                         </div>
                         <div class="metric-small">
@@ -113,8 +130,9 @@
                         </div>
                     </div>
 
-                    <h3>Node Metrics</h3>
-                    <div class="profile-table-container">
+                    <h3 id="header-node-metrics" style="cursor: pointer; user-select: none;">Node Metrics <span>▼</span>
+                    </h3>
+                    <div id="content-node-metrics" class="profile-table-container">
                         <table id="profile-table">
                             <thead>
                                 <tr>
@@ -129,6 +147,75 @@
                                 <!-- Populated by JS -->
                             </tbody>
                         </table>
+                    </div>
+
+                    <h3 id="header-alert-engine" style="margin-top: 24px; cursor: pointer; user-select: none;">Alerting
+                        Engine <span>▼</span></h3>
+                    <div id="content-alert-engine">
+                        <div class="alert-controls"
+                            style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <select id="alert-node" class="alert-input">
+                                    <option value="">Select Node</option>
+                                    <option value="EURJPY">EURJPY</option>
+                                    <option value="USDJPY">USDJPY</option>
+                                    <option value="EURUSD">EURUSD</option>
+                                    <option value="Arb.Spread">Arb.Spread</option>
+                                </select>
+                                <select id="alert-condition" class="alert-input">
+                                    <option value="<">drops below</option>
+                                    <option value=">">goes above</option>
+                                </select>
+                                <input type="number" id="alert-threshold" class="alert-input" placeholder="Value"
+                                    step="any" style="width: 80px;">
+                                <select id="alert-mode" class="alert-input">
+                                    <option value="CONTINUOUS">CONT</option>
+                                    <option value="ONCE">ONCE</option>
+                                </select>
+                            </div>
+                            <button id="alert-set-btn" class="panel-btn"
+                                style="width: 100%; padding: 6px 12px; font-size: 0.85rem; height: auto; border: 1px solid var(--border-color); border-radius: 4px; background: rgba(255, 255, 255, 0.05); cursor: pointer; color: var(--text-primary); transition: all 0.2s ease;">CREATE</button>
+                        </div>
+
+                        <div style="margin-top: 16px;">
+                            <h4
+                                style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px;">
+                                Active Alerts</h4>
+                            <div class="alert-table-container">
+                                <table class="alert-table">
+                                    <thead>
+                                        <tr>
+                                            <th>RULE</th>
+                                            <th>MODE</th>
+                                            <th style="width: 30px;"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="active-alerts-body">
+                                        <!-- Populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 16px;">
+                            <h4
+                                style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px;">
+                                Trigger History</h4>
+                            <div class="alert-table-container" style="max-height: 120px; overflow-y: auto;">
+                                <table class="alert-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="white-space: nowrap;">TIME</th>
+                                            <th style="width: 60px;">EPOCH</th>
+                                            <th>EVENT</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="alert-history-body">
+                                        <!-- Populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -150,7 +237,7 @@
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=14"></script>
 </body>
 
 </html>

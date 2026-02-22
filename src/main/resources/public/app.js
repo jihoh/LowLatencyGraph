@@ -61,6 +61,12 @@ const nodeHistory = new Map(); // Maps NodeID -> Array of {time: timestamp, valu
 const nodeNaNHistory = new Map(); // Tracks discrete NaN timestamps for red highlighting
 const epochToRealTime = new Map(); // Maps integer epochs -> actual JS millisecond timestamps
 let oldestEpochTracker = -1; // O(1) tracking for cleaning up old epochs
+const snapshots = [];
+
+// Alert Engine State
+let activeAlerts = []; // Array of { id, node, condition, threshold, mode, lastNotifiedEpoch }
+let alertHistory = []; // Array of { time: string, message: string }
+let alertIdCounter = 0;
 let chartInstance = null;
 const activeChartSeries = new Map(); // nodeId -> { lineSeries, nanSeries, color }
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308', '#ef4444'];
@@ -69,7 +75,7 @@ let chartColorIndex = 0;
 // Global Z-Index tracker for draggable panels
 let highestZIndex = 1000;
 let isScrubbing = false;
-const snapshots = [];
+
 
 // The UI Zoom buttons bridge over to the active instance
 document.getElementById('zoom-in').addEventListener('click', () => {
@@ -248,6 +254,69 @@ function connect() {
                 }
                 const timelineEpoch = document.getElementById('timeline-epoch');
                 if (timelineEpoch) timelineEpoch.textContent = 'Epoch: ' + payload.epoch;
+            }
+
+            // Alert engine evaluation over latest data
+            if (!isScrubbing && activeAlerts.length > 0) {
+                let anyAlertTriggered = false;
+                let alertsToRemove = [];
+
+                for (let i = 0; i < activeAlerts.length; i++) {
+                    const alert = activeAlerts[i];
+                    const triggerValStr = payload.values[alert.node];
+
+                    if (triggerValStr && triggerValStr !== 'NaN') {
+                        const valNum = parseFloat(triggerValStr);
+                        let triggered = false;
+
+                        if (alert.condition === '<' && valNum < alert.threshold) triggered = true;
+                        else if (alert.condition === '>' && valNum > alert.threshold) triggered = true;
+                        else if (alert.condition === '=' && valNum === alert.threshold) triggered = true;
+
+                        if (triggered) {
+                            anyAlertTriggered = true;
+
+                            // Emit Notification (deduplicated per alert)
+                            if (Notification.permission === "granted" && (payload.epoch - alert.lastNotifiedEpoch > 20 || alert.lastNotifiedEpoch === -1)) {
+                                new Notification("DRG Alert: Target Breached!", {
+                                    body: `${alert.node} ${alert.condition} ${alert.threshold} (Val: ${valNum.toFixed(4)})`
+                                });
+                                alert.lastNotifiedEpoch = payload.epoch;
+
+                                // Record to History
+                                const timeStr = new Date().toLocaleTimeString();
+                                const msg = `${alert.node} ${alert.condition} ${alert.threshold} (Hit: ${valNum.toFixed(4)})`;
+                                alertHistory.unshift({ time: timeStr, epoch: payload.epoch, message: msg });
+                                if (alertHistory.length > 50) alertHistory.pop(); // Cap history size
+                                renderAlertHistory();
+                            }
+
+                            if (alert.mode === 'ONCE') {
+                                alertsToRemove.push(alert.id);
+                            }
+                        } else {
+                            // Reset deduplication if price normalizes
+                            alert.lastNotifiedEpoch = -1;
+                        }
+                    }
+                }
+
+                if (anyAlertTriggered) {
+                    if (!document.body.classList.contains('severe-alert')) {
+                        document.body.classList.add('severe-alert');
+                    }
+                } else {
+                    document.body.classList.remove('severe-alert');
+                }
+
+                // Prune ONCE alerts that fired
+                if (alertsToRemove.length > 0) {
+                    activeAlerts = activeAlerts.filter(a => !alertsToRemove.includes(a.id));
+                    renderActiveAlerts();
+                }
+
+            } else if (activeAlerts.length === 0) {
+                document.body.classList.remove('severe-alert');
             }
 
             // Live History Tracking & Chart Updating
@@ -594,6 +663,150 @@ function initChart() {
     });
 }
 
+document.getElementById('toggle-metrics').addEventListener('click', () => {
+    const metricsContent = document.getElementById('metrics-content');
+    const panel = document.getElementById('metrics-panel');
+    const btn = document.getElementById('toggle-metrics');
+
+    if (metricsContent.style.display === 'none') {
+        metricsContent.style.display = '';
+        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+        btn.title = 'Minimize';
+    } else {
+        metricsContent.style.display = 'none';
+        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+        btn.title = 'Expand';
+    }
+});
+
+// Setup Dashboard Header Collapsibility
+document.querySelectorAll('.metrics-panel h3[id^="header-"]').forEach(header => {
+    header.addEventListener('click', () => {
+        const contentId = header.id.replace('header-', 'content-');
+        const contentDiv = document.getElementById(contentId);
+        if (contentDiv) {
+            if (contentDiv.style.display === 'none') {
+                contentDiv.style.display = '';
+                header.querySelector('span').textContent = '▼';
+            } else {
+                contentDiv.style.display = 'none';
+                header.querySelector('span').textContent = '▶';
+            }
+        }
+    });
+});
+
+// Setup Alerting UI Handlers
+function renderActiveAlerts() {
+    const tbody = document.getElementById('active-alerts-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (activeAlerts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-secondary); py-2">No active alerts</td></tr>`;
+        return;
+    }
+
+    activeAlerts.forEach(alert => {
+        const tr = document.createElement('tr');
+
+        const ruleTd = document.createElement('td');
+        ruleTd.innerHTML = `<span style="color:var(--text-primary)">${alert.node}</span> ${alert.condition} ${alert.threshold}`;
+
+        const modeTd = document.createElement('td');
+        modeTd.textContent = alert.mode;
+        if (alert.mode === 'ONCE') modeTd.style.color = "var(--text-secondary)";
+        else modeTd.style.color = "var(--accent-blue)";
+
+        const actionTd = document.createElement('td');
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-alert-btn';
+        delBtn.innerHTML = '×';
+        delBtn.title = 'Delete Alert';
+        delBtn.onclick = () => {
+            activeAlerts = activeAlerts.filter(a => a.id !== alert.id);
+            renderActiveAlerts();
+        };
+        actionTd.appendChild(delBtn);
+
+        tr.appendChild(ruleTd);
+        tr.appendChild(modeTd);
+        tr.appendChild(actionTd);
+        tbody.appendChild(tr);
+    });
+}
+
+function renderAlertHistory() {
+    const tbody = document.getElementById('alert-history-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (alertHistory.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-secondary); py-2">No trigger history</td></tr>`;
+        return;
+    }
+
+    alertHistory.forEach(hist => {
+        const tr = document.createElement('tr');
+        const timeTd = document.createElement('td');
+        timeTd.textContent = hist.time;
+        timeTd.style.color = "var(--text-secondary)";
+        timeTd.style.whiteSpace = "nowrap";
+
+        const epochTd = document.createElement('td');
+        epochTd.textContent = hist.epoch;
+        epochTd.style.color = "var(--text-secondary)";
+        epochTd.style.fontFamily = "monospace";
+
+        const msgTd = document.createElement('td');
+        msgTd.textContent = hist.message;
+        msgTd.style.color = "var(--accent-red)";
+
+        tr.appendChild(timeTd);
+        tr.appendChild(epochTd);
+        tr.appendChild(msgTd);
+        tbody.appendChild(tr);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderActiveAlerts();
+    renderAlertHistory();
+
+    const alertBtn = document.getElementById('alert-set-btn');
+    if (alertBtn) {
+        alertBtn.addEventListener('click', () => {
+            const node = document.getElementById('alert-node').value;
+            const condition = document.getElementById('alert-condition').value;
+            const threshStr = document.getElementById('alert-threshold').value;
+            const mode = document.getElementById('alert-mode')?.value || 'CONTINUOUS';
+
+            if (!node || !condition || threshStr === '') {
+                return;
+            }
+
+            const newAlert = {
+                id: ++alertIdCounter,
+                node: node,
+                condition: condition,
+                threshold: parseFloat(threshStr),
+                mode: mode,
+                lastNotifiedEpoch: -1
+            };
+
+            activeAlerts.push(newAlert);
+            renderActiveAlerts();
+
+            // Clear input box
+            document.getElementById('alert-threshold').value = '';
+
+            // Request Notification permission
+            if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+                Notification.requestPermission();
+            }
+        });
+    }
+});
 function openChart(nodeId) {
     const chartPanel = document.getElementById('chart-panel');
     const bottomDock = document.getElementById('bottom-dock');
@@ -895,7 +1108,10 @@ function setupDockingControls() {
             }
         }
 
-        e.target.textContent = isMinimized ? '+' : '-';
+        const svgExpand = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+        const svgMinimize = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+        e.target.innerHTML = isMinimized ? svgExpand : svgMinimize;
+        e.target.title = isMinimized ? 'Expand' : 'Minimize';
         if (panZoomInstance) {
             setTimeout(fitGraph, 10);
         }
@@ -912,7 +1128,10 @@ function setupDockingControls() {
             bottomDock.style.height = '';
         }
 
-        e.target.textContent = isMinimized ? '+' : '-';
+        const svgExpand = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+        const svgMinimize = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>';
+        e.target.innerHTML = isMinimized ? svgExpand : svgMinimize;
+        e.target.title = isMinimized ? 'Expand' : 'Minimize';
         if (chartInstance && !isMinimized) {
             setTimeout(() => chartInstance.timeScale().fitContent(), 10);
         }
