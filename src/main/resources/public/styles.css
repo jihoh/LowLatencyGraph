@@ -774,6 +774,50 @@ path.flowchart-link[data-source-hover="true"] {
 }
 
 /* =========================================================================
+   Alert Modal styling
+   ========================================================================= */
+.alert-modal {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    pointer-events: none;
+    /* Let clicks pass through the invisible container */
+    display: flex;
+    flex-direction: column;
+}
+
+.alert-modal.hidden {
+    display: none !important;
+}
+
+.alert-modal-content {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    border-radius: 8px;
+    padding: 20px 24px;
+    width: 340px;
+    max-width: 90vw;
+    text-align: left;
+    pointer-events: auto;
+    /* Re-enable clicks for the actual toast */
+    animation: slideInRight 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes slideInRight {
+    0% {
+        transform: translateX(120%);
+        opacity: 0;
+    }
+
+    100% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* =========================================================================
    Omnidirectional Resize Handles
    ========================================================================= */
 .resizer {

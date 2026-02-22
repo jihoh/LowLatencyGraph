@@ -7,12 +7,25 @@
     <title>Core Graph</title>
     <!-- Modern Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=9">
+    <link rel="stylesheet" href="styles.css?v=13">
 </head>
 
 <body>
-    <!-- Severe Visual Warning Overlay -->
-    <div id="severe-alert-overlay"></div>
+    <!-- Non-blocking Toast Alert -->
+    <div id="alert-modal" class="alert-modal hidden">
+        <div class="alert-modal-content">
+            <h2 style="color: var(--text-primary); font-size: 1rem; margin-bottom: 8px; font-weight: 600;">
+                Target Alert Triggered
+            </h2>
+            <div id="alert-modal-text"
+                style="font-family: monospace; font-size: 0.9rem; color: var(--accent-blue); margin-bottom: 16px; line-height: 1.5;">
+            </div>
+            <div style="display: flex; justify-content: flex-end;">
+                <button id="alert-modal-close" class="panel-btn"
+                    style="padding: 6px 16px; background: transparent; border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Dismiss</button>
+            </div>
+        </div>
+    </div>
     <div id="fixed-overlay"></div>
 
 
@@ -27,13 +40,13 @@
                     <div class="zoom-controls">
                         <span class="control-label">Text</span>
                         <button id="text-out" title="Decrease Text">-</button>
-                        <button id="text-reset" title="Reset Text">Fit</button>
+                        <button id="text-reset" title="Reset Text">Auto</button>
                         <button id="text-in" title="Increase Text">+</button>
                     </div>
                     <div class="zoom-controls">
                         <span class="control-label">Graph</span>
                         <button id="zoom-out" title="Zoom Out">-</button>
-                        <button id="zoom-reset" title="Reset Zoom">Fit</button>
+                        <button id="zoom-reset" title="Reset Zoom">Auto</button>
                         <button id="zoom-in" title="Zoom In">+</button>
                     </div>
                 </div>
@@ -169,8 +182,8 @@
                                 <input type="number" id="alert-threshold" class="alert-input" placeholder="Value"
                                     step="any" style="width: 80px;">
                                 <select id="alert-mode" class="alert-input">
-                                    <option value="CONTINUOUS">CONT</option>
                                     <option value="ONCE">ONCE</option>
+                                    <option value="CONTINUOUS">CONT</option>
                                 </select>
                             </div>
                             <button id="alert-set-btn" class="panel-btn"
@@ -237,7 +250,7 @@
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
-    <script src="app.js?v=14"></script>
+    <script src="app.js?v=16"></script>
 </body>
 
 </html>

@@ -301,12 +301,38 @@ function connect() {
                     }
                 }
 
+                // Prepare modal text if any fired
+                let triggeredMessages = [];
+
                 if (anyAlertTriggered) {
-                    if (!document.body.classList.contains('severe-alert')) {
-                        document.body.classList.add('severe-alert');
+                    for (let i = 0; i < alertsToRemove.length; i++) {
+                        const dismissedId = alertsToRemove[i];
+                        const a = activeAlerts.find(al => al.id === dismissedId);
+                        if (a) {
+                            triggeredMessages.push(`${a.node} ${a.condition} ${a.threshold}`);
+                        }
                     }
-                } else {
-                    document.body.classList.remove('severe-alert');
+                    // For continuous mode, just capture the active ones
+                    if (triggeredMessages.length === 0) {
+                        activeAlerts.forEach(a => {
+                            const valStr = payload.values[a.node];
+                            if (valStr !== 'NaN') {
+                                const v = parseFloat(valStr);
+                                if ((a.condition === '<' && v < a.threshold) || (a.condition === '>' && v > a.threshold) || (a.condition === '=' && v === a.threshold)) {
+                                    triggeredMessages.push(`${a.node} ${a.condition} ${a.threshold} (Current: ${v.toFixed(4)})`);
+                                }
+                            }
+                        });
+                    }
+
+                    const modal = document.getElementById('alert-modal');
+                    const modalText = document.getElementById('alert-modal-text');
+
+                    // Prevent overriding if already showing to allow manual dismissal
+                    if (modal.classList.contains('hidden')) {
+                        modalText.innerHTML = triggeredMessages.join('<br>');
+                        modal.classList.remove('hidden');
+                    }
                 }
 
                 // Prune ONCE alerts that fired
@@ -315,8 +341,6 @@ function connect() {
                     renderActiveAlerts();
                 }
 
-            } else if (activeAlerts.length === 0) {
-                document.body.classList.remove('severe-alert');
             }
 
             // Live History Tracking & Chart Updating
@@ -696,6 +720,16 @@ document.querySelectorAll('.metrics-panel h3[id^="header-"]').forEach(header => 
     });
 });
 
+document.addEventListener('DOMContentLoaded', () => {
+    const modalCloseBtn = document.getElementById('alert-modal-close');
+    if (modalCloseBtn) {
+        modalCloseBtn.addEventListener('click', () => {
+            const modal = document.getElementById('alert-modal');
+            modal.classList.add('hidden');
+        });
+    }
+});
+
 // Setup Alerting UI Handlers
 function renderActiveAlerts() {
     const tbody = document.getElementById('active-alerts-body');
@@ -779,7 +813,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const node = document.getElementById('alert-node').value;
             const condition = document.getElementById('alert-condition').value;
             const threshStr = document.getElementById('alert-threshold').value;
-            const mode = document.getElementById('alert-mode')?.value || 'CONTINUOUS';
+            const mode = document.getElementById('alert-mode')?.value || 'ONCE';
 
             if (!node || !condition || threshStr === '') {
                 return;
@@ -797,8 +831,10 @@ document.addEventListener('DOMContentLoaded', () => {
             activeAlerts.push(newAlert);
             renderActiveAlerts();
 
-            // Clear input box
+            // Clear input box and reset mode to default
             document.getElementById('alert-threshold').value = '';
+            const modeSelect = document.getElementById('alert-mode');
+            if (modeSelect) modeSelect.value = 'ONCE';
 
             // Request Notification permission
             if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
