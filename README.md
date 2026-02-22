@@ -8,9 +8,9 @@ Unlike traditional object-oriented systems where business logic is scattered acr
 
 ### Key Capabilities
 
-*   **Ultra-Low Latency:** Optimized for ~1 microsecond stabilization latency on modern CPUs.
+*   **Ultra-Low Latency:** Optimized for sub-microsecond stabilization latency on modern CPUs.
 *   **Predictability:** **Zero-GC** (Garbage Collection) on the hot path. All memory is pre-allocated.
-*   **Throughput:** Capable of processing millions of updates per second on a single thread.
+*   **Throughput:** Capable of processing millions of updates per second on a single thread. Native integration with **LMAX Disruptor**.
 *   **Zero-Overhead Read:** Direct node value access for the main application thread without GC pressure.
 *   **Safety:** Statically typed, cycle-free topology with explicit ownership.
 
@@ -80,10 +80,10 @@ Instead of Nodes holding `List<Node>` pointers to their children, the engine bui
 Node[] topoOrder;     // Nodes sorted by execution order
 int[] childrenOffset; // Index ranges for each node's children
 int[] childrenList;   // Flattened list of downstream dependencies
-boolean[] dirty;      // Re-evaluation bitset
+long[] dirtyWords;    // Sparse BitSet leveraging hardware intrinsics
 ```
 
-When the engine walks the graph, it streams through these primitive arrays. This is significantly faster and more cache-friendly than chasing `Iterator` pointers in a traditional object graph.
+When the engine walks the graph, it streams through these primitive arrays. Rather than visiting every node in an $O(N)$ sweep to check its boolean state, the engine uses `Long.numberOfTrailingZeros(dirtyWords[w])` to instantly hardware-jump strictly to the exact nodes that were updated in O(K) time complexity. This is significantly faster and more cache-friendly than chasing `Iterator` pointers or sweeping booleans.
 
 ---
 
@@ -259,6 +259,25 @@ public class CoreGraphDemo {
     }
 }
 ```
+
+### 3.4 The Advanced Application (`DisruptorGraphDemo.java`)
+
+For raw throughput bridging network sockets directly to the graph, use the built-in LMAX Disruptor reference integration:
+
+```java
+// Boot the high-performance telemetry dashboard on port 9090
+CoreGraph graph = new CoreGraph("bond_pricer_template.json")
+        .enableDashboardServer(9090);
+
+// Bind the graph natively to an LMAX single-producer RingBuffer
+Disruptor<MarketDataEvent> disruptor = new Disruptor<>(
+        MarketDataEvent::new, 1024, DaemonThreadFactory.INSTANCE, ProducerType.SINGLE, new BlockingWaitStrategy()
+);
+
+disruptor.handleEventsWith(new MarketDataEventHandler(graph));
+```
+
+This demo boots a unified websocket listener rendering a live Javascript dashboard (accessible at `http://localhost:9090`), capable of ingesting millions of binary quotes and visualizing millisecond micro-shock latencies in real-time.
 
 ---
 

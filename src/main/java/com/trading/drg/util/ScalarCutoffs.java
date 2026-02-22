@@ -34,7 +34,11 @@ public final class ScalarCutoffs {
      * Logic: |current - previous| > tolerance
      */
     public static ScalarCutoff absoluteTolerance(double tol) {
-        return (p, c) -> Math.abs(c - p) > tol;
+        return (p, c) -> {
+            if (Double.isNaN(p) != Double.isNaN(c))
+                return true;
+            return Math.abs(c - p) > tol;
+        };
     }
 
     /**
@@ -43,6 +47,8 @@ public final class ScalarCutoffs {
      */
     public static ScalarCutoff relativeTolerance(double tol) {
         return (p, c) -> {
+            if (Double.isNaN(p) != Double.isNaN(c))
+                return true;
             double d = Math.max(Math.abs(p), Math.abs(c));
             return d != 0.0 && Math.abs(c - p) / d > tol;
         };

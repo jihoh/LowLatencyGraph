@@ -793,13 +793,16 @@ function initChart() {
     });
 
     // Dynamic Resizing Observer
+    const chartContent = document.getElementById('chart-content');
     const chartPanel = document.getElementById('chart-panel');
     const resizeObserver = new ResizeObserver(entries => {
-        if (chartInstance && chartContainer.clientWidth > 0 && chartContainer.clientHeight > 0) {
-            chartInstance.resize(chartContainer.clientWidth, chartContainer.clientHeight);
-        }
+        window.requestAnimationFrame(() => {
+            if (chartInstance && chartContent.clientWidth > 0 && chartContent.clientHeight > 0) {
+                chartInstance.resize(chartContent.clientWidth, chartContent.clientHeight);
+            }
+        });
     });
-    resizeObserver.observe(chartContainer);
+    resizeObserver.observe(chartContent);
 
     // Bring to front on click
     chartPanel.addEventListener('mousedown', () => {
@@ -1381,7 +1384,7 @@ function setupDockResizers() {
             const dockRect = bottomDock.getBoundingClientRect();
             // Since bottom dock pushes up, height bounds equals its current bottom edge minus clientY.
             let newHeight = dockRect.bottom - e.clientY;
-            if (newHeight < 100) newHeight = 100;
+            if (newHeight < 300) newHeight = 300;
             if (newHeight > window.innerHeight * 0.8) newHeight = window.innerHeight * 0.8;
             bottomDock.style.height = newHeight + 'px';
         });

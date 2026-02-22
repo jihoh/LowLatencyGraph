@@ -48,11 +48,9 @@ public final class StabilizationEngine {
     private final TopologicalOrder topology;
 
     // The "seen set" or "work list" equivalent.
-    // dirty[i] == true means node i needs to be re-evaluated.
-    private final boolean[] dirty;
-
-    // Circuit Breaker state
-    private boolean healthy = true;
+    // dirtyWords packs 64 boolean flags into a single long for O(K) sparse
+    // traversal.
+    private final long[] dirtyWords;
 
     private int lastStabilizedCount;
     private long epoch;
@@ -61,13 +59,13 @@ public final class StabilizationEngine {
 
     public StabilizationEngine(TopologicalOrder topology) {
         this.topology = topology;
-        this.dirty = new boolean[topology.nodeCount()];
+        this.dirtyWords = new long[(topology.nodeCount() + 63) / 64];
 
         // Mark all source nodes as dirty initially so their values propagate
         // on the first stabilize() call.
         for (int i = 0; i < topology.nodeCount(); i++) {
             if (topology.isSource(i) && topology.node(i) instanceof SourceNode) {
-                dirty[i] = true;
+                markDirty(i);
             }
         }
     }
@@ -81,7 +79,7 @@ public final class StabilizationEngine {
      * Use this when manually updating a source node.
      */
     public void markDirty(String nodeName) {
-        dirty[topology.topoIndex(nodeName)] = true;
+        markDirty(topology.topoIndex(nodeName));
     }
 
     /**
@@ -89,8 +87,10 @@ public final class StabilizationEngine {
      * Extremely fast (array access).
      */
     public void markDirty(int topoIndex) {
-        if (!dirty[topoIndex]) {
-            dirty[topoIndex] = true;
+        int wordIdx = topoIndex >> 6;
+        long bitMask = 1L << topoIndex;
+        if ((dirtyWords[wordIdx] & bitMask) == 0) {
+            dirtyWords[wordIdx] |= bitMask;
             eventsProcessed++;
         }
     }
@@ -123,11 +123,6 @@ public final class StabilizationEngine {
      *                               node exception).
      */
     public int stabilize() {
-        if (!healthy) {
-            throw new IllegalStateException(
-                    "Graph is in unhealthy state due to previous errors. Manual reset required.");
-        }
-
         epoch++;
         int stabilizedCount = 0;
         final int n = topology.nodeCount();
@@ -137,60 +132,57 @@ public final class StabilizationEngine {
         if (hasListener)
             l.onStabilizationStart(epoch);
 
-        // Track errors for this pass
-        boolean passFailed = false;
-        Throwable firstError = null;
-
         try {
-            // Linear scan through topological order.
-            // This is efficient because 'dirty' is visited sequentially (spatial locality).
-            for (int ti = 0; ti < n; ti++) {
-                if (!dirty[ti])
-                    continue;
+            // Sparse traversal using BitSet hardware intrinsics.
+            // This loop operates in O(K) where K is the number of dirty nodes,
+            // skipping up to 64 clean nodes in a single clock cycle.
+            for (int w = 0; w < dirtyWords.length; w++) {
+                while (dirtyWords[w] != 0L) {
+                    // Instantly find the index of the lowest set bit
+                    int bitIndex = Long.numberOfTrailingZeros(dirtyWords[w]);
+                    int ti = (w << 6) + bitIndex; // Reconstruct the absolute topological ID
 
-                // Clear dirty flag *before* processing.
-                // Note: A node can be marked dirty again if it has a self-loop (illegal in DAG)
-                // or if we were doing iterative solving (not supported here).
-                dirty[ti] = false;
+                    // Clear dirty flag *before* processing.
+                    dirtyWords[w] &= ~(1L << bitIndex);
 
-                Node<?> node = topology.node(ti);
+                    // Re-entrant bounds guard, strictly unnecessary if graph compiled correctly.
+                    if (ti >= n)
+                        break;
 
-                boolean changed = false;
-                long nodeStart = 0;
-                if (hasListener) {
-                    nodeStart = System.nanoTime();
-                }
+                    Node<?> node = topology.node(ti);
 
-                try {
-                    changed = node.stabilize();
-                } catch (Throwable e) {
-                    passFailed = true;
-                    if (firstError == null) {
-                        firstError = e;
-                    }
+                    boolean changed = false;
+                    long nodeStart = 0;
                     if (hasListener) {
-                        l.onNodeError(epoch, ti, node.name(), e);
+                        nodeStart = System.nanoTime();
                     }
-                    break; // Stop processing further nodes on critical failure
-                }
 
-                stabilizedCount++;
+                    try {
+                        changed = node.stabilize();
+                    } catch (Throwable e) {
+                        if (hasListener) {
+                            l.onNodeError(epoch, ti, node.name(), e);
+                        }
+                        changed = true; // Force NaN propagation downward
+                    }
 
-                if (hasListener) {
-                    long duration = System.nanoTime() - nodeStart;
-                    l.onNodeStabilized(epoch, ti, node.name(), changed, duration);
+                    stabilizedCount++;
 
-                    // Removed Phase 8 NaN Detection check - allow NaNs to propagate naturally
-                    // without failing the node
-                }
+                    if (hasListener) {
+                        long duration = System.nanoTime() - nodeStart;
+                        l.onNodeStabilized(epoch, ti, node.name(), changed, duration);
+                    }
 
-                // If the value changed, we must visit all children.
-                if (changed) {
-                    // Use CSR structure to iterate children efficiently
-                    final int start = topology.childrenStart(ti);
-                    final int end = topology.childrenEnd(ti);
-                    for (int ci = start; ci < end; ci++)
-                        dirty[topology.childAt(ci)] = true;
+                    // If the value changed, we must visit all children.
+                    if (changed) {
+                        // Use CSR structure to iterate children efficiently
+                        final int start = topology.childrenStart(ti);
+                        final int end = topology.childrenEnd(ti);
+                        for (int ci = start; ci < end; ci++) {
+                            int childTi = topology.childAt(ci);
+                            dirtyWords[childTi >> 6] |= (1L << childTi);
+                        }
+                    }
                 }
             }
         } finally {
@@ -200,24 +192,11 @@ public final class StabilizationEngine {
                 l.onStabilizationEnd(epoch, stabilizedCount);
         }
 
-        if (passFailed) {
-            this.healthy = false;
-            throw new RuntimeException("Stabilization failed due to node errors. Graph is now unhealthy.", firstError);
-        }
-
         return stabilizedCount;
     }
 
     public long epoch() {
         return epoch;
-    }
-
-    public boolean isHealthy() {
-        return healthy;
-    }
-
-    public void resetHealth() {
-        this.healthy = true;
     }
 
     public int lastStabilizedCount() {

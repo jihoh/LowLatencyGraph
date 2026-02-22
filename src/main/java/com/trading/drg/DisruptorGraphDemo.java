@@ -82,7 +82,9 @@ public class DisruptorGraphDemo {
 
                         double bid = baseBid + (Math.random() - 0.5) * 0.1;
                         double ask = baseAsk + (Math.random() - 0.5) * 0.1;
-                        event.setQuote(venue, tenor, bid, 1.0, ask, 1.0);
+                        double bidQty = 1.0 + Math.floor(Math.random() * 10);
+                        double askQty = 1.0 + Math.floor(Math.random() * 10);
+                        event.setQuote(venue, tenor, bid, bidQty, ask, askQty);
                     } finally {
                         ringBuffer.publish(sequence);
                     }

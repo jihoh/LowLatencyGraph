@@ -57,13 +57,21 @@ public abstract class VectorNode implements VectorValue {
         // System.arraycopy is intrinsic and extremely fast.
         System.arraycopy(currentValues, 0, previousValues, 0, size);
 
-        // Compute new values directly into the buffer
-        compute(currentValues);
+        try {
+            // Compute new values directly into the buffer
+            compute(currentValues);
+        } catch (Throwable t) {
+            java.util.Arrays.fill(currentValues, Double.NaN);
+            throw t;
+        }
 
         // Check for changes element-wise
-        for (int i = 0; i < size; i++)
-            if (Math.abs(currentValues[i] - previousValues[i]) > tolerance)
+        for (int i = 0; i < size; i++) {
+            double c = currentValues[i];
+            double p = previousValues[i];
+            if (Double.isNaN(p) != Double.isNaN(c) || Math.abs(c - p) > tolerance)
                 return true;
+        }
         return false;
     }
 
