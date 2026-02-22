@@ -73,8 +73,12 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
         TopologicalOrder topology = engine.topology();
         int nodeCount = topology.nodeCount();
+        int sourceCount = 0;
 
         for (int i = 0; i < nodeCount; i++) {
+            if (topology.isSource(i))
+                sourceCount++;
+
             Node<?> node = topology.node(i);
 
             double val = 0.0;
@@ -102,6 +106,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
         jsonBuilder.append(",\"metrics\":{")
                 .append("\"nodesUpdated\":").append(nodesStabilized).append(",")
                 .append("\"totalNodes\":").append(nodeCount).append(",")
+                .append("\"totalSourceNodes\":").append(sourceCount).append(",")
                 .append("\"eventsProcessed\":").append(engine.totalEventsProcessed());
 
         if (latencyListener != null) {

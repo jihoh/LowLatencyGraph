@@ -67,7 +67,7 @@ public class CoreGraph {
         } catch (java.io.IOException e) {
             throw new RuntimeException("Failed to load graph definition from " + jsonPath, e);
         }
-        var compiler = new JsonGraphCompiler().registerBuiltIns();
+        var compiler = new JsonGraphCompiler();
         var compiled = compiler.compile(graphDef);
 
         var info = graphDef.getGraph();

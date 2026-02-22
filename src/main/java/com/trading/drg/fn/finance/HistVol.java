@@ -1,7 +1,5 @@
 package com.trading.drg.fn.finance;
 
-import com.trading.drg.fn.Fn1;
-
 /**
  * Historical Volatility (Rolling Standard Deviation).
  * 
@@ -13,7 +11,7 @@ import com.trading.drg.fn.Fn1;
  * 
  * Var = (Sum(x^2) / N) - (Sum(x) / N)^2
  */
-public class HistVol implements Fn1 {
+public class HistVol extends AbstractFn1 {
     private final double[] window;
     private final int size;
     private int head = 0;
@@ -29,55 +27,42 @@ public class HistVol implements Fn1 {
         this.window = new double[size];
     }
 
-    private static final org.apache.logging.log4j.Logger log = org.apache.logging.log4j.LogManager
-            .getLogger(HistVol.class);
-    private final com.trading.drg.util.ErrorRateLimiter limiter = new com.trading.drg.util.ErrorRateLimiter(log, 1000);
-
     @Override
-    public double apply(double logReturn) {
-        try {
-            if (Double.isNaN(logReturn)) {
-                return Double.NaN;
-            }
+    protected double calculate(double logReturn) {
+        // Standard Deviation of Log Returns * Sqrt(AnnualizationFactor)
 
-            // Standard Deviation of Log Returns * Sqrt(AnnualizationFactor)
-
-            // 1. Update Sum and SumSq
-            // Remove old
-            if (count >= size) {
-                double old = window[head];
-                sum -= old;
-                sumSq -= old * old;
-            } else {
-                count++;
-            }
-
-            // Add new
-            window[head] = logReturn;
-            sum += logReturn;
-            sumSq += logReturn * logReturn;
-
-            // Advance pointer
-            head++;
-            if (head >= size)
-                head = 0;
-
-            if (count < 2)
-                return 0.0; // Need at least 2 points for variance
-
-            double mean = sum / count;
-            double variance = (sumSq / count) - (mean * mean);
-
-            // Numerical stability check
-            if (variance < 0)
-                variance = 0.0;
-
-            // The original code did not have an annualizationFactor.
-            // Assuming it should return the standard deviation directly if not provided.
-            return Math.sqrt(variance);
-        } catch (Throwable t) {
-            limiter.log("Error in HistVol", t);
-            return Double.NaN;
+        // 1. Update Sum and SumSq
+        // Remove old
+        if (count >= size) {
+            double old = window[head];
+            sum -= old;
+            sumSq -= old * old;
+        } else {
+            count++;
         }
+
+        // Add new
+        window[head] = logReturn;
+        sum += logReturn;
+        sumSq += logReturn * logReturn;
+
+        // Advance pointer
+        head++;
+        if (head >= size)
+            head = 0;
+
+        if (count < 2)
+            return 0.0; // Need at least 2 points for variance
+
+        double mean = sum / count;
+        double variance = (sumSq / count) - (mean * mean);
+
+        // Numerical stability check
+        if (variance < 0)
+            variance = 0.0;
+
+        // The original code did not have an annualizationFactor.
+        // Assuming it should return the standard deviation directly if not provided.
+        return Math.sqrt(variance);
     }
 }

@@ -6,9 +6,6 @@ import com.trading.drg.engine.*;
 import java.util.*;
 
 import com.trading.drg.api.*;
-import com.trading.drg.node.ScalarSourceNode;
-import com.trading.drg.node.VectorSourceNode;
-import com.trading.drg.node.ScalarCalcNode;
 import com.trading.drg.util.ScalarCutoffs;
 
 /**
@@ -26,136 +23,13 @@ import com.trading.drg.util.ScalarCutoffs;
  * Supports plugins via {@link #registerFactory(String, NodeFactory)}.
  */
 public final class JsonGraphCompiler {
-    private final Map<String, NodeFactory> factories = new HashMap<>();
+    private final NodeRegistry registry = new NodeRegistry();
 
     /**
-     * Registers a factory for a specific node type string.
+     * Registers a factory for a specific node type enum.
      */
-    public JsonGraphCompiler registerFactory(String type, NodeFactory f) {
-        factories.put(type, f);
-        return this;
-    }
-
-    /** Register built-in factories (double_source, vector_source). */
-    public JsonGraphCompiler registerBuiltIns() {
-        // --- Fn1 Nodes ---
-        registerFactory("ewma", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.Ewma(getDouble(props, "alpha", 0.1));
-            return new ScalarCalcNode(name, parseCutoff(props), () -> fn.apply(((ScalarValue) deps[0]).doubleValue()));
-        });
-
-        registerFactory("diff", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.Diff();
-            return new ScalarCalcNode(name, parseCutoff(props), () -> fn.apply(((ScalarValue) deps[0]).doubleValue()));
-        });
-
-        registerFactory("hist_vol", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.HistVol(getInt(props, "window", 10));
-            return new ScalarCalcNode(name, parseCutoff(props), () -> fn.apply(((ScalarValue) deps[0]).doubleValue()));
-        });
-
-        registerFactory("log_return", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.LogReturn();
-            return new ScalarCalcNode(name, parseCutoff(props), () -> fn.apply(((ScalarValue) deps[0]).doubleValue()));
-        });
-
-        registerFactory("macd", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.Macd(getInt(props, "fast", 12), getInt(props, "slow", 26));
-            return new ScalarCalcNode(name, parseCutoff(props), () -> fn.apply(((ScalarValue) deps[0]).doubleValue()));
-        });
-
-        registerFactory("rolling_max", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.RollingMax(getInt(props, "window", 10));
-            return new ScalarCalcNode(name, parseCutoff(props), () -> fn.apply(((ScalarValue) deps[0]).doubleValue()));
-        });
-
-        registerFactory("rolling_min", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.RollingMin(getInt(props, "window", 10));
-            return new ScalarCalcNode(name, parseCutoff(props), () -> fn.apply(((ScalarValue) deps[0]).doubleValue()));
-        });
-
-        registerFactory("rsi", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.Rsi(getInt(props, "window", 14));
-            return new ScalarCalcNode(name, parseCutoff(props), () -> fn.apply(((ScalarValue) deps[0]).doubleValue()));
-        });
-
-        registerFactory("sma", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.Sma(getInt(props, "window", 10));
-            return new ScalarCalcNode(name, parseCutoff(props), () -> fn.apply(((ScalarValue) deps[0]).doubleValue()));
-        });
-
-        registerFactory("z_score", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.ZScore(getInt(props, "window", 20));
-            return new ScalarCalcNode(name, parseCutoff(props), () -> fn.apply(((ScalarValue) deps[0]).doubleValue()));
-        });
-
-        // --- Fn2 Nodes ---
-        registerFactory("beta", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.Beta(getInt(props, "window", 20));
-            return new ScalarCalcNode(name, parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).doubleValue(), ((ScalarValue) deps[1]).doubleValue()));
-        });
-
-        registerFactory("correlation", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.Correlation(getInt(props, "window", 20));
-            return new ScalarCalcNode(name, parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).doubleValue(), ((ScalarValue) deps[1]).doubleValue()));
-        });
-
-        // --- Fn3 Nodes ---
-        registerFactory("tri_arb_spread", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.TriangularArbSpread();
-            return new ScalarCalcNode(name, parseCutoff(props), () -> fn.apply(((ScalarValue) deps[0]).doubleValue(),
-                    ((ScalarValue) deps[1]).doubleValue(), ((ScalarValue) deps[2]).doubleValue()));
-        });
-
-        // --- FnN Nodes ---
-        registerFactory("harmonic_mean", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.HarmonicMean();
-            double[] scratch = new double[deps.length];
-            return new ScalarCalcNode(name, parseCutoff(props), () -> {
-                for (int i = 0; i < deps.length; i++)
-                    scratch[i] = ((ScalarValue) deps[i]).doubleValue();
-                return fn.apply(scratch);
-            });
-        });
-
-        registerFactory("weighted_avg", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.WeightedAverage();
-            double[] scratch = new double[deps.length];
-            return new ScalarCalcNode(name, parseCutoff(props), () -> {
-                for (int i = 0; i < deps.length; i++)
-                    scratch[i] = ((ScalarValue) deps[i]).doubleValue();
-                return fn.apply(scratch);
-            });
-        });
-
-        registerFactory("average", (name, props, deps) -> {
-            var fn = new com.trading.drg.fn.finance.Average();
-            double[] scratch = new double[deps.length];
-            return new ScalarCalcNode(name, parseCutoff(props), () -> {
-                for (int i = 0; i < deps.length; i++)
-                    scratch[i] = ((ScalarValue) deps[i]).doubleValue();
-                return fn.apply(scratch);
-            });
-        });
-
-        registerFactory("scalar_source", (name, props, deps) -> {
-            double init = getDouble(props, "initial_value", Double.NaN);
-            ScalarCutoff cutoff = parseCutoff(props);
-            return new ScalarSourceNode(name, init, cutoff);
-        });
-        registerFactory("double_source", (name, props, deps) -> {
-            double init = getDouble(props, "initial_value", Double.NaN);
-            ScalarCutoff cutoff = parseCutoff(props);
-            return new ScalarSourceNode(name, init, cutoff);
-        });
-        registerFactory("vector_source", (name, props, deps) -> {
-            int size = getInt(props, "size", -1);
-            if (size <= 0)
-                throw new IllegalArgumentException("vector_source needs positive 'size'");
-            return new VectorSourceNode(name, size, getDouble(props, "tolerance", 1e-15));
-        });
+    public JsonGraphCompiler registerFactory(NodeType type, NodeFactory f) {
+        registry.registerFactory(type, f);
         return this;
     }
 
@@ -186,9 +60,10 @@ public final class JsonGraphCompiler {
 
         // 2. Instantiate and Build Topology
         for (var nd : nodeDefs) {
-            NodeFactory f = factories.get(nd.getType());
+            NodeType type = NodeType.fromString(nd.getType());
+            NodeFactory f = registry.getFactory(type);
             if (f == null)
-                throw new IllegalArgumentException("No factory for type: " + nd.getType());
+                throw new IllegalArgumentException("No factory registered for type: " + type.name());
 
             Node<?>[] deps = new Node<?>[0];
             if (nd.getDependencies() != null) {
@@ -310,7 +185,7 @@ public final class JsonGraphCompiler {
 
         while (!queue.isEmpty()) {
             var node = queue.poll();
-            if ("template".equals(node.getType())) {
+            if (NodeType.TEMPLATE.name().equalsIgnoreCase(node.getType())) {
                 // Expand
                 String templateName = (String) node.getProperties().get("template");
                 if (templateName == null)

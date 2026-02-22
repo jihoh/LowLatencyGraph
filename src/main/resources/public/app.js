@@ -52,6 +52,7 @@ let isGraphRendered = false;
 const prevValues = new Map();
 // Stores the direct children of each node: { "NodeA": ["NodeB", "NodeC"] }
 let graphRouting = {};
+let reverseGraphRouting = {}; // Stores direct parents: { "NodeB": ["NodeA"] }
 // Array to track message arrival times for Stabilization Rate calculation
 const messageTimes = [];
 let panZoomInstance = null;
@@ -121,6 +122,45 @@ document.getElementById('text-reset').addEventListener('click', () => {
     document.documentElement.style.setProperty('--node-text-scale', textScale);
 });
 
+function updateMetricsDOM(payload) {
+    if (payload.epoch !== undefined) {
+        epochValue.textContent = payload.epoch;
+    }
+    if (payload.graphName) {
+        document.getElementById('graph-title').textContent = payload.graphName;
+    }
+    if (payload.graphVersion) {
+        document.getElementById('graph-version').textContent = 'v' + payload.graphVersion;
+    }
+
+    if (payload.metrics) {
+        if (payload.metrics.eventsProcessed !== undefined) {
+            document.getElementById('events-value').textContent = payload.metrics.eventsProcessed;
+        }
+        if (payload.metrics.totalNodes !== undefined) {
+            reactiveEff.textContent = `${payload.metrics.nodesUpdated} / ${payload.metrics.totalNodes}`;
+            document.getElementById('graph-total-nodes').textContent = payload.metrics.totalNodes;
+        }
+        if (payload.metrics.totalSourceNodes !== undefined) {
+            document.getElementById('graph-source-nodes').textContent = payload.metrics.totalSourceNodes;
+        }
+        if (payload.metrics.frontendHz !== undefined) {
+            stabRate.textContent = payload.metrics.frontendHz;
+        }
+        if (payload.metrics.latency) {
+            if (payload.metrics.latency.latest !== undefined) {
+                latLatest.textContent = formatVal(payload.metrics.latency.latest, 2);
+            }
+            if (payload.metrics.latency.avg !== undefined) {
+                latAvg.textContent = formatVal(payload.metrics.latency.avg, 2);
+            }
+        }
+        if (payload.metrics.profile) {
+            updateProfileTable(payload.metrics.profile);
+        }
+    }
+}
+
 function connect() {
     const ws = new WebSocket(`ws://${window.location.host}/ws/graph`);
 
@@ -140,46 +180,23 @@ function connect() {
         try {
             const payload = JSON.parse(event.data);
 
-            // Update epoch counter
-            epochValue.textContent = payload.epoch;
-
-            if (payload.graphName) {
-                document.getElementById('graph-title').textContent = payload.graphName;
+            // Real-time Stabilizations / sec using a sliding window
+            let currentHz = 0;
+            const now = performance.now();
+            messageTimes.push(now);
+            if (messageTimes.length > 50) {
+                messageTimes.shift();
             }
-            if (payload.graphVersion) {
-                document.getElementById('graph-version').textContent = 'v' + payload.graphVersion;
+            if (messageTimes.length > 1) {
+                const elapsedSc = (now - messageTimes[0]) / 1000.0;
+                currentHz = Math.round((messageTimes.length - 1) / elapsedSc);
             }
 
-            // Update Metrics (Latency, Profile, Throguput, Efficiency)
-            if (payload.metrics) {
-                if (payload.metrics.eventsProcessed !== undefined) {
-                    document.getElementById('events-value').textContent = payload.metrics.eventsProcessed;
-                }
-                if (payload.metrics.totalNodes !== undefined) {
-                    reactiveEff.textContent = `${payload.metrics.nodesUpdated} / ${payload.metrics.totalNodes}`;
-                }
+            if (!payload.metrics) payload.metrics = {};
+            payload.metrics.frontendHz = currentHz;
 
-                // Real-time Stabilizations / sec using a sliding window
-                const now = performance.now();
-                messageTimes.push(now);
-                if (messageTimes.length > 50) {
-                    messageTimes.shift();
-                }
-                if (messageTimes.length > 1) {
-                    const elapsedSc = (now - messageTimes[0]) / 1000.0;
-                    const hz = (messageTimes.length - 1) / elapsedSc;
-                    stabRate.textContent = Math.round(hz);
-                }
-
-                if (payload.metrics.latency) {
-                    if (payload.metrics.latency.latest !== undefined) {
-                        latLatest.textContent = formatVal(payload.metrics.latency.latest, 2);
-                    }
-                    latAvg.textContent = formatVal(payload.metrics.latency.avg, 2);
-                }
-                if (payload.metrics.profile) {
-                    updateProfileTable(payload.metrics.profile);
-                }
+            if (!isScrubbing) {
+                updateMetricsDOM(payload);
             }
 
             if (!isGraphRendered) {
@@ -213,6 +230,13 @@ function connect() {
                     // Store routing map from backend
                     if (payload.routing) {
                         graphRouting = payload.routing;
+                        reverseGraphRouting = {};
+                        for (const [parent, children] of Object.entries(graphRouting)) {
+                            for (const child of children) {
+                                if (!reverseGraphRouting[child]) reverseGraphRouting[child] = [];
+                                reverseGraphRouting[child].push(parent);
+                            }
+                        }
                     }
 
                     // Store initial values
@@ -439,10 +463,56 @@ function formatVal(val, places = 4) {
     return Number(val).toFixed(places);
 }
 
+// Globals for Profile Table Sorting
+let latestProfileData = [];
+let profileSortCol = 'evaluations';
+let profileSortAsc = false;
+
 // Update the Top 5 Node Profile table dynamically
 function updateProfileTable(profileArray) {
+    latestProfileData = profileArray;
+    renderProfileTable();
+}
+
+function renderProfileTable() {
+    if (!latestProfileData || latestProfileData.length === 0) return;
+
+    // Apply sorting
+    const sortedData = [...latestProfileData].sort((a, b) => {
+        let valA, valB;
+        switch (profileSortCol) {
+            case 'name':
+                valA = a.name;
+                valB = b.name;
+                break;
+            case 'latest':
+                valA = Number(a.latest) || 0;
+                valB = Number(b.latest) || 0;
+                break;
+            case 'avg':
+                valA = Number(a.avg) || 0;
+                valB = Number(b.avg) || 0;
+                break;
+            case 'updates':
+                valA = Number(a.evaluations) || 0;
+                valB = Number(b.evaluations) || 0;
+                break;
+            case 'nans':
+                valA = Number(a.nans) || 0;
+                valB = Number(b.nans) || 0;
+                break;
+            default:
+                valA = Number(a.evaluations) || 0;
+                valB = Number(b.evaluations) || 0;
+        }
+
+        if (valA < valB) return profileSortAsc ? -1 : 1;
+        if (valA > valB) return profileSortAsc ? 1 : -1;
+        return 0;
+    });
+
     let html = '';
-    for (const node of profileArray) {
+    for (const node of sortedData) {
         let displayName = node.name;
         if (displayName.length > 20) {
             displayName = displayName.substring(0, 17) + '...';
@@ -466,6 +536,40 @@ function updateProfileTable(profileArray) {
         content.style.maxHeight = content.scrollHeight + 'px';
     }
 }
+
+// Bind sorting listeners on initial load
+document.addEventListener('DOMContentLoaded', () => {
+    const tableHeaders = document.querySelectorAll('#profile-table th');
+    tableHeaders.forEach(th => {
+        // Add pointer cursor to indicate clickability
+        th.style.cursor = 'pointer';
+        th.title = 'Click to sort';
+
+        th.addEventListener('click', () => {
+            const colName = th.getAttribute('data-col');
+            if (profileSortCol === colName) {
+                profileSortAsc = !profileSortAsc;
+            } else {
+                profileSortCol = colName;
+                profileSortAsc = false; // default to descending for new columns (makes sense for latency/count)
+            }
+
+            // Update header UI carets
+            tableHeaders.forEach(h => h.innerHTML = h.innerHTML.replace(/ [▲▼]/g, ''));
+            th.innerHTML += profileSortAsc ? ' ▲' : ' ▼';
+
+            renderProfileTable();
+        });
+    });
+
+    const modalCloseBtn = document.getElementById('alert-modal-close');
+    if (modalCloseBtn) {
+        modalCloseBtn.addEventListener('click', () => {
+            const modal = document.getElementById('alert-modal');
+            modal.classList.add('hidden');
+        });
+    }
+});
 
 // Sanitize name to match Mermaid's internal ID generator
 function getMermaidNodeId(nodeName) {
@@ -534,42 +638,68 @@ function getDownstreamNodes(nodeName, visited = new Set()) {
     return Array.from(new Set(allDownstream));
 }
 
+// Recursively find all upstream components
+function getUpstreamNodes(nodeName, visited = new Set()) {
+    if (visited.has(nodeName)) return [];
+    visited.add(nodeName);
+    const parents = reverseGraphRouting[nodeName] || [];
+    let allUpstream = [nodeName, ...parents];
+    for (const parent of parents) {
+        allUpstream = allUpstream.concat(getUpstreamNodes(parent, visited));
+    }
+    return Array.from(new Set(allUpstream));
+}
+
 // Apply or remove hover CSS mathematically 
-function highlightNodes(nodeNames, isHovered) {
+function highlightNodes(nodeNames, isHovered, type = 'downstream') {
     for (const name of nodeNames) {
         const svgNodeId = getMermaidNodeId(name);
         const nodeGroup = document.querySelector(`[id^="flowchart-${svgNodeId}-"]`);
         if (nodeGroup) {
             if (isHovered) {
-                nodeGroup.classList.add('node-hover-highlight');
+                nodeGroup.classList.add(`node-hover-${type}`);
             } else {
-                nodeGroup.classList.remove('node-hover-highlight');
+                nodeGroup.classList.remove(`node-hover-${type}`);
             }
         }
 
         document.querySelectorAll(`.LS-${svgNodeId}`).forEach(e => {
-            e.dataset.sourceHover = isHovered ? "true" : "false";
+            e.dataset[`sourceHover${type.charAt(0).toUpperCase() + type.slice(1)}`] = isHovered ? "true" : "false";
         });
         document.querySelectorAll(`.LE-${svgNodeId}`).forEach(e => {
-            e.dataset.targetHover = isHovered ? "true" : "false";
+            e.dataset[`targetHover${type.charAt(0).toUpperCase() + type.slice(1)}`] = isHovered ? "true" : "false";
         });
     }
 }
 
 // Bind native browser pointer events onto the underlying DOM structure generated by Mermaid
 function attachHoverListeners() {
-    for (const nodeName of Object.keys(graphRouting)) {
+    for (const nodeName of prevValues.keys()) {
         const svgNodeId = getMermaidNodeId(nodeName);
         const nodeGroup = document.querySelector(`[id^="flowchart-${svgNodeId}-"]`);
 
         if (nodeGroup) {
             nodeGroup.addEventListener('mouseenter', () => {
-                const downstream = getDownstreamNodes(nodeName);
-                highlightNodes(downstream, true);
+                const downstream = getDownstreamNodes(nodeName).filter(n => n !== nodeName);
+                const upstream = getUpstreamNodes(nodeName).filter(n => n !== nodeName);
+
+                highlightNodes(downstream, true, 'downstream');
+                highlightNodes(upstream, true, 'upstream');
+                highlightNodes([nodeName], true, 'self');
+
+                const graphView = document.getElementById('graph-view');
+                if (graphView) graphView.classList.add('graph-hover-active');
             });
             nodeGroup.addEventListener('mouseleave', () => {
-                const downstream = getDownstreamNodes(nodeName);
-                highlightNodes(downstream, false);
+                const downstream = getDownstreamNodes(nodeName).filter(n => n !== nodeName);
+                const upstream = getUpstreamNodes(nodeName).filter(n => n !== nodeName);
+
+                highlightNodes(downstream, false, 'downstream');
+                highlightNodes(upstream, false, 'upstream');
+                highlightNodes([nodeName], false, 'self');
+
+                const graphView = document.getElementById('graph-view');
+                if (graphView) graphView.classList.remove('graph-hover-active');
             });
             nodeGroup.addEventListener('click', () => {
                 openChart(nodeName);
@@ -740,15 +870,7 @@ document.querySelectorAll('.metrics-panel h3[id^="header-"]').forEach(header => 
     });
 });
 
-document.addEventListener('DOMContentLoaded', () => {
-    const modalCloseBtn = document.getElementById('alert-modal-close');
-    if (modalCloseBtn) {
-        modalCloseBtn.addEventListener('click', () => {
-            const modal = document.getElementById('alert-modal');
-            modal.classList.add('hidden');
-        });
-    }
-});
+// Support code moved to top of file inside the combined DOMContentLoaded block.
 
 // Setup Alerting UI Handlers
 function renderActiveAlerts() {
@@ -930,17 +1052,22 @@ function openChart(nodeId) {
         }
     }
 
-    // Update title to show all active charts (with colored blocks)
-    let titleHtml = Array.from(activeChartSeries.entries()).map(([id, cs]) =>
-        `<span style="color:${cs.color}; margin-right: 10px;">&#9632; ${id}</span>`
-    ).join('');
-    document.getElementById('chart-title').innerHTML = titleHtml;
+    // Update title to show all active charts (with colored blocks) and add click-to-remove listener
+    const chartTitleContainer = document.getElementById('chart-title');
+    chartTitleContainer.innerHTML = '';
+    for (const [id, cs] of activeChartSeries.entries()) {
+        const span = document.createElement('span');
+        span.style.color = cs.color;
+        span.style.marginRight = '10px';
+        span.style.cursor = 'pointer';
+        span.title = `Click to remove ${id} from chart`;
+        span.innerHTML = `&#9632; ${id}`;
+        span.onclick = () => openChart(id);
+        chartTitleContainer.appendChild(span);
+    }
 
     document.getElementById('chart-panel').classList.remove('hidden');
     chartInstance.timeScale().fitContent();
-    if (panZoomInstance) {
-        setTimeout(fitGraph, 10);
-    }
 }
 
 function closeChart() {
@@ -976,6 +1103,7 @@ if (tlStatus) {
         const lastPayload = snapshots[snapshots.length - 1];
         document.getElementById('timeline-epoch').textContent = 'Epoch: ' + lastPayload.epoch;
         updateGraphDOM(lastPayload.values);
+        updateMetricsDOM(lastPayload);
         renderScrubbedChartLive();
     });
 }
@@ -1000,6 +1128,7 @@ if (timeScrub) {
             if (lastPayload) {
                 document.getElementById('timeline-epoch').textContent = 'Epoch: ' + lastPayload.epoch;
                 updateGraphDOM(lastPayload.values);
+                updateMetricsDOM(lastPayload);
                 renderScrubbedChartLive();
             }
         } else {
@@ -1013,6 +1142,7 @@ if (timeScrub) {
             if (targetPayload) {
                 document.getElementById('timeline-epoch').textContent = 'Epoch: ' + targetPayload.epoch;
                 updateGraphDOM(targetPayload.values);
+                updateMetricsDOM(targetPayload);
                 renderScrubbedChartScrubbed(idx);
             }
         }
@@ -1168,9 +1298,6 @@ function setupDockingControls() {
         const svgMinimize = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
         e.target.innerHTML = isMinimized ? svgExpand : svgMinimize;
         e.target.title = isMinimized ? 'Expand' : 'Minimize';
-        if (panZoomInstance) {
-            setTimeout(fitGraph, 10);
-        }
     });
 
     // Chart VSCode Terminal Minimization Hook
@@ -1184,15 +1311,12 @@ function setupDockingControls() {
             bottomDock.style.height = '';
         }
 
-        const svgExpand = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
-        const svgMinimize = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>';
+        const svgExpand = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>';
+        const svgMinimize = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
         e.target.innerHTML = isMinimized ? svgExpand : svgMinimize;
         e.target.title = isMinimized ? 'Expand' : 'Minimize';
         if (chartInstance && !isMinimized) {
             setTimeout(() => chartInstance.timeScale().fitContent(), 10);
-        }
-        if (panZoomInstance) {
-            setTimeout(fitGraph, 10);
         }
     });
 }
@@ -1227,9 +1351,6 @@ function setupDockResizers() {
                 rightResizer.classList.remove('active');
                 document.body.style.cursor = '';
                 if (chartInstance) chartInstance.timeScale().fitContent();
-                if (panZoomInstance) {
-                    setTimeout(fitGraph, 10);
-                }
             }
         });
     }
@@ -1259,9 +1380,6 @@ function setupDockResizers() {
                 bottomResizer.classList.remove('active');
                 document.body.style.cursor = '';
                 if (chartInstance) chartInstance.timeScale().fitContent();
-                if (panZoomInstance) {
-                    setTimeout(fitGraph, 10);
-                }
             }
         });
     }

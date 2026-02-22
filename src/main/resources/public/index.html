@@ -71,7 +71,7 @@
                             <button id="toggle-chart" class="panel-btn" title="Minimize">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="18 15 12 9 6 15"></polyline>
+                                    <polyline points="6 9 12 15 18 9"></polyline>
                                 </svg>
                             </button>
                         </div>
@@ -112,23 +112,36 @@
                     </h3>
                     <div id="content-graph-metrics" class="metric-row">
                         <div class="metric-small">
-                            <span class="label">Epoch</span>
-                            <span class="value" id="epoch-value">0</span>
+                            <span class="label">Total Nodes</span>
+                            <span class="value" id="graph-total-nodes">0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Sources</span>
+                            <span class="value" id="graph-source-nodes">0</span>
                         </div>
                         <div class="metric-small">
                             <span class="label">Events</span>
                             <span class="value" id="events-value">0</span>
-                        </div>
-                        <div class="metric-small">
-                            <span class="label">Evaluated</span>
-                            <span class="value" id="reactive-eff">0 / 0</span>
                         </div>
                     </div>
 
                     <h3 id="header-stab-metrics" style="cursor: pointer; user-select: none;">Stabilization Metrics
                         <span>▼</span>
                     </h3>
-                    <div id="content-stab-metrics" class="metric-row">
+                    <div id="content-stab-metrics" class="metric-row"
+                        style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px 1rem; padding-bottom: 12px;">
+                        <div class="metric-small">
+                            <span class="label">Epoch</span>
+                            <span class="value" id="epoch-value">0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Evaluated</span>
+                            <span class="value" id="reactive-eff">0 / 0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Rate (Hz)</span>
+                            <span class="value" id="stab-rate">0</span>
+                        </div>
                         <div class="metric-small">
                             <span class="label">Latest (μs)</span>
                             <span class="value" id="lat-latest">0.00</span>
@@ -136,10 +149,6 @@
                         <div class="metric-small">
                             <span class="label">Avg (μs)</span>
                             <span class="value" id="lat-avg">0.00</span>
-                        </div>
-                        <div class="metric-small">
-                            <span class="label">Rate (Hz)</span>
-                            <span class="value" id="stab-rate">0</span>
                         </div>
                     </div>
 
@@ -149,11 +158,11 @@
                         <table id="profile-table">
                             <thead>
                                 <tr>
-                                    <th>NODE</th>
-                                    <th style="text-align: right;">LATEST (μs)</th>
-                                    <th style="text-align: right;">AVG (μs)</th>
-                                    <th style="text-align: right;">UPDATES</th>
-                                    <th style="text-align: right;">NaNs</th>
+                                    <th data-col="name">NODE</th>
+                                    <th data-col="latest" style="text-align: right;">LATEST (μs)</th>
+                                    <th data-col="avg" style="text-align: right;">AVG (μs)</th>
+                                    <th data-col="updates" style="text-align: right;">UPDATES</th>
+                                    <th data-col="nans" style="text-align: right;">NaNs</th>
                                 </tr>
                             </thead>
                             <tbody id="profile-body">
@@ -163,8 +172,8 @@
                     </div>
 
                     <h3 id="header-alert-engine" style="margin-top: 24px; cursor: pointer; user-select: none;">Alerting
-                        Engine <span>▼</span></h3>
-                    <div id="content-alert-engine">
+                        Engine <span>▶</span></h3>
+                    <div id="content-alert-engine" style="display: none;">
                         <div class="alert-controls"
                             style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
                             <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -244,9 +253,11 @@
     </div>
 
     <!-- Load Mermaid & Dependencies -->
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
-    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"
+        crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"
+        crossorigin="anonymous"></script>
     <script src="app.js?v=16"></script>
 </body>
 

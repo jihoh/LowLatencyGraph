@@ -5,19 +5,19 @@
         "nodes": [
             {
                 "name": "EURUSD",
-                "type": "scalar_source"
+                "type": "SCALAR_SOURCE"
             },
             {
                 "name": "USDJPY",
-                "type": "scalar_source"
+                "type": "SCALAR_SOURCE"
             },
             {
                 "name": "EURJPY",
-                "type": "scalar_source"
+                "type": "SCALAR_SOURCE"
             },
             {
                 "name": "Arb.Spread",
-                "type": "tri_arb_spread",
+                "type": "TRI_ARB_SPREAD",
                 "dependencies": [
                     "EURUSD",
                     "USDJPY",
@@ -26,7 +26,7 @@
             },
             {
                 "name": "Arb.Spread.Ewma",
-                "type": "ewma",
+                "type": "EWMA",
                 "dependencies": [
                     "Arb.Spread"
                 ],

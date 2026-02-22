@@ -6,6 +6,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "BondPricerGraphDemo",
+            "request": "launch",
+            "mainClass": "com.trading.drg.BondPricerGraphDemo",
+            "projectName": "claude-graph"
+        },
+        {
+            "type": "java",
             "name": "Current File",
             "request": "launch",
             "mainClass": "${file}"

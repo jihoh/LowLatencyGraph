@@ -8,21 +8,21 @@
                 "nodes": [
                     {
                         "name": "{{TICKER}}",
-                        "type": "scalar_source",
+                        "type": "SCALAR_SOURCE",
                         "properties": {
                             "initial_value": "{{START_PRICE}}"
                         }
                     },
                     {
                         "name": "{{TICKER}}_LogReturn",
-                        "type": "log_return",
+                        "type": "LOG_RETURN",
                         "dependencies": [
                             "{{TICKER}}"
                         ]
                     },
                     {
                         "name": "{{TICKER}}_Vol",
-                        "type": "hist_vol",
+                        "type": "HIST_VOL",
                         "dependencies": [
                             "{{TICKER}}_LogReturn"
                         ],
@@ -32,7 +32,7 @@
                     },
                     {
                         "name": "{{TICKER}}_ZScore",
-                        "type": "z_score",
+                        "type": "Z_SCORE",
                         "dependencies": [
                             "{{TICKER}}_Vol"
                         ],
@@ -42,7 +42,7 @@
                     },
                     {
                         "name": "{{TICKER}}_Signal",
-                        "type": "ewma",
+                        "type": "EWMA",
                         "dependencies": [
                             "{{TICKER}}_ZScore"
                         ],
@@ -55,23 +55,23 @@
         ],
         "nodes": [
             {
-                "type": "template",
+                "type": "TEMPLATE",
                 "properties": {
                     "template": "stock_metrics_deep",
                     "TICKER": "AAPL",
-                    "START_PRICE": 180.50
+                    "START_PRICE": 180.5
                 }
             },
             {
                 "name": "MSFT",
-                "type": "scalar_source",
+                "type": "SCALAR_SOURCE",
                 "properties": {
-                    "initial_value": 410.20
+                    "initial_value": 410.2
                 }
             },
             {
                 "name": "MSFT_SMA",
-                "type": "sma",
+                "type": "SMA",
                 "dependencies": [
                     "MSFT"
                 ],
@@ -81,14 +81,14 @@
             },
             {
                 "name": "GOOG",
-                "type": "scalar_source",
+                "type": "SCALAR_SOURCE",
                 "properties": {
                     "initial_value": 170.15
                 }
             },
             {
                 "name": "GOOG_RSI",
-                "type": "rsi",
+                "type": "RSI",
                 "dependencies": [
                     "GOOG"
                 ],
@@ -98,7 +98,7 @@
             },
             {
                 "name": "GOOG_MACD",
-                "type": "macd",
+                "type": "MACD",
                 "dependencies": [
                     "GOOG_RSI"
                 ],
@@ -109,21 +109,21 @@
             },
             {
                 "name": "AMZN",
-                "type": "scalar_source",
+                "type": "SCALAR_SOURCE",
                 "properties": {
-                    "initial_value": 185.30
+                    "initial_value": 185.3
                 }
             },
             {
                 "name": "AMZN_Diff",
-                "type": "diff",
+                "type": "DIFF",
                 "dependencies": [
                     "AMZN"
                 ]
             },
             {
                 "name": "AMZN_Vol",
-                "type": "hist_vol",
+                "type": "HIST_VOL",
                 "dependencies": [
                     "AMZN_Diff"
                 ],
@@ -133,7 +133,7 @@
             },
             {
                 "name": "AMZN_Signal",
-                "type": "ewma",
+                "type": "EWMA",
                 "dependencies": [
                     "AMZN_Vol"
                 ],
@@ -143,7 +143,7 @@
             },
             {
                 "name": "Shared_Tech_Avg",
-                "type": "average",
+                "type": "AVERAGE",
                 "dependencies": [
                     "AAPL_Signal",
                     "MSFT_SMA"
@@ -151,7 +151,7 @@
             },
             {
                 "name": "Tech_Avg_MACD",
-                "type": "macd",
+                "type": "MACD",
                 "dependencies": [
                     "Shared_Tech_Avg"
                 ],
@@ -162,7 +162,7 @@
             },
             {
                 "name": "GOOG_AMZN_Avg",
-                "type": "average",
+                "type": "AVERAGE",
                 "dependencies": [
                     "GOOG_MACD",
                     "AMZN_Signal"
@@ -170,7 +170,7 @@
             },
             {
                 "name": "GOOG_AMZN_Risk",
-                "type": "rolling_max",
+                "type": "ROLLING_MAX",
                 "dependencies": [
                     "GOOG_AMZN_Avg"
                 ],
@@ -180,7 +180,7 @@
             },
             {
                 "name": "AAPL_Standalone_Risk",
-                "type": "rolling_max",
+                "type": "ROLLING_MAX",
                 "dependencies": [
                     "AAPL_Signal"
                 ],
@@ -190,7 +190,7 @@
             },
             {
                 "name": "GOOG_Momentum_EWMA",
-                "type": "ewma",
+                "type": "EWMA",
                 "dependencies": [
                     "GOOG_MACD"
                 ],
@@ -200,7 +200,7 @@
             },
             {
                 "name": "AMZN_ZScore_Ext",
-                "type": "z_score",
+                "type": "Z_SCORE",
                 "dependencies": [
                     "AMZN_Signal"
                 ],
@@ -210,7 +210,7 @@
             },
             {
                 "name": "MSFT_Vol_Ext",
-                "type": "hist_vol",
+                "type": "HIST_VOL",
                 "dependencies": [
                     "MSFT_SMA"
                 ],
