@@ -5,7 +5,8 @@ import com.trading.drg.api.StabilizationListener;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.io.GraphDefinition;
 import com.trading.drg.io.JsonGraphCompiler;
-import com.trading.drg.io.JsonParser;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.File;
 // Removed Wiring imports
 import com.trading.drg.api.ScalarValue;
 
@@ -62,7 +63,8 @@ public class CoreGraph {
         // 1. Parse & Compile
         GraphDefinition graphDef;
         try {
-            graphDef = JsonParser.parseFile(jsonPath);
+            ObjectMapper mapper = new ObjectMapper();
+            graphDef = mapper.readValue(jsonPath.toFile(), GraphDefinition.class);
         } catch (java.io.IOException e) {
             throw new RuntimeException("Failed to load graph definition from " + jsonPath, e);
         }

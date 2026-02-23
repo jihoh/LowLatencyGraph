@@ -3,6 +3,8 @@ package com.trading.drg.io;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 /**
  * POJO representation of a Graph Topology.
  *
@@ -11,6 +13,7 @@ import java.util.Map;
  * structure
  * from the persistence format.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public final class GraphDefinition {
     private GraphInfo graph;
 
@@ -23,6 +26,7 @@ public final class GraphDefinition {
     }
 
     /** Meta-information about the graph. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static final class GraphInfo {
         private String name, version;
         private List<NodeDef> nodes;
@@ -62,6 +66,7 @@ public final class GraphDefinition {
     }
 
     /** Definition of a reusable sub-graph template. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static final class TemplateDef {
         private String name;
         private List<NodeDef> nodes;
@@ -84,6 +89,7 @@ public final class GraphDefinition {
     }
 
     /** Definition of a single node in the graph. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static final class NodeDef {
         private String name, type;
         private boolean source;
