@@ -8,17 +8,33 @@ import java.util.Random;
 /**
  * Demonstrates the usage of the {@link CoreGraph} wrapper class.
  */
-public class CoreGraphDemo {
-    private static final Logger log = LogManager.getLogger(CoreGraphDemo.class);
+public class CoreGraphSimpleDemo {
+    private static final Logger log = LogManager.getLogger(CoreGraphSimpleDemo.class);
 
     public static void main(String[] args) throws Exception {
         log.info("Starting CoreGraph Demo...");
 
-        var graph = new CoreGraph("src/main/resources/tri_arb.json")
+        // Initialize the graph
+        var graph = new CoreGraph("src/main/resources/fx_arb.json")
                 .enableNodeProfiling()
                 .enableLatencyTracking()
-                .enableDashboardServer(8088);
+                .enableDashboardServer(8080);
 
+        // Run the simulation
+        simulateMarketFeed(graph);
+
+        // Get Latency Stats
+        log.info("Demo complete.");
+        System.out.println("\n--- Global Latency Stats ---");
+        System.out.println(graph.getLatencyListener().dump());
+        System.out.println("\n--- Node Performance Profile ---");
+        System.out.println(graph.getProfileListener().dump());
+
+        // Stop the dashboard server after demo
+        graph.getDashboardServer().stop();
+    }
+
+    private static void simulateMarketFeed(CoreGraph graph) throws InterruptedException {
         // Advanced Simulation Loop
         Random rng = new Random(42);
         int updates = 100_000;
@@ -87,25 +103,6 @@ public class CoreGraphDemo {
             }
 
             Thread.sleep(100);
-        }
-
-        System.out.println("\n--- Final Graph State (Mermaid) ---");
-        System.out.println(new com.trading.drg.util.GraphExplain(graph.getEngine()).toMermaid());
-
-        // Stop the dashboard server after demo
-        if (graph.getDashboardServer() != null) {
-            graph.getDashboardServer().stop();
-        }
-
-        // Get Latency Stats
-        log.info("Demo complete.");
-        System.out.println("\n--- Global Latency Stats ---");
-        if (graph.getLatencyListener() != null) {
-            System.out.println(graph.getLatencyListener().dump());
-        }
-        System.out.println("\n--- Node Performance Profile ---");
-        if (graph.getProfileListener() != null) {
-            System.out.println(graph.getProfileListener().dump());
         }
     }
 }

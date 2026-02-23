@@ -6,6 +6,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "CoreGraphComplexDemo",
+            "request": "launch",
+            "mainClass": "com.trading.drg.CoreGraphComplexDemo",
+            "projectName": "claude-graph"
+        },
+        {
+            "type": "java",
             "name": "DisruptorGraphDemo",
             "request": "launch",
             "mainClass": "com.trading.drg.DisruptorGraphDemo",

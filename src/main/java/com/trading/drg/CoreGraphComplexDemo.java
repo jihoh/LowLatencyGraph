@@ -19,17 +19,17 @@ import java.util.concurrent.ThreadFactory;
  * raw binary network events into explicit node updates and strictly triggers
  * DRG stabilization bursts exactly per batch.
  */
-public class DisruptorGraphDemo {
+public class CoreGraphComplexDemo {
 
-    private static final Logger log = LogManager.getLogger(DisruptorGraphDemo.class);
-    private static final int PORT = 9090;
+    private static final Logger log = LogManager.getLogger(CoreGraphComplexDemo.class);
+    private static final int PORT = 8080;
     private static final int RING_BUFFER_SIZE = 1024;
 
     public static void main(String[] args) throws Exception {
         log.info("Starting Disruptor E2E Demo...");
 
         // 1. Initialize DRG Engine
-        CoreGraph graph = new CoreGraph("src/main/resources/bond_pricer_template.json")
+        CoreGraph graph = new CoreGraph("src/main/resources/bond_pricer.json")
                 .enableNodeProfiling()
                 .enableLatencyTracking();
         graph.enableDashboardServer(PORT);
