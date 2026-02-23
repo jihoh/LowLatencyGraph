@@ -56,13 +56,14 @@ let reverseGraphRouting = {}; // Stores direct parents: { "NodeB": ["NodeA"] }
 // Array to track message arrival times for Stabilization Rate calculation
 const messageTimes = [];
 let panZoomInstance = null;
+const graphElementsCache = new Map(); // O(1) memory bindings for static Graph SVG elements
 
 // Lightweight Charts Globals
 const nodeHistory = new Map(); // Maps NodeID -> Array of {time: timestamp, value: number}
 const nodeNaNHistory = new Map(); // Tracks discrete NaN timestamps for red highlighting
 const epochToRealTime = new Map(); // Maps integer epochs -> actual JS millisecond timestamps
 let oldestEpochTracker = -1; // O(1) tracking for cleaning up old epochs
-const snapshots = [];
+let snapshots = []; // Master timeline payload cache
 
 
 // Alert Engine State
@@ -84,6 +85,12 @@ let chartColorIndex = 0;
 // Global Z-Index tracker for draggable panels
 let highestZIndex = 1000;
 let isScrubbing = false;
+
+// Heavily hit DOM elements hoisted for zero-allocation access loops
+const domTimeScrubber = document.getElementById('time-scrubber');
+const domTimelineEpoch = document.getElementById('timeline-epoch');
+const domAlertModal = document.getElementById('alert-modal');
+const domAlertModalText = document.getElementById('alert-modal-text');
 
 
 // The UI Zoom buttons bridge over to the active instance
@@ -239,6 +246,27 @@ function connect() {
                         // Prefill prevValues so partial tick streams don't shatter the tracked struct
                         sortedNodes.forEach(nodeName => {
                             if (!prevValues.has(nodeName)) prevValues.set(nodeName, 'NaN');
+
+                            // Compute cached DOM queries upfront for 0-allocation updates natively in WebSockets
+                            const svgNodeId = getMermaidNodeId(nodeName);
+                            const nodeGroup = document.querySelector(`[id^="flowchart-${svgNodeId}-"]`);
+                            let nodeValueEl = null;
+                            let textNodes = null;
+
+                            if (nodeGroup) {
+                                nodeValueEl = nodeGroup.querySelector('.node-value');
+                                if (!nodeValueEl) {
+                                    textNodes = nodeGroup.querySelectorAll('tspan');
+                                }
+                            }
+
+                            graphElementsCache.set(nodeName, {
+                                group: nodeGroup,
+                                valueEl: nodeValueEl,
+                                textNodesFallback: textNodes,
+                                lsPaths: document.querySelectorAll(`.LS-${svgNodeId}`),
+                                lePaths: document.querySelectorAll(`.LE-${svgNodeId}`)
+                            });
                         });
 
                         if (alertNodeSelect) {
@@ -321,26 +349,33 @@ function connect() {
             }
 
             if (!isScrubbing) {
-                const scrubber = document.getElementById('time-scrubber');
-                if (scrubber) {
-                    scrubber.max = snapshots.length - 1;
-                    scrubber.value = snapshots.length - 1;
+                if (domTimeScrubber) {
+                    domTimeScrubber.max = snapshots.length - 1;
+                    domTimeScrubber.value = snapshots.length - 1;
                 }
-                const timelineEpoch = document.getElementById('timeline-epoch');
-                if (timelineEpoch) timelineEpoch.textContent = 'Epoch: ' + payload.epoch;
+                if (domTimelineEpoch) domTimelineEpoch.textContent = 'Epoch: ' + payload.epoch;
             }
 
             // Alert engine evaluation over latest data
             if (!isScrubbing && activeAlerts.length > 0) {
                 let anyAlertTriggered = false;
                 let alertsToRemove = [];
+                // Fast-Path: Only parse numbers once per-node, per-tick, 
+                // regardless of how many discrete alerts listen to the same node!
+                const parsedValues = new Map();
 
                 for (let i = 0; i < activeAlerts.length; i++) {
                     const alert = activeAlerts[i];
                     const triggerValStr = payload.values[alert.node];
 
                     if (triggerValStr && triggerValStr !== 'NaN') {
-                        const valNum = parseFloat(triggerValStr);
+                        // Retrieve from cache or parse dynamically
+                        let valNum = parsedValues.get(alert.node);
+                        if (valNum === undefined) {
+                            valNum = parseFloat(triggerValStr);
+                            parsedValues.set(alert.node, valNum);
+                        }
+
                         let triggered = false;
 
                         if (alert.condition === '<' && valNum < alert.threshold) triggered = true;
@@ -388,13 +423,10 @@ function connect() {
                     }
 
 
-                    const modal = document.getElementById('alert-modal');
-                    const modalText = document.getElementById('alert-modal-text');
-
                     // Prevent overriding if already showing to allow manual dismissal
-                    if (modal.classList.contains('hidden')) {
-                        modalText.innerHTML = triggeredMessages.join('<br>');
-                        modal.classList.remove('hidden');
+                    if (domAlertModal && domAlertModal.classList.contains('hidden')) {
+                        domAlertModalText.innerHTML = triggeredMessages.join('<br>');
+                        domAlertModal.classList.remove('hidden');
                     }
                 }
 
@@ -552,24 +584,47 @@ function renderProfileTable() {
         return 0;
     });
 
-    let html = '';
-    for (const node of sortedData) {
-        let displayName = node.name;
-        if (displayName.length > 20) {
-            displayName = displayName.substring(0, 17) + '...';
-        }
+    // Zero-Allocation Fast Path:
+    // If the table already has the exact number of rows, just update the text nodes in-place.
+    const rows = profileBody.children;
+    if (rows.length === sortedData.length) {
+        for (let i = 0; i < sortedData.length; i++) {
+            const node = sortedData[i];
+            const cells = rows[i].children;
 
-        html += `
-            <tr>
-                <td title="${node.name}">${displayName}</td>
-                <td class="right">${node.evaluations}</td>
-                <td class="right">${formatVal(node.latest, 2)}</td>
-                <td class="right">${formatVal(node.avg, 2)}</td>
-                <td class="right">${node.nans}</td>
-            </tr>
-        `;
+            let displayName = node.name;
+            if (displayName.length > 20) {
+                displayName = displayName.substring(0, 17) + '...';
+            }
+
+            cells[0].textContent = displayName;
+            cells[0].title = node.name;
+            cells[1].textContent = node.evaluations;
+            cells[2].textContent = formatVal(node.latest, 2);
+            cells[3].textContent = formatVal(node.avg, 2);
+            cells[4].textContent = node.nans;
+        }
+    } else {
+        // Initialization or length change: rebuild the DOM once
+        let html = '';
+        for (const node of sortedData) {
+            let displayName = node.name;
+            if (displayName.length > 20) {
+                displayName = displayName.substring(0, 17) + '...';
+            }
+
+            html += `
+                <tr>
+                    <td title="${node.name}">${displayName}</td>
+                    <td class="right">${node.evaluations}</td>
+                    <td class="right">${formatVal(node.latest, 2)}</td>
+                    <td class="right">${formatVal(node.avg, 2)}</td>
+                    <td class="right">${node.nans}</td>
+                </tr>
+            `;
+        }
+        profileBody.innerHTML = html;
     }
-    profileBody.innerHTML = html;
 
     // Recalculate accordion height so rows aren't clipped visually if it's open
     const content = document.getElementById('content-node-metrics');
@@ -625,34 +680,27 @@ function updateGraphDOM(newValues) {
 
         // Only touch the DOM if the value ACTUALLY changed contextually
         if (oldVal !== newVal) {
-            const svgNodeId = getMermaidNodeId(nodeName);
-            // Mermaid assigns IDs like 'flowchart-Arb_Spread-xxx' but the <g id="Arb_Spread"> is wrapped around it
-            const nodeGroup = document.querySelector(`[id^="flowchart-${svgNodeId}-"]`);
-
-            if (nodeGroup) {
+            const cachedDOM = graphElementsCache.get(nodeName);
+            if (cachedDOM && cachedDOM.group) {
+                const nodeGroup = cachedDOM.group;
                 const isNaN = newVal === "NaN";
+
                 if (isNaN) {
                     nodeGroup.classList.add('nan-node');
-                    document.querySelectorAll(`.LS-${svgNodeId}`).forEach(e => e.dataset.sourceNan = "true");
-                    document.querySelectorAll(`.LE-${svgNodeId}`).forEach(e => e.dataset.targetNan = "true");
+                    cachedDOM.lsPaths.forEach(e => e.dataset.sourceNan = "true");
+                    cachedDOM.lePaths.forEach(e => e.dataset.targetNan = "true");
                 } else {
                     nodeGroup.classList.remove('nan-node');
-                    document.querySelectorAll(`.LS-${svgNodeId}`).forEach(e => e.dataset.sourceNan = "false");
-                    document.querySelectorAll(`.LE-${svgNodeId}`).forEach(e => e.dataset.targetNan = "false");
+                    cachedDOM.lsPaths.forEach(e => e.dataset.sourceNan = "false");
+                    cachedDOM.lePaths.forEach(e => e.dataset.targetNan = "false");
                 }
 
                 const displayVal = isNaN ? "NaN" : formatVal(newVal);
 
-                // Directly target the new semantic class we injected in GraphExplain.java
-                const valueEl = nodeGroup.querySelector('.node-value');
-                if (valueEl) {
-                    valueEl.textContent = displayVal;
-                } else {
-                    // Fallback for strict SVG text nodes (if htmlLabels: false)
-                    const textNodes = nodeGroup.querySelectorAll('tspan');
-                    if (textNodes.length > 1) {
-                        textNodes[textNodes.length - 1].textContent = displayVal;
-                    }
+                if (cachedDOM.valueEl) {
+                    cachedDOM.valueEl.textContent = displayVal;
+                } else if (cachedDOM.textNodesFallback && cachedDOM.textNodesFallback.length > 1) {
+                    cachedDOM.textNodesFallback[cachedDOM.textNodesFallback.length - 1].textContent = displayVal;
                 }
 
                 // Trigger CSS flash animation
@@ -694,8 +742,10 @@ function getUpstreamNodes(nodeName, visited = new Set()) {
 // Apply or remove hover CSS mathematically 
 function highlightNodes(nodeNames, isHovered, type = 'downstream') {
     for (const name of nodeNames) {
-        const svgNodeId = getMermaidNodeId(name);
-        const nodeGroup = document.querySelector(`[id^="flowchart-${svgNodeId}-"]`);
+        const cachedDOM = graphElementsCache.get(name);
+        if (!cachedDOM) continue;
+
+        const nodeGroup = cachedDOM.group;
         if (nodeGroup) {
             if (isHovered) {
                 nodeGroup.classList.add(`node-hover-${type}`);
@@ -704,10 +754,10 @@ function highlightNodes(nodeNames, isHovered, type = 'downstream') {
             }
         }
 
-        document.querySelectorAll(`.LS-${svgNodeId}`).forEach(e => {
+        cachedDOM.lsPaths.forEach(e => {
             e.dataset[`sourceHover${type.charAt(0).toUpperCase() + type.slice(1)}`] = isHovered ? "true" : "false";
         });
-        document.querySelectorAll(`.LE-${svgNodeId}`).forEach(e => {
+        cachedDOM.lePaths.forEach(e => {
             e.dataset[`targetHover${type.charAt(0).toUpperCase() + type.slice(1)}`] = isHovered ? "true" : "false";
         });
     }
@@ -716,38 +766,38 @@ function highlightNodes(nodeNames, isHovered, type = 'downstream') {
 // Bind native browser pointer events onto the underlying DOM structure generated by Mermaid
 function attachHoverListeners() {
     for (const nodeName of prevValues.keys()) {
-        const svgNodeId = getMermaidNodeId(nodeName);
-        const nodeGroup = document.querySelector(`[id^="flowchart-${svgNodeId}-"]`);
+        const cachedDOM = graphElementsCache.get(nodeName);
+        if (!cachedDOM || !cachedDOM.group) continue;
 
-        if (nodeGroup) {
-            nodeGroup.addEventListener('mouseenter', () => {
-                const downstream = getDownstreamNodes(nodeName).filter(n => n !== nodeName);
-                const upstream = getUpstreamNodes(nodeName).filter(n => n !== nodeName);
+        const nodeGroup = cachedDOM.group;
 
-                highlightNodes(downstream, true, 'downstream');
-                highlightNodes(upstream, true, 'upstream');
-                highlightNodes([nodeName], true, 'self');
+        nodeGroup.addEventListener('mouseenter', () => {
+            const downstream = getDownstreamNodes(nodeName).filter(n => n !== nodeName);
+            const upstream = getUpstreamNodes(nodeName).filter(n => n !== nodeName);
 
-                const graphView = document.getElementById('graph-view');
-                if (graphView) graphView.classList.add('graph-hover-active');
-            });
-            nodeGroup.addEventListener('mouseleave', () => {
-                const downstream = getDownstreamNodes(nodeName).filter(n => n !== nodeName);
-                const upstream = getUpstreamNodes(nodeName).filter(n => n !== nodeName);
+            highlightNodes(downstream, true, 'downstream');
+            highlightNodes(upstream, true, 'upstream');
+            highlightNodes([nodeName], true, 'self');
 
-                highlightNodes(downstream, false, 'downstream');
-                highlightNodes(upstream, false, 'upstream');
-                highlightNodes([nodeName], false, 'self');
+            const graphView = document.getElementById('graph-view');
+            if (graphView) graphView.classList.add('graph-hover-active');
+        });
+        nodeGroup.addEventListener('mouseleave', () => {
+            const downstream = getDownstreamNodes(nodeName).filter(n => n !== nodeName);
+            const upstream = getUpstreamNodes(nodeName).filter(n => n !== nodeName);
 
-                const graphView = document.getElementById('graph-view');
-                if (graphView) graphView.classList.remove('graph-hover-active');
-            });
-            nodeGroup.addEventListener('click', () => {
-                openChart(nodeName);
-            });
-            // Make it obviously clickable
-            nodeGroup.style.cursor = 'pointer';
-        }
+            highlightNodes(downstream, false, 'downstream');
+            highlightNodes(upstream, false, 'upstream');
+            highlightNodes([nodeName], false, 'self');
+
+            const graphView = document.getElementById('graph-view');
+            if (graphView) graphView.classList.remove('graph-hover-active');
+        });
+        nodeGroup.addEventListener('click', () => {
+            openChart(nodeName);
+        });
+        // Make it obviously clickable
+        nodeGroup.style.cursor = 'pointer';
     }
 }
 
