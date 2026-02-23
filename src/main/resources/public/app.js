@@ -305,8 +305,8 @@ function connect() {
                 if (oldestEpochTracker === -1) {
                     oldestEpochTracker = payload.epoch;
                 }
-                // Cleanup old mappings
-                while (payload.epoch - oldestEpochTracker > 1000) {
+                // Cleanup old mappings precisely matched to the historical timeline buffer
+                while (payload.epoch - oldestEpochTracker > 18000) {
                     epochToRealTime.delete(oldestEpochTracker);
                     oldestEpochTracker++;
                 }
