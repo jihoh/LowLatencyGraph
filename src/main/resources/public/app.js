@@ -71,9 +71,11 @@ class RingBuffer {
     }
 
     push(item) {
-        this.buffer[this.head] = item;
-        this.head = (this.head + 1) % this.capacity;
-        if (this.size < this.capacity) {
+        this.buffer[this.head++] = item;
+        if (this.head === this.capacity) {
+            this.head = 0;
+        }
+        if (this.size !== this.capacity) {
             this.size++;
         }
     }
@@ -82,17 +84,16 @@ class RingBuffer {
         if (logicalIndex < 0 || logicalIndex >= this.size) {
             return undefined;
         }
-        // If the buffer is full, the oldest element is at `head`.
-        // If not full, the oldest element is at `0`.
-        const oldestIndex = this.size === this.capacity ? this.head : 0;
-        const physicalIndex = (oldestIndex + logicalIndex) % this.capacity;
+        let physicalIndex = (this.size === this.capacity ? this.head : 0) + logicalIndex;
+        if (physicalIndex >= this.capacity) {
+            physicalIndex -= this.capacity;
+        }
         return this.buffer[physicalIndex];
     }
 
     last() {
         if (this.size === 0) return undefined;
-        // Last element is right behind head, wrapped around
-        return this.buffer[(this.head - 1 + this.capacity) % this.capacity];
+        return this.head === 0 ? this.buffer[this.capacity - 1] : this.buffer[this.head - 1];
     }
 
     // Export flat, chronologically sorted array specifically for charting engines
