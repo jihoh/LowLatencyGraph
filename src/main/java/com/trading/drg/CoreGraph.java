@@ -37,7 +37,6 @@ public class CoreGraph {
     private final com.trading.drg.util.CompositeStabilizationListener compositeListener;
 
     // Optional trackers
-    // Optional trackers
     private com.trading.drg.util.LatencyTrackingListener latencyListener;
     private com.trading.drg.util.NodeProfileListener profileListener;
     private com.trading.drg.web.GraphDashboardServer dashboardServer;
@@ -266,7 +265,5 @@ public class CoreGraph {
         return engine.stabilize();
     }
 
-    // Deprecated / Backwards Compat proxies if needed,
-    // but we are adhering to a "breaking change" refactor plan.
-    // Methods start(), stop(), publish() are REMOVED.
+    // End of CoreGraph
 }

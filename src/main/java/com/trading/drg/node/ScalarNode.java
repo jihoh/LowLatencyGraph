@@ -11,7 +11,7 @@ import com.trading.drg.api.ScalarValue;
  * previous value) and change detection via ScalarCutoff.
  *
  * Design:
- * - Template Method: The stabilize() method is final and implements the change,
+ * - Template Method: The stabilize() method is final and implements the change
  * detection logic. Subclasses only need to implement the compute() method.
  * - Zero Allocation: Stores state in primitive double fields to avoid object
  * creation during updates.

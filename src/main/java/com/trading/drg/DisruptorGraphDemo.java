@@ -14,7 +14,7 @@ import java.util.concurrent.ThreadFactory;
 /**
  * End-To-End Testing Demo using LMAX Disruptor pattern.
  * <p>
- * Simulates an external market data feed streaming real-time QUOTE and TRADE
+ * Simulates an external market data feed streaming real-time QUOTE
  * events into a Disruptor RingBuffer. A dedicated consumer translates those
  * raw binary network events into explicit node updates and strictly triggers
  * DRG stabilization bursts exactly per batch.
