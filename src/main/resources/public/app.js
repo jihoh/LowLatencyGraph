@@ -63,11 +63,29 @@ const nodeNaNHistory = new Map(); // Tracks discrete NaN timestamps for red high
 const epochToRealTime = new Map(); // Maps integer epochs -> actual JS millisecond timestamps
 let oldestEpochTracker = -1; // O(1) tracking for cleaning up old epochs
 const snapshots = [];
+let lastSnapshotSaveTime = 0;
+const SNAPSHOT_SAVE_INTERVAL = 2000;
+
+function saveSnapshotsToLocal() {
+    try {
+        localStorage.setItem('drg_snapshots', JSON.stringify(snapshots));
+        localStorage.setItem('drg_epochToRealTime', JSON.stringify(Array.from(epochToRealTime.entries())));
+    } catch (e) {
+        console.warn("Storage cap reached for snapshots", e);
+    }
+}
 
 // Alert Engine State
-let activeAlerts = []; // Array of { id, node, condition, threshold, lastNotifiedEpoch }
-let alertHistory = []; // Array of { time: string, message: string }
-let alertIdCounter = 0;
+let activeAlerts = JSON.parse(localStorage.getItem('drg_activeAlerts') || '[]');
+let alertHistory = JSON.parse(localStorage.getItem('drg_alertHistory') || '[]');
+let alertIdCounter = parseInt(localStorage.getItem('drg_alertIdCounter') || '0', 10);
+
+function saveAlertState() {
+    localStorage.setItem('drg_activeAlerts', JSON.stringify(activeAlerts));
+    localStorage.setItem('drg_alertHistory', JSON.stringify(alertHistory));
+    localStorage.setItem('drg_alertIdCounter', alertIdCounter.toString());
+}
+
 let chartInstance = null;
 const activeChartSeries = new Map(); // nodeId -> { lineSeries, nanSeries, color }
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308', '#ef4444'];
@@ -286,7 +304,7 @@ function connect() {
                     oldestEpochTracker = payload.epoch;
                 }
                 // Cleanup old mappings
-                while (payload.epoch - oldestEpochTracker > 1000) {
+                while (payload.epoch - oldestEpochTracker > 100000) {
                     epochToRealTime.delete(oldestEpochTracker);
                     oldestEpochTracker++;
                 }
@@ -294,6 +312,9 @@ function connect() {
 
             // Cache historical state uniformly ensuring precise 1:1 timeline matches
             snapshots.push(payload);
+            if (snapshots.length > 100000) {
+                snapshots.shift();
+            }
 
             if (!isScrubbing) {
                 const scrubber = document.getElementById('time-scrubber');
@@ -303,6 +324,12 @@ function connect() {
                 }
                 const timelineEpoch = document.getElementById('timeline-epoch');
                 if (timelineEpoch) timelineEpoch.textContent = 'Epoch: ' + payload.epoch;
+
+                // Throttle saving history to local storage
+                if (performance.now() - lastSnapshotSaveTime > SNAPSHOT_SAVE_INTERVAL) {
+                    saveSnapshotsToLocal();
+                    lastSnapshotSaveTime = performance.now();
+                }
             }
 
             // Alert engine evaluation over latest data
@@ -337,6 +364,8 @@ function connect() {
                                 const msg = `${alert.node} ${alert.condition} ${alert.threshold} (Hit: ${valNum.toFixed(4)})`;
                                 alertHistory.unshift({ time: timeStr, epoch: payload.epoch, message: msg });
                                 if (alertHistory.length > 50) alertHistory.pop(); // Cap history size
+
+                                saveAlertState();
                                 renderAlertHistory();
                             }
 
@@ -374,6 +403,7 @@ function connect() {
                 // Prune ONCE alerts that fired
                 if (alertsToRemove.length > 0) {
                     activeAlerts = activeAlerts.filter(a => !alertsToRemove.includes(a.id));
+                    saveAlertState();
                     renderActiveAlerts();
                 }
 
@@ -899,6 +929,7 @@ function renderActiveAlerts() {
         delBtn.title = 'Delete Alert';
         delBtn.onclick = () => {
             activeAlerts = activeAlerts.filter(a => a.id !== alert.id);
+            saveAlertState();
             renderActiveAlerts();
         };
         actionTd.appendChild(delBtn);
@@ -966,6 +997,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             activeAlerts.push(newAlert);
+            saveAlertState();
             renderActiveAlerts();
 
             // Clear input box
@@ -1385,6 +1417,66 @@ window.addEventListener('DOMContentLoaded', () => {
     setupOmnidirectionalResize('metrics-panel');
     setupDockingControls();
     setupDockResizers();
+
+    // Rehydrate Chart History
+    try {
+        const savedSnapshots = localStorage.getItem('drg_snapshots');
+        const savedEpochs = localStorage.getItem('drg_epochToRealTime');
+
+        if (savedEpochs) {
+            new Map(JSON.parse(savedEpochs)).forEach((v, k) => epochToRealTime.set(k, v));
+            let minEpoch = Number.MAX_SAFE_INTEGER;
+            for (const key of epochToRealTime.keys()) {
+                if (key < minEpoch) minEpoch = key;
+            }
+            if (minEpoch !== Number.MAX_SAFE_INTEGER) oldestEpochTracker = minEpoch;
+        }
+
+        if (savedSnapshots) {
+            const parsed = JSON.parse(savedSnapshots);
+            snapshots.push(...parsed);
+
+            // Rebuild charting maps
+            snapshots.forEach(payload => {
+                for (const [key, val] of Object.entries(payload.values)) {
+                    if (!nodeHistory.has(key)) {
+                        nodeHistory.set(key, []);
+                        nodeNaNHistory.set(key, []);
+                    }
+                    const historyArr = nodeHistory.get(key);
+                    const nanArr = nodeNaNHistory.get(key);
+                    const isNaNVal = (val === 'NaN' || Number.isNaN(Number(val)));
+
+                    let plotVal = val;
+                    if (isNaNVal) {
+                        plotVal = historyArr.length > 0 ? historyArr[historyArr.length - 1].value : 0;
+                    }
+                    historyArr.push({ time: payload.epoch, value: plotVal });
+                    if (isNaNVal) {
+                        nanArr.push({ time: payload.epoch, value: 1 });
+                    }
+                }
+            });
+
+            // Update DOM Scrubber max bounds
+            if (snapshots.length > 0) {
+                const scrubber = document.getElementById('time-scrubber');
+                if (scrubber) {
+                    scrubber.max = snapshots.length - 1;
+                    scrubber.value = snapshots.length - 1;
+                }
+                const timelineEpoch = document.getElementById('timeline-epoch');
+                if (timelineEpoch) timelineEpoch.textContent = 'Epoch: ' + snapshots[snapshots.length - 1].epoch;
+
+                const lastValues = snapshots[snapshots.length - 1].values;
+                if (lastValues) {
+                    for (const [k, v] of Object.entries(lastValues)) prevValues.set(k, v);
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Failed to rehydrate history", e);
+    }
 
     // Boot WebSocket strictly after DOM stabilizes
     connect();
