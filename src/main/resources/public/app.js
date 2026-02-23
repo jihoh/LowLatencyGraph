@@ -65,7 +65,7 @@ let oldestEpochTracker = -1; // O(1) tracking for cleaning up old epochs
 const snapshots = [];
 
 // Alert Engine State
-let activeAlerts = []; // Array of { id, node, condition, threshold, mode, lastNotifiedEpoch }
+let activeAlerts = []; // Array of { id, node, condition, threshold, lastNotifiedEpoch }
 let alertHistory = []; // Array of { time: string, message: string }
 let alertIdCounter = 0;
 let chartInstance = null;
@@ -340,9 +340,7 @@ function connect() {
                                 renderAlertHistory();
                             }
 
-                            if (alert.mode === 'ONCE') {
-                                alertsToRemove.push(alert.id);
-                            }
+                            alertsToRemove.push(alert.id);
                         } else {
                             // Reset deduplication if price normalizes
                             alert.lastNotifiedEpoch = -1;
@@ -361,18 +359,7 @@ function connect() {
                             triggeredMessages.push(`${a.node} ${a.condition} ${a.threshold}`);
                         }
                     }
-                    // For continuous mode, just capture the active ones
-                    if (triggeredMessages.length === 0) {
-                        activeAlerts.forEach(a => {
-                            const valStr = payload.values[a.node];
-                            if (valStr !== 'NaN') {
-                                const v = parseFloat(valStr);
-                                if ((a.condition === '<' && v < a.threshold) || (a.condition === '>' && v > a.threshold) || (a.condition === '=' && v === a.threshold)) {
-                                    triggeredMessages.push(`${a.node} ${a.condition} ${a.threshold} (Current: ${v.toFixed(4)})`);
-                                }
-                            }
-                        });
-                    }
+
 
                     const modal = document.getElementById('alert-modal');
                     const modalText = document.getElementById('alert-modal-text');
@@ -903,10 +890,7 @@ function renderActiveAlerts() {
         const ruleTd = document.createElement('td');
         ruleTd.innerHTML = `<span style="color:var(--text-primary)">${alert.node}</span> ${alert.condition} ${alert.threshold}`;
 
-        const modeTd = document.createElement('td');
-        modeTd.textContent = alert.mode;
-        if (alert.mode === 'ONCE') modeTd.style.color = "var(--text-secondary)";
-        else modeTd.style.color = "var(--accent-blue)";
+
 
         const actionTd = document.createElement('td');
         const delBtn = document.createElement('button');
@@ -920,7 +904,6 @@ function renderActiveAlerts() {
         actionTd.appendChild(delBtn);
 
         tr.appendChild(ruleTd);
-        tr.appendChild(modeTd);
         tr.appendChild(actionTd);
         tbody.appendChild(tr);
     });
@@ -969,7 +952,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const node = document.getElementById('alert-node').value;
             const condition = document.getElementById('alert-condition').value;
             const threshStr = document.getElementById('alert-threshold').value;
-            const mode = document.getElementById('alert-mode')?.value || 'ONCE';
 
             if (!node || !condition || threshStr === '') {
                 return;
@@ -980,17 +962,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 node: node,
                 condition: condition,
                 threshold: parseFloat(threshStr),
-                mode: mode,
                 lastNotifiedEpoch: -1
             };
 
             activeAlerts.push(newAlert);
             renderActiveAlerts();
 
-            // Clear input box and reset mode to default
+            // Clear input box
             document.getElementById('alert-threshold').value = '';
-            const modeSelect = document.getElementById('alert-mode');
-            if (modeSelect) modeSelect.value = 'ONCE';
 
             // Request Notification permission
             if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
