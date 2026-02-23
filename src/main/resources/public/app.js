@@ -121,7 +121,7 @@ const nodeHistory = new Map(); // Maps NodeID -> Array of {time: timestamp, valu
 const nodeNaNHistory = new Map(); // Tracks discrete NaN timestamps for red highlighting
 const epochToRealTime = new Map(); // Maps integer epochs -> actual JS millisecond timestamps
 let oldestEpochTracker = -1; // O(1) tracking for cleaning up old epochs
-const snapshots = new RingBuffer(18000); // Master timeline payload cache (~30 mins at 10Hz)
+const snapshots = new RingBuffer(globalHistoryDepth); // Master timeline payload cache
 
 
 // Alert Engine State
@@ -141,7 +141,8 @@ const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#0
 let chartColorIndex = 0;
 
 // Global Z-Index tracker for draggable panels
-let highestZIndex = 1000;
+// Settings Configs
+let globalHistoryDepth = 3000;
 let isScrubbing = false;
 
 // Heavily hit DOM elements hoisted for zero-allocation access loops
@@ -396,7 +397,7 @@ function connect() {
                     oldestEpochTracker = payload.epoch;
                 }
                 // Cleanup old mappings precisely matched to the historical timeline buffer
-                while (payload.epoch - oldestEpochTracker > 18000) {
+                while (payload.epoch - oldestEpochTracker > globalHistoryDepth) {
                     epochToRealTime.delete(oldestEpochTracker);
                     oldestEpochTracker++;
                 }
@@ -503,8 +504,8 @@ function connect() {
                 if (val === undefined) continue;
 
                 if (!nodeHistory.has(key)) {
-                    nodeHistory.set(key, new RingBuffer(18000));
-                    nodeNaNHistory.set(key, new RingBuffer(18000));
+                    nodeHistory.set(key, new RingBuffer(globalHistoryDepth));
+                    nodeNaNHistory.set(key, new RingBuffer(globalHistoryDepth));
                 }
                 const historyArr = nodeHistory.get(key);
                 const nanArr = nodeNaNHistory.get(key);
@@ -1164,8 +1165,8 @@ function openChart(nodeId) {
         // Lazy Hydration: Build the history array from the snapshots master cache 
         // ONLY when a user opens the chart, saving massive background memory.
         if (!nodeHistory.has(nodeId)) {
-            const histBuf = new RingBuffer(18000);
-            const nanBuf = new RingBuffer(18000);
+            const histBuf = new RingBuffer(globalHistoryDepth);
+            const nanBuf = new RingBuffer(globalHistoryDepth);
 
             for (let i = 0; i < snapshots.size; i++) {
                 const snap = snapshots.get(i);
