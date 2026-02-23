@@ -116,6 +116,9 @@ class RingBuffer {
     }
 }
 
+// Settings Configs
+let globalHistoryDepth = 3000;
+
 // Lightweight Charts Globals
 const nodeHistory = new Map(); // Maps NodeID -> Array of {time: timestamp, value: number}
 const nodeNaNHistory = new Map(); // Tracks discrete NaN timestamps for red highlighting
@@ -141,8 +144,6 @@ const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#0
 let chartColorIndex = 0;
 
 // Global Z-Index tracker for draggable panels
-// Settings Configs
-let globalHistoryDepth = 3000;
 let isScrubbing = false;
 
 // Heavily hit DOM elements hoisted for zero-allocation access loops
