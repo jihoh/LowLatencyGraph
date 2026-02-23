@@ -63,27 +63,17 @@ const nodeNaNHistory = new Map(); // Tracks discrete NaN timestamps for red high
 const epochToRealTime = new Map(); // Maps integer epochs -> actual JS millisecond timestamps
 let oldestEpochTracker = -1; // O(1) tracking for cleaning up old epochs
 const snapshots = [];
-let lastSnapshotSaveTime = 0;
-const SNAPSHOT_SAVE_INTERVAL = 2000;
 
-function saveSnapshotsToLocal() {
-    try {
-        localStorage.setItem('drg_snapshots', JSON.stringify(snapshots));
-        localStorage.setItem('drg_epochToRealTime', JSON.stringify(Array.from(epochToRealTime.entries())));
-    } catch (e) {
-        console.warn("Storage cap reached for snapshots", e);
-    }
-}
 
 // Alert Engine State
-let activeAlerts = JSON.parse(localStorage.getItem('drg_activeAlerts') || '[]');
-let alertHistory = JSON.parse(localStorage.getItem('drg_alertHistory') || '[]');
-let alertIdCounter = parseInt(localStorage.getItem('drg_alertIdCounter') || '0', 10);
+let activeAlerts = JSON.parse(localStorage.getItem('activeAlerts') || '[]');
+let alertHistory = JSON.parse(localStorage.getItem('alertHistory') || '[]');
+let alertIdCounter = parseInt(localStorage.getItem('alertIdCounter') || '0', 10);
 
 function saveAlertState() {
-    localStorage.setItem('drg_activeAlerts', JSON.stringify(activeAlerts));
-    localStorage.setItem('drg_alertHistory', JSON.stringify(alertHistory));
-    localStorage.setItem('drg_alertIdCounter', alertIdCounter.toString());
+    localStorage.setItem('activeAlerts', JSON.stringify(activeAlerts));
+    localStorage.setItem('alertHistory', JSON.stringify(alertHistory));
+    localStorage.setItem('alertIdCounter', alertIdCounter.toString());
 }
 
 let chartInstance = null;
@@ -263,6 +253,18 @@ function connect() {
 
                         // Attach custom CSS hover bindings safely post SVG ingestion
                         attachHoverListeners();
+
+                        // Restore persisted chart selections
+                        try {
+                            const persistedSeries = JSON.parse(localStorage.getItem('activeChartSeries') || '[]');
+                            // Deduplicate and filter against valid routing nodes
+                            const validSeries = persistedSeries.filter(nodeId => sortedNodes.includes(nodeId));
+                            validSeries.forEach(nodeId => {
+                                openChart(nodeId);
+                            });
+                        } catch (e) {
+                            console.warn("Could not restore chart selections", e);
+                        }
                     }
                 }
                 return; // Initialization payload processed. Do not pass to tick logic.
@@ -304,7 +306,7 @@ function connect() {
                     oldestEpochTracker = payload.epoch;
                 }
                 // Cleanup old mappings
-                while (payload.epoch - oldestEpochTracker > 100000) {
+                while (payload.epoch - oldestEpochTracker > 1000) {
                     epochToRealTime.delete(oldestEpochTracker);
                     oldestEpochTracker++;
                 }
@@ -312,7 +314,7 @@ function connect() {
 
             // Cache historical state uniformly ensuring precise 1:1 timeline matches
             snapshots.push(payload);
-            if (snapshots.length > 100000) {
+            if (snapshots.length > 1000) {
                 snapshots.shift();
             }
 
@@ -324,12 +326,6 @@ function connect() {
                 }
                 const timelineEpoch = document.getElementById('timeline-epoch');
                 if (timelineEpoch) timelineEpoch.textContent = 'Epoch: ' + payload.epoch;
-
-                // Throttle saving history to local storage
-                if (performance.now() - lastSnapshotSaveTime > SNAPSHOT_SAVE_INTERVAL) {
-                    saveSnapshotsToLocal();
-                    lastSnapshotSaveTime = performance.now();
-                }
             }
 
             // Alert engine evaluation over latest data
@@ -354,7 +350,7 @@ function connect() {
 
                             // Emit Notification (deduplicated per alert)
                             if (Notification.permission === "granted" && (payload.epoch - alert.lastNotifiedEpoch > 20 || alert.lastNotifiedEpoch === -1)) {
-                                new Notification("DRG Alert: Target Breached!", {
+                                new Notification("Alert: Target Breached!", {
                                     body: `${alert.node} ${alert.condition} ${alert.threshold} (Val: ${valNum.toFixed(4)})`
                                 });
                                 alert.lastNotifiedEpoch = payload.epoch;
@@ -362,7 +358,7 @@ function connect() {
                                 // Record to History
                                 const timeStr = new Date().toLocaleTimeString();
                                 const msg = `${alert.node} ${alert.condition} ${alert.threshold} (Hit: ${valNum.toFixed(4)})`;
-                                alertHistory.unshift({ time: timeStr, epoch: payload.epoch, message: msg });
+                                alertHistory.unshift({ id: `${Date.now()}-${alert.node}`, time: timeStr, epoch: payload.epoch, message: msg });
                                 if (alertHistory.length > 50) alertHistory.pop(); // Cap history size
 
                                 saveAlertState();
@@ -950,7 +946,7 @@ function renderAlertHistory() {
         return;
     }
 
-    alertHistory.forEach(hist => {
+    alertHistory.forEach((hist, index) => {
         const tr = document.createElement('tr');
         const timeTd = document.createElement('td');
         timeTd.textContent = hist.time;
@@ -966,9 +962,27 @@ function renderAlertHistory() {
         msgTd.textContent = hist.message;
         msgTd.style.color = "var(--accent-red)";
 
+        const actionTd = document.createElement('td');
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-alert-btn';
+        delBtn.innerHTML = '×';
+        delBtn.title = 'Delete History Record';
+        delBtn.onclick = () => {
+            if (hist.id) {
+                alertHistory = alertHistory.filter(h => h.id !== hist.id);
+            } else {
+                // Fallback for older localStorage records without IDs
+                alertHistory.splice(index, 1);
+            }
+            saveAlertState();
+            renderAlertHistory();
+        };
+        actionTd.appendChild(delBtn);
+
         tr.appendChild(timeTd);
         tr.appendChild(epochTd);
         tr.appendChild(msgTd);
+        tr.appendChild(actionTd);
         tbody.appendChild(tr);
     });
 }
@@ -1010,6 +1024,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+function saveChartSelection() {
+    localStorage.setItem('activeChartSeries', JSON.stringify(Array.from(activeChartSeries.keys())));
+}
+
 function openChart(nodeId) {
     const chartPanel = document.getElementById('chart-panel');
     const bottomDock = document.getElementById('bottom-dock');
@@ -1093,6 +1111,7 @@ function openChart(nodeId) {
 
     document.getElementById('chart-panel').classList.remove('hidden');
     chartInstance.timeScale().fitContent();
+    saveChartSelection();
 }
 
 function closeChart() {
@@ -1103,6 +1122,7 @@ function closeChart() {
     }
     activeChartSeries.clear();
     document.getElementById('chart-title').innerHTML = '';
+    saveChartSelection();
 }
 
 // ============================================================================
@@ -1418,65 +1438,7 @@ window.addEventListener('DOMContentLoaded', () => {
     setupDockingControls();
     setupDockResizers();
 
-    // Rehydrate Chart History
-    try {
-        const savedSnapshots = localStorage.getItem('drg_snapshots');
-        const savedEpochs = localStorage.getItem('drg_epochToRealTime');
 
-        if (savedEpochs) {
-            new Map(JSON.parse(savedEpochs)).forEach((v, k) => epochToRealTime.set(k, v));
-            let minEpoch = Number.MAX_SAFE_INTEGER;
-            for (const key of epochToRealTime.keys()) {
-                if (key < minEpoch) minEpoch = key;
-            }
-            if (minEpoch !== Number.MAX_SAFE_INTEGER) oldestEpochTracker = minEpoch;
-        }
-
-        if (savedSnapshots) {
-            const parsed = JSON.parse(savedSnapshots);
-            snapshots.push(...parsed);
-
-            // Rebuild charting maps
-            snapshots.forEach(payload => {
-                for (const [key, val] of Object.entries(payload.values)) {
-                    if (!nodeHistory.has(key)) {
-                        nodeHistory.set(key, []);
-                        nodeNaNHistory.set(key, []);
-                    }
-                    const historyArr = nodeHistory.get(key);
-                    const nanArr = nodeNaNHistory.get(key);
-                    const isNaNVal = (val === 'NaN' || Number.isNaN(Number(val)));
-
-                    let plotVal = val;
-                    if (isNaNVal) {
-                        plotVal = historyArr.length > 0 ? historyArr[historyArr.length - 1].value : 0;
-                    }
-                    historyArr.push({ time: payload.epoch, value: plotVal });
-                    if (isNaNVal) {
-                        nanArr.push({ time: payload.epoch, value: 1 });
-                    }
-                }
-            });
-
-            // Update DOM Scrubber max bounds
-            if (snapshots.length > 0) {
-                const scrubber = document.getElementById('time-scrubber');
-                if (scrubber) {
-                    scrubber.max = snapshots.length - 1;
-                    scrubber.value = snapshots.length - 1;
-                }
-                const timelineEpoch = document.getElementById('timeline-epoch');
-                if (timelineEpoch) timelineEpoch.textContent = 'Epoch: ' + snapshots[snapshots.length - 1].epoch;
-
-                const lastValues = snapshots[snapshots.length - 1].values;
-                if (lastValues) {
-                    for (const [k, v] of Object.entries(lastValues)) prevValues.set(k, v);
-                }
-            }
-        }
-    } catch (e) {
-        console.warn("Failed to rehydrate history", e);
-    }
 
     // Boot WebSocket strictly after DOM stabilizes
     connect();
