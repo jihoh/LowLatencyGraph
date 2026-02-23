@@ -210,6 +210,10 @@ function updateMetricsDOM(payload) {
         if (payload.metrics.eventsProcessed !== undefined) {
             document.getElementById('events-value').textContent = payload.metrics.eventsProcessed;
         }
+        if (payload.metrics.epochEvents !== undefined) {
+            const el = document.getElementById('events-epoch-value');
+            if (el) el.textContent = payload.metrics.epochEvents;
+        }
         if (payload.metrics.totalNodes !== undefined) {
             reactiveEff.textContent = `${payload.metrics.nodesUpdated} / ${payload.metrics.totalNodes}`;
             document.getElementById('graph-total-nodes').textContent = payload.metrics.totalNodes;
@@ -494,7 +498,10 @@ function connect() {
 
             // Live History Tracking & Chart Updating
             // The Java backend pushes updates every epoch.
-            for (const [key, val] of Object.entries(payload.values)) {
+            for (const [key, cs] of activeChartSeries.entries()) {
+                const val = payload.values[key];
+                if (val === undefined) continue;
+
                 if (!nodeHistory.has(key)) {
                     nodeHistory.set(key, new RingBuffer(18000));
                     nodeNaNHistory.set(key, new RingBuffer(18000));
@@ -522,17 +529,14 @@ function connect() {
                     nanArr.push({ time: payload.epoch, value: NaN });
                 }
 
-                // If this is the node currently being charted, explicitly push the live tick
-                if (activeChartSeries.has(key)) {
-                    try {
-                        if (!isScrubbing) {
-                            const cs = activeChartSeries.get(key);
-                            if (cs.lineSeries) cs.lineSeries.update(point);
-                            if (cs.nanSeries && isNaNVal) cs.nanSeries.update({ time: payload.epoch, value: 1 });
-                        }
-                    } catch (e) {
-                        document.getElementById('chart-title').textContent = "UPD ERR: " + e.message;
+                // Explicitly push the live tick
+                try {
+                    if (!isScrubbing) {
+                        if (cs.lineSeries) cs.lineSeries.update(point);
+                        if (cs.nanSeries && isNaNVal) cs.nanSeries.update({ time: payload.epoch, value: 1 });
                     }
+                } catch (e) {
+                    document.getElementById('chart-title').textContent = "UPD ERR: " + e.message;
                 }
             }
         } catch (error) {
@@ -1127,6 +1131,10 @@ function openChart(nodeId) {
         if (cs.nanSeries) chartInstance.removeSeries(cs.nanSeries);
         activeChartSeries.delete(nodeId);
 
+        // Free memory immediately
+        nodeHistory.delete(nodeId);
+        nodeNaNHistory.delete(nodeId);
+
         if (activeChartSeries.size === 0) {
             closeChart();
             return;
@@ -1153,10 +1161,40 @@ function openChart(nodeId) {
 
         activeChartSeries.set(nodeId, { lineSeries: lineS, nanSeries: nanS, color: color });
 
-        // Populate the existing history buffers instantly
+        // Lazy Hydration: Build the history array from the snapshots master cache 
+        // ONLY when a user opens the chart, saving massive background memory.
+        if (!nodeHistory.has(nodeId)) {
+            const histBuf = new RingBuffer(18000);
+            const nanBuf = new RingBuffer(18000);
+
+            for (let i = 0; i < snapshots.size; i++) {
+                const snap = snapshots.get(i);
+                if (!snap || !snap.values) continue;
+
+                const val = snap.values[nodeId];
+                if (val === undefined) continue;
+
+                const isNaNVal = (val === 'NaN' || Number.isNaN(Number(val)));
+                let plotVal = val;
+                if (isNaNVal) {
+                    plotVal = histBuf.size > 0 ? histBuf.last().value : 0;
+                }
+
+                histBuf.push({ time: snap.epoch, value: plotVal });
+
+                if (isNaNVal) {
+                    nanBuf.push({ time: snap.epoch, value: 1 });
+                } else {
+                    nanBuf.push({ time: snap.epoch, value: NaN });
+                }
+            }
+            nodeHistory.set(nodeId, histBuf);
+            nodeNaNHistory.set(nodeId, nanBuf);
+        }
+
         try {
-            const arr = nodeHistory.get(nodeId) ? nodeHistory.get(nodeId).toArray() : [];
-            const nanArr = nodeNaNHistory.get(nodeId) ? nodeNaNHistory.get(nodeId).toArray() : [];
+            const arr = nodeHistory.get(nodeId).toArray();
+            const nanArr = nodeNaNHistory.get(nodeId).toArray();
 
             if (isScrubbing) {
                 const scrubberIdx = parseInt(document.getElementById('time-scrubber').value);
@@ -1194,11 +1232,19 @@ function openChart(nodeId) {
 }
 
 function closeChart() {
-    document.getElementById('chart-panel').classList.add('hidden');
+    const chartPanel = document.getElementById('chart-panel');
+    const bottomDock = document.getElementById('bottom-dock');
+    if (chartPanel) chartPanel.classList.add('minimized');
+    if (bottomDock) bottomDock.classList.add('minimized');
+
+    // Wipe all chart series and free the lazy memory
     for (const [id, cs] of activeChartSeries.entries()) {
         if (cs.lineSeries) chartInstance.removeSeries(cs.lineSeries);
         if (cs.nanSeries) chartInstance.removeSeries(cs.nanSeries);
+        nodeHistory.delete(id);
+        nodeNaNHistory.delete(id);
     }
+
     activeChartSeries.clear();
     document.getElementById('chart-title').innerHTML = '';
     saveChartSelection();

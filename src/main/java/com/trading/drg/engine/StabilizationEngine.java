@@ -55,6 +55,8 @@ public final class StabilizationEngine {
     private int lastStabilizedCount;
     private long epoch;
     private long eventsProcessed;
+    private int eventsThisEpoch;
+    private int lastEpochEvents;
     private StabilizationListener listener;
 
     public StabilizationEngine(TopologicalOrder topology) {
@@ -92,6 +94,7 @@ public final class StabilizationEngine {
         if ((dirtyWords[wordIdx] & bitMask) == 0) {
             dirtyWords[wordIdx] |= bitMask;
             eventsProcessed++;
+            eventsThisEpoch++;
         }
     }
 
@@ -188,6 +191,9 @@ public final class StabilizationEngine {
         } finally {
             // Cleanup: After stabilization, source nodes are no longer "newly updated".
             this.lastStabilizedCount = stabilizedCount;
+            this.lastEpochEvents = this.eventsThisEpoch;
+            this.eventsThisEpoch = 0; // reset for next epoch batch
+
             if (hasListener)
                 l.onStabilizationEnd(epoch, stabilizedCount);
         }
@@ -209,6 +215,10 @@ public final class StabilizationEngine {
 
     public long totalEventsProcessed() {
         return eventsProcessed;
+    }
+
+    public int lastEpochEvents() {
+        return lastEpochEvents;
     }
 
     public TopologicalOrder topology() {

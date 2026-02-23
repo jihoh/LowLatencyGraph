@@ -149,7 +149,8 @@ public class WebsocketPublisherListener implements StabilizationListener {
                 .append("\"nodesUpdated\":").append(nodesStabilized).append(",")
                 .append("\"totalNodes\":").append(nodeCount).append(",")
                 .append("\"totalSourceNodes\":").append(sourceCount).append(",")
-                .append("\"eventsProcessed\":").append(engine.totalEventsProcessed());
+                .append("\"eventsProcessed\":").append(engine.totalEventsProcessed()).append(",")
+                .append("\"epochEvents\":").append(engine.lastEpochEvents());
 
         if (latencyListener != null) {
             jsonBuilder.append(",\"latency\":{")
