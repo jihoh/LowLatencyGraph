@@ -18,7 +18,7 @@ public class CoreGraphSimpleDemo {
         var graph = new CoreGraph("src/main/resources/fx_arb.json")
                 .enableNodeProfiling()
                 .enableLatencyTracking()
-                .enableDashboardServer(8080);
+                .enableDashboardServer(8081);
 
         // Run the simulation
         simulateMarketFeed(graph);

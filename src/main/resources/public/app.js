@@ -312,10 +312,12 @@ function connect() {
                 }
             }
 
-            // Cache historical state uniformly ensuring precise 1:1 timeline matches
+            // Cache historical state uniformly ensuring precise timeline matches using an amortized double buffer
             snapshots.push(payload);
-            if (snapshots.length > 1000) {
-                snapshots.shift();
+            if (snapshots.length >= 18000) {
+                // When we hit 30 mins of snapshots, cleanly slice off the oldest 15 mins.
+                // Re-pointing the global array allows the GC to scoop up the old objects atomically
+                snapshots = snapshots.slice(9000);
             }
 
             if (!isScrubbing) {
@@ -424,12 +426,27 @@ function connect() {
                 }
 
                 const point = { time: payload.epoch, value: plotVal };
-                historyArr.push(point);
+
+                // Double Buffer Ring implementation for O(1) ingestion without GC thrashing
+                if (historyArr.length >= 18000) {
+                    // When the buffer hits 2x capacity (30 mins), we cleanly slice off the oldest half
+                    // This creates an amortized O(1) shifting pattern, causing 1 bulk GC sweep per 15 mins
+                    const retainedHistory = historyArr.slice(9000);
+                    nodeHistory.set(key, retainedHistory);
+                }
+
+                nodeHistory.get(key).push(point);
 
                 // Track continuous NaN statuses for the chart's red overlay background
                 if (isNaNVal) {
                     const nanPoint = { time: payload.epoch, value: 1 };
-                    nanArr.push(nanPoint);
+
+                    if (nanArr.length >= 18000) {
+                        const retainedNaN = nanArr.slice(9000);
+                        nodeNaNHistory.set(key, retainedNaN);
+                    }
+
+                    nodeNaNHistory.get(key).push(nanPoint);
                 }
 
                 // If this is the node currently being charted, explicitly push the live tick
