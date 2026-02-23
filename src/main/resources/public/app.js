@@ -58,12 +58,69 @@ const messageTimes = [];
 let panZoomInstance = null;
 const graphElementsCache = new Map(); // O(1) memory bindings for static Graph SVG elements
 
+/**
+ * A zero-allocation fixed-size circular buffer.
+ * Overwrites the oldest elements seamlessly instead of garbage collecting.
+ */
+class RingBuffer {
+    constructor(capacity) {
+        this.capacity = capacity;
+        this.buffer = new Array(capacity);
+        this.head = 0; // Where the next element will be written
+        this.size = 0; // Current number of valid elements
+    }
+
+    push(item) {
+        this.buffer[this.head] = item;
+        this.head = (this.head + 1) % this.capacity;
+        if (this.size < this.capacity) {
+            this.size++;
+        }
+    }
+
+    get(logicalIndex) {
+        if (logicalIndex < 0 || logicalIndex >= this.size) {
+            return undefined;
+        }
+        // If the buffer is full, the oldest element is at `head`.
+        // If not full, the oldest element is at `0`.
+        const oldestIndex = this.size === this.capacity ? this.head : 0;
+        const physicalIndex = (oldestIndex + logicalIndex) % this.capacity;
+        return this.buffer[physicalIndex];
+    }
+
+    last() {
+        if (this.size === 0) return undefined;
+        // Last element is right behind head, wrapped around
+        return this.buffer[(this.head - 1 + this.capacity) % this.capacity];
+    }
+
+    // Export flat, chronologically sorted array specifically for charting engines
+    toArray() {
+        if (this.size === 0) return [];
+        if (this.size < this.capacity) {
+            return this.buffer.slice(0, this.size);
+        }
+
+        // When full, concat the oldest half (tail to end) with the newest half (0 to tail)
+        const result = new Array(this.capacity);
+        let dst = 0;
+        for (let i = this.head; i < this.capacity; i++) {
+            result[dst++] = this.buffer[i];
+        }
+        for (let i = 0; i < this.head; i++) {
+            result[dst++] = this.buffer[i];
+        }
+        return result;
+    }
+}
+
 // Lightweight Charts Globals
 const nodeHistory = new Map(); // Maps NodeID -> Array of {time: timestamp, value: number}
 const nodeNaNHistory = new Map(); // Tracks discrete NaN timestamps for red highlighting
 const epochToRealTime = new Map(); // Maps integer epochs -> actual JS millisecond timestamps
 let oldestEpochTracker = -1; // O(1) tracking for cleaning up old epochs
-let snapshots = []; // Master timeline payload cache
+const snapshots = new RingBuffer(18000); // Master timeline payload cache (~30 mins at 10Hz)
 
 
 // Alert Engine State
@@ -342,16 +399,11 @@ function connect() {
 
             // Cache historical state uniformly ensuring precise timeline matches using an amortized double buffer
             snapshots.push(payload);
-            if (snapshots.length >= 18000) {
-                // When we hit 30 mins of snapshots, cleanly slice off the oldest 15 mins.
-                // Re-pointing the global array allows the GC to scoop up the old objects atomically
-                snapshots = snapshots.slice(9000);
-            }
 
             if (!isScrubbing) {
                 if (domTimeScrubber) {
-                    domTimeScrubber.max = snapshots.length - 1;
-                    domTimeScrubber.value = snapshots.length - 1;
+                    domTimeScrubber.max = snapshots.size - 1;
+                    domTimeScrubber.value = snapshots.size - 1;
                 }
                 if (domTimelineEpoch) domTimelineEpoch.textContent = 'Epoch: ' + payload.epoch;
             }
@@ -443,8 +495,8 @@ function connect() {
             // The Java backend pushes updates every epoch.
             for (const [key, val] of Object.entries(payload.values)) {
                 if (!nodeHistory.has(key)) {
-                    nodeHistory.set(key, []);
-                    nodeNaNHistory.set(key, []);
+                    nodeHistory.set(key, new RingBuffer(18000));
+                    nodeNaNHistory.set(key, new RingBuffer(18000));
                 }
                 const historyArr = nodeHistory.get(key);
                 const nanArr = nodeNaNHistory.get(key);
@@ -454,31 +506,19 @@ function connect() {
                 // Bridge the graph using the last known good value if current payload is NaN
                 let plotVal = val;
                 if (isNaNVal) {
-                    plotVal = historyArr.length > 0 ? historyArr[historyArr.length - 1].value : 0;
+                    plotVal = historyArr.size > 0 ? historyArr.last().value : 0;
                 }
 
                 const point = { time: payload.epoch, value: plotVal };
 
-                // Double Buffer Ring implementation for O(1) ingestion without GC thrashing
-                if (historyArr.length >= 18000) {
-                    // When the buffer hits 2x capacity (30 mins), we cleanly slice off the oldest half
-                    // This creates an amortized O(1) shifting pattern, causing 1 bulk GC sweep per 15 mins
-                    const retainedHistory = historyArr.slice(9000);
-                    nodeHistory.set(key, retainedHistory);
-                }
-
-                nodeHistory.get(key).push(point);
+                historyArr.push(point);
 
                 // Track continuous NaN statuses for the chart's red overlay background
                 if (isNaNVal) {
                     const nanPoint = { time: payload.epoch, value: 1 };
-
-                    if (nanArr.length >= 18000) {
-                        const retainedNaN = nanArr.slice(9000);
-                        nodeNaNHistory.set(key, retainedNaN);
-                    }
-
-                    nodeNaNHistory.get(key).push(nanPoint);
+                    nanArr.push(nanPoint);
+                } else {
+                    nanArr.push({ time: payload.epoch, value: NaN });
                 }
 
                 // If this is the node currently being charted, explicitly push the live tick
@@ -499,35 +539,6 @@ function connect() {
             document.body.innerHTML += '<div style="color:red; background:white; font-size: 24px; position:fixed; z-index:9999; top:10px; left:10px;">ERROR: ' + error.message + ' <br/> ' + error.stack + '</div>';
         }
     };
-}
-
-// Builds exactly what GraphExplain does in Java, allowing us to bootstrap the initial render
-function buildMermaidString(values) {
-    let str = "graph TD;\n";
-    // We infer topology loosely here just for fallback, but ideally in a production
-    // scenario, the server would send the topology *once* on connect, and then only deltas.
-    // For this prototype, we'll hardcode the Tri-Arb topology since it's known, 
-    // or rely on a simpler top-down flow if we just list nodes.
-
-    // Hardcoded Tri-Arb layout for absolute structural perfection
-    str += `
-      USDJPY["<div class='node-inner'><span class='node-title source-node'>USDJPY</span><b class='node-value'>${formatVal(values['USDJPY'])}</b></div>"];
-      style USDJPY fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-      EURJPY["<div class='node-inner'><span class='node-title source-node'>EURJPY</span><b class='node-value'>${formatVal(values['EURJPY'])}</b></div>"];
-      style EURJPY fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-      EURUSD["<div class='node-inner'><span class='node-title source-node'>EURUSD</span><b class='node-value'>${formatVal(values['EURUSD'])}</b></div>"];
-      style EURUSD fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-      
-      Arb_Spread["<div class='node-inner'><span class='node-title'>Arb.Spread</span><b class='node-value'>${formatVal(values['Arb.Spread'])}</b></div>"];
-      Arb_Spread_Ewma["<div class='node-inner'><span class='node-title'>Arb.Spread.Ewma</span><b class='node-value'>${formatVal(values['Arb.Spread.Ewma'])}</b></div>"];
-      
-      USDJPY --> Arb_Spread;
-      EURJPY --> Arb_Spread;
-      EURUSD --> Arb_Spread;
-      Arb_Spread --> Arb_Spread_Ewma;
-    `;
-
-    return str;
 }
 
 // Formats number to N decimal places
@@ -1143,14 +1154,14 @@ function openChart(nodeId) {
 
         // Populate the existing history buffers instantly
         try {
-            const arr = nodeHistory.get(nodeId) || [];
-            const nanArr = nodeNaNHistory.get(nodeId) || [];
+            const arr = nodeHistory.get(nodeId) ? nodeHistory.get(nodeId).toArray() : [];
+            const nanArr = nodeNaNHistory.get(nodeId) ? nodeNaNHistory.get(nodeId).toArray() : [];
 
             if (isScrubbing) {
                 const scrubberIdx = parseInt(document.getElementById('time-scrubber').value);
                 lineS.setData(arr.slice(0, scrubberIdx + 1));
-                if (snapshots[scrubberIdx]) {
-                    const maxEpoch = snapshots[scrubberIdx].epoch;
+                if (snapshots.get(scrubberIdx)) {
+                    const maxEpoch = snapshots.get(scrubberIdx).epoch;
                     nanS.setData(nanArr.filter(p => p.time <= maxEpoch));
                 }
             } else {
@@ -1198,7 +1209,7 @@ function closeChart() {
 
 if (tlStatus) {
     tlStatus.addEventListener('click', () => {
-        if (!isScrubbing || snapshots.length === 0) return;
+        if (!isScrubbing || snapshots.size === 0) return;
 
         // Jump back to Live unconditionally
         isScrubbing = false;
@@ -1209,10 +1220,10 @@ if (tlStatus) {
 
         const scrubber = document.getElementById('time-scrubber');
         if (scrubber) {
-            scrubber.value = snapshots.length - 1;
+            scrubber.value = snapshots.size - 1;
         }
 
-        const lastPayload = snapshots[snapshots.length - 1];
+        const lastPayload = snapshots.last();
         document.getElementById('timeline-epoch').textContent = 'Epoch: ' + lastPayload.epoch;
         updateGraphDOM(lastPayload.values);
         updateMetricsDOM(lastPayload);
@@ -1226,7 +1237,7 @@ if (timeScrub) {
         isScrubbing = true;
         const idx = parseInt(e.target.value);
 
-        if (idx >= snapshots.length - 1) {
+        if (idx >= snapshots.size - 1) {
             // Returned to Live
             isScrubbing = false;
             if (tlStatus) {
@@ -1236,7 +1247,7 @@ if (timeScrub) {
             const btnAutoTrack = document.getElementById('btn-auto-track');
             if (btnAutoTrack) btnAutoTrack.style.display = 'none';
 
-            const lastPayload = snapshots[snapshots.length - 1];
+            const lastPayload = snapshots.last();
             if (lastPayload) {
                 document.getElementById('timeline-epoch').textContent = 'Epoch: ' + lastPayload.epoch;
                 updateGraphDOM(lastPayload.values);
@@ -1250,7 +1261,7 @@ if (timeScrub) {
             const btnAutoTrack = document.getElementById('btn-auto-track');
             if (btnAutoTrack) btnAutoTrack.style.display = 'flex';
 
-            const targetPayload = snapshots[idx];
+            const targetPayload = snapshots.get(idx);
             if (targetPayload) {
                 document.getElementById('timeline-epoch').textContent = 'Epoch: ' + targetPayload.epoch;
                 updateGraphDOM(targetPayload.values);
@@ -1266,12 +1277,12 @@ function renderScrubbedChartScrubbed(idx) {
     for (const [nodeId, cs] of activeChartSeries.entries()) {
         const historyArr = nodeHistory.get(nodeId);
         if (historyArr && cs.lineSeries) {
-            cs.lineSeries.setData(historyArr.slice(0, idx + 1));
+            cs.lineSeries.setData(historyArr.toArray().slice(0, idx + 1));
         }
         const nanArr = nodeNaNHistory.get(nodeId);
-        if (cs.nanSeries && nanArr && snapshots[idx]) {
-            const maxEpoch = snapshots[idx].epoch;
-            cs.nanSeries.setData(nanArr.filter(p => p.time <= maxEpoch));
+        if (cs.nanSeries && nanArr && snapshots.get(idx)) {
+            const maxEpoch = snapshots.get(idx).epoch;
+            cs.nanSeries.setData(nanArr.toArray().filter(p => p.time <= maxEpoch));
         }
     }
 }
@@ -1281,11 +1292,11 @@ function renderScrubbedChartLive() {
     for (const [nodeId, cs] of activeChartSeries.entries()) {
         const historyArr = nodeHistory.get(nodeId);
         if (historyArr && cs.lineSeries) {
-            cs.lineSeries.setData(historyArr);
+            cs.lineSeries.setData(historyArr.toArray());
         }
         const nanArr = nodeNaNHistory.get(nodeId);
         if (cs.nanSeries && nanArr) {
-            cs.nanSeries.setData(nanArr);
+            cs.nanSeries.setData(nanArr.toArray());
         }
     }
 }
