@@ -649,13 +649,28 @@ path.flowchart-link[data-source-hover-self="true"] {
 }
 
 /* Modern Typography Mapping */
+.node-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
 .node-title {
     font-size: calc(13px * var(--node-text-scale, 1.0));
     font-weight: 500;
     fill: #8b92a5 !important;
-    /* Muted gray text */
     color: #8b92a5 !important;
     letter-spacing: 0.3px;
+    line-height: 1.1;
+    transition: font-size 0.2s ease;
+}
+
+.node-type {
+    font-size: calc(10px * var(--node-text-scale, 1.0));
+    color: #6e7681 !important;
+    line-height: 1.0;
     transition: font-size 0.2s ease;
 }
 

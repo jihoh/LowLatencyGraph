@@ -144,6 +144,7 @@ const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#0
 let chartColorIndex = 0;
 
 // Global Z-Index tracker for draggable panels
+let highestZIndex = 1000;
 let isScrubbing = false;
 
 // Heavily hit DOM elements hoisted for zero-allocation access loops

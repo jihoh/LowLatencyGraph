@@ -5,7 +5,6 @@ import com.trading.drg.engine.*;
 
 import java.util.*;
 
-import com.trading.drg.api.*;
 import com.trading.drg.util.ScalarCutoffs;
 
 /**
@@ -56,11 +55,13 @@ public final class JsonGraphCompiler {
         nodeDefs = topologicalSort(nodeDefs);
 
         Map<String, Node<?>> nodesByName = new HashMap<>(nodeDefs.size() * 2);
+        Map<String, String> logicalTypes = new HashMap<>(nodeDefs.size() * 2);
         var topo = TopologicalOrder.builder();
 
         // 2. Instantiate and Build Topology
         for (var nd : nodeDefs) {
             NodeType type = NodeType.fromString(nd.getType());
+            logicalTypes.put(nd.getName(), type.name());
             NodeFactory f = registry.getFactory(type);
             if (f == null)
                 throw new IllegalArgumentException("No factory registered for type: " + type.name());
@@ -90,7 +91,7 @@ public final class JsonGraphCompiler {
         }
 
         return new CompiledGraph(graphInfo.getName(), graphInfo.getVersion(),
-                new StabilizationEngine(topo.build()), nodesByName);
+                new StabilizationEngine(topo.build()), nodesByName, logicalTypes);
     }
 
     private List<GraphDefinition.NodeDef> topologicalSort(List<GraphDefinition.NodeDef> nodes) {
@@ -260,12 +261,15 @@ public final class JsonGraphCompiler {
         private final String name, version;
         private final StabilizationEngine engine;
         private final Map<String, Node<?>> nodesByName;
+        private final Map<String, String> logicalTypes;
 
-        CompiledGraph(String name, String version, StabilizationEngine engine, Map<String, Node<?>> nodesByName) {
+        CompiledGraph(String name, String version, StabilizationEngine engine, Map<String, Node<?>> nodesByName,
+                Map<String, String> logicalTypes) {
             this.name = name;
             this.version = version;
             this.engine = engine;
             this.nodesByName = Collections.unmodifiableMap(nodesByName);
+            this.logicalTypes = Collections.unmodifiableMap(logicalTypes);
         }
 
         public String name() {
@@ -282,6 +286,10 @@ public final class JsonGraphCompiler {
 
         public Map<String, Node<?>> nodesByName() {
             return nodesByName;
+        }
+
+        public Map<String, String> logicalTypes() {
+            return logicalTypes;
         }
     }
 }

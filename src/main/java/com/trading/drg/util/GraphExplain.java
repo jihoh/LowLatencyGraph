@@ -1,8 +1,5 @@
 package com.trading.drg.util;
 
-import com.trading.drg.api.*;
-import com.trading.drg.engine.*;
-
 import com.trading.drg.api.Node;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.engine.TopologicalOrder;
@@ -25,10 +22,16 @@ import com.trading.drg.node.ScalarSourceNode;
 public final class GraphExplain {
     private final StabilizationEngine engine;
     private final TopologicalOrder topology;
+    private final java.util.Map<String, String> logicalTypes;
 
     public GraphExplain(StabilizationEngine engine) {
+        this(engine, java.util.Collections.emptyMap());
+    }
+
+    public GraphExplain(StabilizationEngine engine, java.util.Map<String, String> logicalTypes) {
         this.engine = engine;
         this.topology = engine.topology();
+        this.logicalTypes = logicalTypes;
     }
 
     /**
@@ -110,16 +113,27 @@ public final class GraphExplain {
                 val = ssn.doubleValue();
             }
             String valueStr = String.format("%.4f", val);
+            String nodeType = logicalTypes.get(node.name());
+            if (nodeType == null) {
+                // Fallback for programmatic nodes without explicit JSON types
+                String className = node.getClass().getSimpleName();
+                if (className.endsWith("Node")) {
+                    className = className.substring(0, className.length() - 4);
+                }
+                nodeType = className.replaceAll("([a-z])([A-Z]+)", "$1_$2").toUpperCase();
+            }
 
             // Stylize nodes with semantic span classes for CSS isolation
             if (topology.isSource(i)) {
                 sb.append("  ").append(safeName)
                         .append("[\"<div class='node-inner'><span class='node-title source-node'>").append(node.name())
-                        .append("</span><b class='node-value'>").append(valueStr).append("</b></div>\"];\n");
+                        .append("</span><span class='node-type'>").append(nodeType).append("</span>")
+                        .append("<b class='node-value'>").append(valueStr).append("</b></div>\"];\n");
             } else {
                 sb.append("  ").append(safeName).append("[\"<div class='node-inner'><span class='node-title'>")
                         .append(node.name())
-                        .append("</span><b class='node-value'>").append(valueStr).append("</b></div>\"];\n");
+                        .append("</span><span class='node-type'>").append(nodeType).append("</span>")
+                        .append("<b class='node-value'>").append(valueStr).append("</b></div>\"];\n");
             }
 
             int cc = topology.childCount(i);

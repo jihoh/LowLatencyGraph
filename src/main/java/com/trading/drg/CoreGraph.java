@@ -6,7 +6,6 @@ import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.io.GraphDefinition;
 import com.trading.drg.io.JsonGraphCompiler;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.File;
 // Removed Wiring imports
 import com.trading.drg.api.ScalarValue;
 
@@ -34,6 +33,7 @@ public class CoreGraph {
 
     private final String name;
     private final String version;
+    private final Map<String, String> logicalTypes;
 
     private final com.trading.drg.util.CompositeStabilizationListener compositeListener;
 
@@ -77,6 +77,7 @@ public class CoreGraph {
 
         this.engine = compiled.engine();
         this.nodes = compiled.nodesByName();
+        this.logicalTypes = compiled.logicalTypes();
 
         // Pre-cache source nodes for update()
         var topology = engine.topology();
@@ -155,7 +156,7 @@ public class CoreGraph {
             this.dashboardServer = new com.trading.drg.web.GraphDashboardServer();
 
             var wsListener = new com.trading.drg.web.WebsocketPublisherListener(
-                    this.engine, this.dashboardServer, this.name, this.version);
+                    this.engine, this.dashboardServer, this.name, this.version, this.logicalTypes);
 
             if (this.latencyListener != null) {
                 wsListener.setLatencyListener(this.latencyListener);
