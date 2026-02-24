@@ -375,8 +375,11 @@ body {
     border-radius: 0;
     border: 1px solid var(--border-color);
     flex-shrink: 0;
-    max-height: 240px;
-    /* Fits header + 5 rows cleanly */
+    height: 240px;
+    min-height: 100px;
+    max-height: 90vh;
+    resize: vertical;
+    /* Fits header + 5 rows cleanly, but user can resize down */
     overflow-y: auto;
     overflow-x: auto;
 }
