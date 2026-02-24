@@ -51,6 +51,11 @@ public final class JsonGraphCompiler {
 
         var nodeDefs = expandTemplates(graphInfo.getNodes(), templateMap);
 
+        // Capture original JSON sequence
+        List<String> originalOrder = nodeDefs.stream()
+                .map(GraphDefinition.NodeDef::getName)
+                .toList();
+
         // 1. Sort dependencies topologically
         nodeDefs = topologicalSort(nodeDefs);
 
@@ -91,7 +96,7 @@ public final class JsonGraphCompiler {
         }
 
         return new CompiledGraph(graphInfo.getName(), graphInfo.getVersion(),
-                new StabilizationEngine(topo.build()), nodesByName, logicalTypes);
+                new StabilizationEngine(topo.build()), nodesByName, logicalTypes, originalOrder);
     }
 
     private List<GraphDefinition.NodeDef> topologicalSort(List<GraphDefinition.NodeDef> nodes) {
@@ -262,14 +267,16 @@ public final class JsonGraphCompiler {
         private final StabilizationEngine engine;
         private final Map<String, Node<?>> nodesByName;
         private final Map<String, String> logicalTypes;
+        private final List<String> originalOrder;
 
         CompiledGraph(String name, String version, StabilizationEngine engine, Map<String, Node<?>> nodesByName,
-                Map<String, String> logicalTypes) {
+                Map<String, String> logicalTypes, List<String> originalOrder) {
             this.name = name;
             this.version = version;
             this.engine = engine;
             this.nodesByName = Collections.unmodifiableMap(nodesByName);
             this.logicalTypes = Collections.unmodifiableMap(logicalTypes);
+            this.originalOrder = Collections.unmodifiableList(originalOrder);
         }
 
         public String name() {
@@ -290,6 +297,10 @@ public final class JsonGraphCompiler {
 
         public Map<String, String> logicalTypes() {
             return logicalTypes;
+        }
+
+        public List<String> originalOrder() {
+            return originalOrder;
         }
     }
 }

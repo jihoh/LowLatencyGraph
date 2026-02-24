@@ -23,15 +23,22 @@ public final class GraphExplain {
     private final StabilizationEngine engine;
     private final TopologicalOrder topology;
     private final java.util.Map<String, String> logicalTypes;
+    private final java.util.List<String> displayOrder;
 
     public GraphExplain(StabilizationEngine engine) {
-        this(engine, java.util.Collections.emptyMap());
+        this(engine, java.util.Collections.emptyMap(), java.util.Collections.emptyList());
     }
 
     public GraphExplain(StabilizationEngine engine, java.util.Map<String, String> logicalTypes) {
+        this(engine, logicalTypes, java.util.Collections.emptyList());
+    }
+
+    public GraphExplain(StabilizationEngine engine, java.util.Map<String, String> logicalTypes,
+            java.util.List<String> displayOrder) {
         this.engine = engine;
         this.topology = engine.topology();
         this.logicalTypes = logicalTypes;
+        this.displayOrder = displayOrder;
     }
 
     /**
@@ -101,7 +108,21 @@ public final class GraphExplain {
     public String toMermaid() {
         StringBuilder sb = new StringBuilder(4096);
         sb.append("graph TD;\n");
-        for (int i = 0; i < topology.nodeCount(); i++) {
+
+        java.util.List<String> order = this.displayOrder != null && !this.displayOrder.isEmpty()
+                ? this.displayOrder
+                : new java.util.ArrayList<>();
+        if (order.isEmpty()) {
+            for (int i = 0; i < topology.nodeCount(); i++) {
+                order.add(topology.node(i).name());
+            }
+        }
+
+        // 1. Declare nodes in exact display order
+        for (String nodeName : order) {
+            int i = topology.topoIndex(nodeName);
+            if (i < 0)
+                continue;
             Node<?> node = topology.node(i);
             String safeName = sanitize(node.name());
 
@@ -135,6 +156,15 @@ public final class GraphExplain {
                         .append("</span><span class='node-type'>").append(nodeType).append("</span>")
                         .append("<b class='node-value'>").append(valueStr).append("</b></div>\"];\n");
             }
+        }
+
+        // 2. Declare all edges afterwards
+        for (String nodeName : order) {
+            int i = topology.topoIndex(nodeName);
+            if (i < 0)
+                continue;
+            Node<?> node = topology.node(i);
+            String safeName = sanitize(node.name());
 
             int cc = topology.childCount(i);
             for (int j = 0; j < cc; j++) {

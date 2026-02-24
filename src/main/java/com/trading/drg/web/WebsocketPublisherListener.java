@@ -43,12 +43,12 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final StringBuilder jsonBuilder = new StringBuilder(1024);
 
     public WebsocketPublisherListener(StabilizationEngine engine, GraphDashboardServer server, String graphName,
-            String graphVersion, java.util.Map<String, String> logicalTypes) {
+            String graphVersion, java.util.Map<String, String> logicalTypes, java.util.List<String> originalOrder) {
         this.engine = engine;
         this.server = server;
         this.graphName = graphName;
         this.graphVersion = graphVersion;
-        this.initialMermaid = new com.trading.drg.util.GraphExplain(engine, logicalTypes).toMermaid()
+        this.initialMermaid = new com.trading.drg.util.GraphExplain(engine, logicalTypes, originalOrder).toMermaid()
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n");
 
