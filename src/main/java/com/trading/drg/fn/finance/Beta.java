@@ -69,4 +69,5 @@ public class Beta extends AbstractFn2 {
 
         return covXY / varY;
     }
+
 }

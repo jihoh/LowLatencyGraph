@@ -45,4 +45,5 @@ public class Rsi extends AbstractFn1 {
         double rs = avgGain / avgLoss;
         return 100.0 - (100.0 / (1.0 + rs));
     }
+
 }

@@ -93,6 +93,8 @@ public final class GraphDefinition {
     public static final class NodeDef {
         private String name, type;
         private boolean source;
+        @com.fasterxml.jackson.annotation.JsonAlias("dependencies")
+        private Map<String, String> inputs;
         private List<String> dependencies;
         private Map<String, Object> properties;
 
@@ -126,6 +128,14 @@ public final class GraphDefinition {
 
         public void setDependencies(List<String> v) {
             dependencies = v;
+        }
+
+        public Map<String, String> getInputs() {
+            return inputs;
+        }
+
+        public void setInputs(Map<String, String> inputs) {
+            this.inputs = inputs;
         }
 
         public Map<String, Object> getProperties() {

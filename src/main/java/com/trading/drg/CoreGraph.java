@@ -35,6 +35,7 @@ public class CoreGraph {
     private final String version;
     private final Map<String, String> logicalTypes;
     private final java.util.List<String> originalOrder;
+    private final Map<String, Map<String, String>> edgeLabels;
 
     private final com.trading.drg.util.CompositeStabilizationListener compositeListener;
 
@@ -80,6 +81,7 @@ public class CoreGraph {
         this.nodes = compiled.nodesByName();
         this.logicalTypes = compiled.logicalTypes();
         this.originalOrder = compiled.originalOrder();
+        this.edgeLabels = compiled.edgeLabels();
 
         // Pre-cache source nodes for update()
         var topology = engine.topology();
@@ -158,7 +160,8 @@ public class CoreGraph {
             this.dashboardServer = new com.trading.drg.web.GraphDashboardServer();
 
             var wsListener = new com.trading.drg.web.WebsocketPublisherListener(
-                    this.engine, this.dashboardServer, this.name, this.version, this.logicalTypes, this.originalOrder);
+                    this.engine, this.dashboardServer, this.name, this.version, this.logicalTypes, this.originalOrder,
+                    this.edgeLabels);
 
             if (this.latencyListener != null) {
                 wsListener.setLatencyListener(this.latencyListener);

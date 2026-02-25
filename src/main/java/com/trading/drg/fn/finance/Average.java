@@ -13,4 +13,5 @@ public class Average extends AbstractFnN {
         }
         return sum / inputs.length;
     }
+
 }

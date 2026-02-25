@@ -5,6 +5,7 @@ package com.trading.drg.fn.finance;
  * 
  * y[t] = ln(x[t] / x[t-1])
  */
+
 public class LogReturn extends AbstractFn1 {
     private double prev;
     private boolean initialized = false;
@@ -30,4 +31,5 @@ public class LogReturn extends AbstractFn1 {
         prev = input;
         return ret;
     }
+
 }

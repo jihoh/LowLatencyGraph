@@ -11,6 +11,7 @@ package com.trading.drg.fn.finance;
  * 
  * Var = (Sum(x^2) / N) - (Sum(x) / N)^2
  */
+
 public class HistVol extends AbstractFn1 {
     private final double[] window;
     private final int size;
@@ -65,4 +66,5 @@ public class HistVol extends AbstractFn1 {
         // Assuming it should return the standard deviation directly if not provided.
         return Math.sqrt(variance);
     }
+
 }

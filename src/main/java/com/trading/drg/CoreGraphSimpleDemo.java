@@ -40,6 +40,11 @@ public class CoreGraphSimpleDemo {
         int updates = 100_000;
 
         String[] nodes = { "EURUSD", "USDJPY", "EURJPY" };
+        graph.update("EURUSD", 1.18);
+        graph.update("USDJPY", 154.9);
+        graph.update("EURJPY", 182.8);
+        graph.stabilize();
+
         int nanCountdown = 0;
         String nanNode = null;
 
@@ -76,10 +81,7 @@ public class CoreGraphSimpleDemo {
             double shock = (rng.nextDouble() - 0.5) * 0.05; // Slightly larger shock for 1s ticks
             double currentValue = graph.getDouble(targetNode);
 
-            // Cold start: The graph now defaults to NaN. Seed it on the first tick.
-            if (Double.isNaN(currentValue)) {
-                currentValue = targetNode.equals("USDJPY") ? 154.9 : (targetNode.equals("EURJPY") ? 182.8 : 1.18);
-            }
+            // Remove the Double.isNaN() cold start block entirely.
 
             if (targetNode.contains("JPY")) {
                 shock *= 100;

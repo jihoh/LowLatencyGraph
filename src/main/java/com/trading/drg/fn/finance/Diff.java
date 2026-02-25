@@ -5,6 +5,7 @@ package com.trading.drg.fn.finance;
  * 
  * y[t] = x[t] - x[t-1]
  */
+
 public class Diff extends AbstractFn1 {
     private double prev;
     private boolean initialized = false;
@@ -21,4 +22,5 @@ public class Diff extends AbstractFn1 {
         prev = input;
         return diff;
     }
+
 }

@@ -25,4 +25,5 @@ public class WeightedAverage extends AbstractFnN {
             return Double.NaN;
         return sumProduct / sumWeight;
     }
+
 }

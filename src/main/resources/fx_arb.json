@@ -18,18 +18,18 @@
             {
                 "name": "Arb.Spread",
                 "type": "TRI_ARB_SPREAD",
-                "dependencies": [
-                    "EURUSD",
-                    "USDJPY",
-                    "EURJPY"
-                ]
+                "inputs": {
+                    "leg1": "EURUSD",
+                    "leg2": "USDJPY",
+                    "direct": "EURJPY"
+                }
             },
             {
                 "name": "Arb.Spread.Ewma",
                 "type": "EWMA",
-                "dependencies": [
-                    "Arb.Spread"
-                ],
+                "inputs": {
+                    "input": "Arb.Spread"
+                },
                 "properties": {
                     "alpha": 0.1
                 }

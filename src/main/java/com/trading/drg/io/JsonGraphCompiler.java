@@ -27,8 +27,8 @@ public final class JsonGraphCompiler {
     /**
      * Registers a factory for a specific node type enum.
      */
-    public JsonGraphCompiler registerFactory(NodeType type, NodeFactory f) {
-        registry.registerFactory(type, f);
+    public JsonGraphCompiler registerFactory(NodeType type, NodeRegistry.NodeMetadata meta) {
+        registry.registerFactory(type, meta.namedInputs(), meta.factory());
         return this;
     }
 
@@ -61,25 +61,59 @@ public final class JsonGraphCompiler {
 
         Map<String, Node<?>> nodesByName = new HashMap<>(nodeDefs.size() * 2);
         Map<String, String> logicalTypes = new HashMap<>(nodeDefs.size() * 2);
+        Map<String, Map<String, String>> edgeLabels = new HashMap<>(nodeDefs.size() * 2);
         var topo = TopologicalOrder.builder();
 
         // 2. Instantiate and Build Topology
         for (var nd : nodeDefs) {
             NodeType type = NodeType.fromString(nd.getType());
             logicalTypes.put(nd.getName(), type.name());
-            NodeFactory f = registry.getFactory(type);
-            if (f == null)
-                throw new IllegalArgumentException("No factory registered for type: " + type.name());
-
-            Node<?>[] deps = new Node<?>[0];
-            if (nd.getDependencies() != null) {
-                deps = new Node<?>[nd.getDependencies().size()];
-                for (int i = 0; i < deps.length; i++) {
-                    deps[i] = nodesByName.get(nd.getDependencies().get(i));
-                }
+            NodeRegistry.NodeMetadata meta = registry.getMetadata(type);
+            if (meta == null) {
+                throw new IllegalArgumentException("No NodeFactory for type " + type + " in node " + nd.getName());
             }
 
-            Node<?> node = f.create(nd.getName(),
+            // Resolve dependencies array
+            Node<?>[] deps;
+
+            // 1. Array Dependencies (legacy)
+            if (nd.getDependencies() != null && !nd.getDependencies().isEmpty()) {
+                deps = new Node<?>[nd.getDependencies().size()];
+                for (int i = 0; i < deps.length; i++) {
+                    String depName = nd.getDependencies().get(i);
+                    Node<?> upstream = nodesByName.get(depName);
+                    if (upstream == null)
+                        throw new IllegalArgumentException(
+                                "Dependency " + depName + " not found for node " + nd.getName());
+
+                    deps[i] = upstream;
+                }
+            }
+            // 2. Named Map Inputs (new)
+            else if (nd.getInputs() != null && !nd.getInputs().isEmpty() && meta.namedInputs() != null) {
+                deps = new Node<?>[meta.namedInputs().length];
+                for (int i = 0; i < deps.length; i++) {
+                    String inputKey = meta.namedInputs()[i];
+                    String depName = nd.getInputs().get(inputKey);
+                    if (depName == null) {
+                        throw new IllegalArgumentException(
+                                "Missing @NamedInput '" + inputKey + "' in JSON inputs map for node " + nd.getName());
+                    }
+
+                    edgeLabels.computeIfAbsent(nd.getName(), k -> new HashMap<>()).put(depName, inputKey);
+
+                    Node<?> upstream = nodesByName.get(depName);
+                    if (upstream == null)
+                        throw new IllegalArgumentException(
+                                "Dependency " + depName + " not found for node " + nd.getName());
+
+                    deps[i] = upstream;
+                }
+            } else {
+                deps = new Node<?>[0];
+            }
+
+            Node<?> node = meta.factory().create(nd.getName(),
                     nd.getProperties() != null ? nd.getProperties() : Collections.emptyMap(),
                     deps);
             nodesByName.put(nd.getName(), node);
@@ -93,10 +127,15 @@ public final class JsonGraphCompiler {
                     topo.addEdge(dep, nd.getName());
                 }
             }
+            if (nd.getInputs() != null) {
+                for (String dep : nd.getInputs().values()) {
+                    topo.addEdge(dep, nd.getName());
+                }
+            }
         }
 
         return new CompiledGraph(graphInfo.getName(), graphInfo.getVersion(),
-                new StabilizationEngine(topo.build()), nodesByName, logicalTypes, originalOrder);
+                new StabilizationEngine(topo.build()), nodesByName, logicalTypes, originalOrder, edgeLabels);
     }
 
     private List<GraphDefinition.NodeDef> topologicalSort(List<GraphDefinition.NodeDef> nodes) {
@@ -111,8 +150,20 @@ public final class JsonGraphCompiler {
         }
 
         for (var n : nodes) {
+            // Track dependencies from legacy array
             if (n.getDependencies() != null) {
                 for (String dep : n.getDependencies()) {
+                    if (!byName.containsKey(dep)) {
+                        throw new IllegalArgumentException("Unknown dependency: " + dep + " for node: " + n.getName());
+                    }
+                    outEdges.get(dep).add(n.getName());
+                    inDegree.put(n.getName(), inDegree.get(n.getName()) + 1);
+                }
+            }
+
+            // Track dependencies from new Named Inputs map
+            if (n.getInputs() != null) {
+                for (String dep : n.getInputs().values()) {
                     if (!byName.containsKey(dep)) {
                         throw new IllegalArgumentException("Unknown dependency: " + dep + " for node: " + n.getName());
                     }
@@ -268,15 +319,18 @@ public final class JsonGraphCompiler {
         private final Map<String, Node<?>> nodesByName;
         private final Map<String, String> logicalTypes;
         private final List<String> originalOrder;
+        private final Map<String, Map<String, String>> edgeLabels;
 
         CompiledGraph(String name, String version, StabilizationEngine engine, Map<String, Node<?>> nodesByName,
-                Map<String, String> logicalTypes, List<String> originalOrder) {
+                Map<String, String> logicalTypes, List<String> originalOrder,
+                Map<String, Map<String, String>> edgeLabels) {
             this.name = name;
             this.version = version;
             this.engine = engine;
             this.nodesByName = Collections.unmodifiableMap(nodesByName);
             this.logicalTypes = Collections.unmodifiableMap(logicalTypes);
             this.originalOrder = Collections.unmodifiableList(originalOrder);
+            this.edgeLabels = Collections.unmodifiableMap(edgeLabels);
         }
 
         public String name() {
@@ -301,6 +355,10 @@ public final class JsonGraphCompiler {
 
         public List<String> originalOrder() {
             return originalOrder;
+        }
+
+        public Map<String, Map<String, String>> edgeLabels() {
+            return edgeLabels;
         }
     }
 }

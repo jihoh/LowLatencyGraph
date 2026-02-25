@@ -670,6 +670,21 @@ path.flowchart-link[data-source-hover-self="true"] {
     transition: font-size 0.2s ease;
 }
 
+/* Custom Mermaid edge label styling */
+.edgeLabel {
+    font-size: calc(10px * var(--node-text-scale, 1.0)) !important;
+    background-color: transparent !important;
+    color: #6e7681 !important;
+}
+
+.edgeLabel rect {
+    fill: transparent !important;
+}
+
+.edgeLabel span {
+    background-color: transparent !important;
+}
+
 .node-type {
     font-size: calc(10px * var(--node-text-scale, 1.0));
     color: #6e7681 !important;
@@ -1247,4 +1262,34 @@ body.severe-alert #severe-alert-overlay {
     background: var(--accent-blue);
     border-color: var(--accent-blue);
     color: white;
+}
+
+/* =========================================================================
+   Custom Context Menu
+   ========================================================================= */
+.context-menu {
+    position: absolute;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 0;
+    min-width: 150px;
+    z-index: 99999;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    font-size: 0.85rem;
+}
+
+.context-menu.hidden {
+    display: none;
+}
+
+.context-menu-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: background-color 0.2s;
+}
+
+.context-menu-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
 }

@@ -10,13 +10,9 @@ package com.trading.drg.fn.finance;
 public class TriangularArbSpread extends AbstractFn3 {
 
     @Override
-    protected double calculate(double eurUsd, double usdJpy, double eurJpy) {
-        // 1. Calculate Synthetic EUR/JPY
-        // (EUR/USD) * (USD/JPY) = EUR/JPY
-        double synthetic = eurUsd * usdJpy;
-
-        // 2. Calculate Spread
-        // Direct - Synthetic
-        return eurJpy - synthetic;
+    protected double calculate(double leg1, double leg2, double direct) {
+        double synthetic = leg1 * leg2;
+        return direct - synthetic;
     }
+
 }

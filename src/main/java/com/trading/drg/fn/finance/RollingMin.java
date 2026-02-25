@@ -44,4 +44,5 @@ public class RollingMin extends AbstractFn1 {
         }
         return min;
     }
+
 }

@@ -39,4 +39,5 @@ public class Sma extends AbstractFn1 {
             return sum / size;
         }
     }
+
 }

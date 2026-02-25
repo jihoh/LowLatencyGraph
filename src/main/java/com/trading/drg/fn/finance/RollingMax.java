@@ -58,4 +58,5 @@ public class RollingMax extends AbstractFn1 {
         }
         return max;
     }
+
 }

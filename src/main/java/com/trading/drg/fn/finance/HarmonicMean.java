@@ -25,4 +25,5 @@ public class HarmonicMean extends AbstractFnN {
 
         return inputs.length / sumInverse;
     }
+
 }

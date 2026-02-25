@@ -24,6 +24,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final String graphName;
     private final String graphVersion;
     private final String initialMermaid;
+    private final java.util.Map<String, java.util.Map<String, String>> edgeLabels;
     private final com.trading.drg.util.ErrorRateLimiter errLimiter = new com.trading.drg.util.ErrorRateLimiter(log,
             1000);
 
@@ -43,12 +44,15 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final StringBuilder jsonBuilder = new StringBuilder(1024);
 
     public WebsocketPublisherListener(StabilizationEngine engine, GraphDashboardServer server, String graphName,
-            String graphVersion, java.util.Map<String, String> logicalTypes, java.util.List<String> originalOrder) {
+            String graphVersion, java.util.Map<String, String> logicalTypes, java.util.List<String> originalOrder,
+            java.util.Map<String, java.util.Map<String, String>> edgeLabels) {
         this.engine = engine;
         this.server = server;
         this.graphName = graphName;
         this.graphVersion = graphVersion;
-        this.initialMermaid = new com.trading.drg.util.GraphExplain(engine, logicalTypes, originalOrder).toMermaid()
+        this.edgeLabels = edgeLabels;
+        this.initialMermaid = new com.trading.drg.util.GraphExplain(engine, logicalTypes, originalOrder, edgeLabels)
+                .toMermaid()
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n");
 
@@ -82,7 +86,30 @@ public class WebsocketPublisherListener implements StabilizationListener {
             if (i < nodeCount - 1)
                 initBuilder.append(",");
         }
-        initBuilder.append("}}");
+        initBuilder.append("},");
+
+        initBuilder.append("\"edgeLabels\":{");
+        boolean firstEdge = true;
+        if (edgeLabels != null) {
+            for (var entry : edgeLabels.entrySet()) {
+                if (!firstEdge)
+                    initBuilder.append(",");
+                initBuilder.append("\"").append(entry.getKey()).append("\":{");
+                boolean firstChild = true;
+                for (var childEntry : entry.getValue().entrySet()) {
+                    if (!firstChild)
+                        initBuilder.append(",");
+                    initBuilder.append("\"").append(childEntry.getKey()).append("\":\"")
+                            .append(childEntry.getValue().replace("\"", "\\\"")).append("\"");
+                    firstChild = false;
+                }
+                initBuilder.append("}");
+                firstEdge = false;
+            }
+        }
+        initBuilder.append("}");
+
+        initBuilder.append("}");
 
         server.setInitialGraphConfig(initBuilder.toString());
     }

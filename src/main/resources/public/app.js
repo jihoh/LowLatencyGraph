@@ -153,6 +153,26 @@ const domTimelineEpoch = document.getElementById('timeline-epoch');
 const domAlertModal = document.getElementById('alert-modal');
 const domAlertModalText = document.getElementById('alert-modal-text');
 
+// Global Context Menu Listeners
+document.addEventListener('click', (e) => {
+    const ctxMenu = document.getElementById('node-context-menu');
+    if (ctxMenu && !ctxMenu.classList.contains('hidden')) {
+        // If they click anywhere else, including the native Mermaid canvas, hide it
+        ctxMenu.classList.add('hidden');
+    }
+});
+
+const ctxAddChartBtn = document.getElementById('ctx-add-chart');
+if (ctxAddChartBtn) {
+    ctxAddChartBtn.addEventListener('click', (e) => {
+        const ctxMenu = document.getElementById('node-context-menu');
+        const nodeName = ctxMenu ? ctxMenu.dataset.contextNode : null;
+        if (nodeName) {
+            openChart(nodeName);
+        }
+    });
+}
+
 
 // The UI Zoom buttons bridge over to the active instance
 document.getElementById('zoom-in').addEventListener('click', () => {
@@ -812,8 +832,22 @@ function attachHoverListeners() {
             const graphView = document.getElementById('graph-view');
             if (graphView) graphView.classList.remove('graph-hover-active');
         });
-        nodeGroup.addEventListener('click', () => {
-            openChart(nodeName);
+        nodeGroup.addEventListener('contextmenu', (e) => {
+            e.preventDefault(); // Prevent browser right-click menu
+            const ctxMenu = document.getElementById('node-context-menu');
+            if (ctxMenu) {
+                ctxMenu.style.left = `${e.clientX}px`;
+                ctxMenu.style.top = `${e.clientY}px`;
+                ctxMenu.classList.remove('hidden');
+                ctxMenu.dataset.contextNode = nodeName;
+            }
+        });
+        nodeGroup.addEventListener('click', (e) => {
+            // Also explicitly hide the context menu if they left-click the node itself
+            const ctxMenu = document.getElementById('node-context-menu');
+            if (ctxMenu && !ctxMenu.classList.contains('hidden')) {
+                ctxMenu.classList.add('hidden');
+            }
         });
         // Make it obviously clickable
         nodeGroup.style.cursor = 'pointer';
