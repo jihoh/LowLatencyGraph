@@ -143,16 +143,6 @@ const activeChartSeries = new Map(); // nodeId -> { lineSeries, nanSeries, color
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308', '#ef4444'];
 let chartColorIndex = 0;
 
-// Global Z-Index tracker for draggable panels
-let highestZIndex = 1000;
-let isScrubbing = false;
-
-// Heavily hit DOM elements hoisted for zero-allocation access loops
-const domTimeScrubber = document.getElementById('time-scrubber');
-const domTimelineEpoch = document.getElementById('timeline-epoch');
-const domAlertModal = document.getElementById('alert-modal');
-const domAlertModalText = document.getElementById('alert-modal-text');
-
 // Global Context Menu Listeners
 document.addEventListener('click', (e) => {
     const ctxMenu = document.getElementById('node-context-menu');
@@ -173,6 +163,156 @@ if (ctxAddChartBtn) {
     });
 }
 
+// Global Descriptions and Edge Labels Cache
+let nodeDescriptions = {};
+let edgeLabels = {};
+let expandedGroups = new Set();
+let activeDetailsNode = null;
+
+const ctxViewDetailsBtn = document.getElementById('ctx-view-details');
+if (ctxViewDetailsBtn) {
+    ctxViewDetailsBtn.addEventListener('click', () => {
+        const ctxMenu = document.getElementById('node-context-menu');
+        const nodeName = ctxMenu ? ctxMenu.dataset.contextNode : null;
+        if (nodeName) {
+            openDetailsModal(nodeName);
+        }
+    });
+}
+
+document.getElementById('details-close').addEventListener('click', closeDetailsModal);
+
+// Details Modal Draggable Logic
+const detailsModalEl = document.querySelector('.details-modal');
+const detailsHeaderEl = document.getElementById('details-node-name');
+let isDetailsDragging = false;
+let detailsDragStartX = 0;
+let detailsDragStartY = 0;
+let detailsInitialLeft = 0;
+let detailsInitialTop = 0;
+
+detailsHeaderEl.addEventListener('mousedown', (e) => {
+    isDetailsDragging = true;
+    detailsDragStartX = e.clientX;
+    detailsDragStartY = e.clientY;
+
+    // Bring to front
+    highestZIndex++;
+    document.getElementById('node-details-modal').style.zIndex = highestZIndex;
+
+    const rect = detailsModalEl.getBoundingClientRect();
+    detailsInitialLeft = rect.left;
+    detailsInitialTop = rect.top;
+
+    detailsModalEl.style.transform = 'none';
+    detailsModalEl.style.left = `${detailsInitialLeft}px`;
+    detailsModalEl.style.top = `${detailsInitialTop}px`;
+    detailsHeaderEl.style.cursor = 'grabbing';
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (!isDetailsDragging) return;
+    const dx = e.clientX - detailsDragStartX;
+    const dy = e.clientY - detailsDragStartY;
+    detailsModalEl.style.left = `${detailsInitialLeft + dx}px`;
+    detailsModalEl.style.top = `${detailsInitialTop + dy}px`;
+});
+
+document.addEventListener('mouseup', () => {
+    if (isDetailsDragging) {
+        isDetailsDragging = false;
+        detailsHeaderEl.style.cursor = 'grab';
+    }
+});
+
+// Close modal when clicking outside of it
+document.getElementById('node-details-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'node-details-modal') {
+        closeDetailsModal();
+    }
+});
+
+function openDetailsModal(nodeName) {
+    const modal = document.getElementById('node-details-modal');
+
+    // Set Header and Description
+    document.getElementById('details-node-name').textContent = nodeName;
+    document.getElementById('details-node-desc').textContent = nodeDescriptions[nodeName] || "No description available for this calculation type.";
+
+    // Set Lineage
+    const parentsList = document.getElementById('details-parents-list');
+    const childrenList = document.getElementById('details-children-list');
+    parentsList.innerHTML = '';
+    childrenList.innerHTML = '';
+
+    const parents = reverseGraphRouting[nodeName] || [];
+    if (parents.length === 0) {
+        parentsList.innerHTML = '<li style="color: var(--text-secondary)">None (Source Node)</li>';
+    } else {
+        parents.forEach(p => {
+            // edgeLabels is populated as Child -> Parent -> Label
+            const labelMap = edgeLabels[nodeName];
+            const label = labelMap ? labelMap[p] : null;
+            const li = document.createElement('li');
+            li.innerHTML = `<strong>${p}</strong> ${label ? `<span style="color:var(--text-secondary); font-size: 0.8em; margin-left: 8px;">-> ${label}</span>` : ''}`;
+            parentsList.appendChild(li);
+        });
+    }
+
+    const children = graphRouting[nodeName] || [];
+    if (children.length === 0) {
+        childrenList.innerHTML = '<li style="color: var(--text-secondary)">None (Terminal Node)</li>';
+    } else {
+        children.forEach(c => {
+            const labelMap = edgeLabels[nodeName];
+            const label = labelMap ? labelMap[c] : null;
+            const li = document.createElement('li');
+            li.innerHTML = `<strong>${c}</strong> ${label ? `<span style="color:var(--text-secondary); font-size: 0.8em; margin-left: 8px;">-> ${label}</span>` : ''}`;
+            childrenList.appendChild(li);
+        });
+    }
+
+    // Set Properties
+    const propsSection = document.getElementById('details-properties-section');
+    const propsList = document.getElementById('details-properties-list');
+    if (propsList) propsList.innerHTML = '';
+
+    if (window.graphProperties && window.graphProperties[nodeName] && Object.keys(window.graphProperties[nodeName]).length > 0) {
+        if (propsSection) propsSection.style.display = 'block';
+        const props = window.graphProperties[nodeName];
+        for (const [key, value] of Object.entries(props)) {
+            const li = document.createElement('li');
+            li.innerHTML = `<span style="color:var(--text-secondary); font-family: monospace; font-size: 0.9em; display:inline-block; width: 120px;">${key}</span> <strong style="color:var(--text-highlight); font-family: monospace; font-size: 0.9em;">${value}</strong>`;
+            if (propsList) propsList.appendChild(li);
+        }
+    } else {
+        if (propsSection) propsSection.style.display = 'none';
+    }
+
+    // Reveal modal first so we can read its dimensions if needed
+    modal.classList.remove('hidden');
+    highestZIndex++;
+    modal.style.zIndex = highestZIndex;
+
+    activeDetailsNode = nodeName;
+}
+
+function closeDetailsModal() {
+    document.getElementById('node-details-modal').classList.add('hidden');
+    activeDetailsNode = null;
+}
+
+
+
+// Global Z-Index tracker for draggable panels
+let highestZIndex = 1000;
+let isScrubbing = false;
+
+// Heavily hit DOM elements hoisted for zero-allocation access loops
+let domTimeScrubber = null;
+let domTimelineEpoch = null;
+let domAlertModal = null;
+let domAlertModalText = null;
 
 // The UI Zoom buttons bridge over to the active instance
 document.getElementById('zoom-in').addEventListener('click', () => {
@@ -257,6 +397,53 @@ function updateMetricsDOM(payload) {
         }
         if (payload.metrics.profile) {
             updateProfileTable(payload.metrics.profile);
+
+            // Hydrate Live Metrics for the active Details modal if open
+            if (activeDetailsNode) {
+                const p = payload.metrics.profile.find(x => x.name === activeDetailsNode);
+                if (p) {
+                    const updEl = document.getElementById('details-metric-update');
+                    const avgEl = document.getElementById('details-metric-avg');
+                    const nanEl = document.getElementById('details-metric-nan');
+                    if (updEl) updEl.textContent = p.evaluations;
+                    if (avgEl) avgEl.textContent = formatVal(p.avg, 2);
+                    if (nanEl) nanEl.textContent = p.nans;
+                }
+            }
+        }
+    }
+
+    // Re-hydrate the single node being viewed in the node details modal
+    if (activeDetailsNode && payload.values) {
+        const val = payload.values[activeDetailsNode];
+        const valEl = document.getElementById('details-metric-value');
+        if (valEl && val !== undefined) {
+            valEl.textContent = val;
+            if (val === 'NaN') {
+                valEl.style.color = 'var(--status-down)';
+            } else {
+                valEl.style.color = 'var(--text-highlight)';
+            }
+        }
+
+        // Update states
+        if (payload.states && payload.states[activeDetailsNode]) {
+            const stateObj = payload.states[activeDetailsNode];
+            const stateSection = document.getElementById('details-state-section');
+            const stateList = document.getElementById('details-state-list');
+
+            if (stateSection && stateList) {
+                stateSection.style.display = 'block';
+                stateList.innerHTML = '';
+                for (const [key, stateVal] of Object.entries(stateObj)) {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span style="color:var(--text-secondary); font-family: monospace; font-size: 0.9em; display:inline-block; width: 120px;">${key}</span> <strong style="color:var(--text-highlight); font-family: monospace; font-size: 0.9em;">${typeof stateVal === 'number' ? Number(stateVal).toFixed(4) : stateVal}</strong>`;
+                    stateList.appendChild(li);
+                }
+            }
+        } else {
+            const stateSection = document.getElementById('details-state-section');
+            if (stateSection) stateSection.style.display = 'none';
         }
     }
 }
@@ -283,6 +470,7 @@ function connect() {
             // Branch 1: Heavy Static Initializer Payload
             if (payload.type === 'init') {
                 if (!isGraphRendered) {
+                    window.graphProperties = payload.properties || {};
                     document.getElementById('graph-title').textContent = payload.graphName;
                     document.getElementById('graph-version').textContent = "v" + payload.graphVersion;
                     // Render layout from server once
@@ -379,6 +567,15 @@ function connect() {
                             console.warn("Could not restore chart selections", e);
                         }
                     }
+
+                    // Store descriptions and edge labels globally
+                    if (payload.descriptions) {
+                        nodeDescriptions = payload.descriptions;
+                    }
+                    if (payload.edgeLabels) {
+                        edgeLabels = payload.edgeLabels;
+                    }
+
                 }
                 return; // Initialization payload processed. Do not pass to tick logic.
             }
@@ -1594,6 +1791,11 @@ function setupDockResizers() {
 
 // Init Context
 window.addEventListener('DOMContentLoaded', () => {
+    domTimeScrubber = document.getElementById('time-scrubber');
+    domTimelineEpoch = document.getElementById('timeline-epoch');
+    domAlertModal = document.getElementById('alert-modal');
+    domAlertModalText = document.getElementById('alert-modal-text');
+
     initChart();
     setupOmnidirectionalResize('chart-panel');
     setupOmnidirectionalResize('metrics-panel');

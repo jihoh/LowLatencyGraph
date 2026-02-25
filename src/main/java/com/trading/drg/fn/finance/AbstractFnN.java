@@ -35,5 +35,4 @@ public abstract class AbstractFnN implements FnN {
      * Subclasses implement the actual logic here.
      */
     protected abstract double calculate(double[] inputs);
-
 }

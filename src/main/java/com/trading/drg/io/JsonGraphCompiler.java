@@ -61,6 +61,7 @@ public final class JsonGraphCompiler {
 
         Map<String, Node<?>> nodesByName = new HashMap<>(nodeDefs.size() * 2);
         Map<String, String> logicalTypes = new HashMap<>(nodeDefs.size() * 2);
+        Map<String, String> descriptions = new HashMap<>(nodeDefs.size() * 2);
         Map<String, Map<String, String>> edgeLabels = new HashMap<>(nodeDefs.size() * 2);
         var topo = TopologicalOrder.builder();
 
@@ -68,6 +69,7 @@ public final class JsonGraphCompiler {
         for (var nd : nodeDefs) {
             NodeType type = NodeType.fromString(nd.getType());
             logicalTypes.put(nd.getName(), type.name());
+            descriptions.put(nd.getName(), type.getDescription());
             NodeRegistry.NodeMetadata meta = registry.getMetadata(type);
             if (meta == null) {
                 throw new IllegalArgumentException("No NodeFactory for type " + type + " in node " + nd.getName());
@@ -135,7 +137,8 @@ public final class JsonGraphCompiler {
         }
 
         return new CompiledGraph(graphInfo.getName(), graphInfo.getVersion(),
-                new StabilizationEngine(topo.build()), nodesByName, logicalTypes, originalOrder, edgeLabels);
+                new StabilizationEngine(topo.build()), nodesByName, logicalTypes, descriptions, originalOrder,
+                edgeLabels);
     }
 
     private List<GraphDefinition.NodeDef> topologicalSort(List<GraphDefinition.NodeDef> nodes) {
@@ -318,17 +321,19 @@ public final class JsonGraphCompiler {
         private final StabilizationEngine engine;
         private final Map<String, Node<?>> nodesByName;
         private final Map<String, String> logicalTypes;
+        private final Map<String, String> descriptions;
         private final List<String> originalOrder;
         private final Map<String, Map<String, String>> edgeLabels;
 
         CompiledGraph(String name, String version, StabilizationEngine engine, Map<String, Node<?>> nodesByName,
-                Map<String, String> logicalTypes, List<String> originalOrder,
+                Map<String, String> logicalTypes, Map<String, String> descriptions, List<String> originalOrder,
                 Map<String, Map<String, String>> edgeLabels) {
             this.name = name;
             this.version = version;
             this.engine = engine;
             this.nodesByName = Collections.unmodifiableMap(nodesByName);
             this.logicalTypes = Collections.unmodifiableMap(logicalTypes);
+            this.descriptions = Collections.unmodifiableMap(descriptions);
             this.originalOrder = Collections.unmodifiableList(originalOrder);
             this.edgeLabels = Collections.unmodifiableMap(edgeLabels);
         }
@@ -351,6 +356,10 @@ public final class JsonGraphCompiler {
 
         public Map<String, String> logicalTypes() {
             return logicalTypes;
+        }
+
+        public Map<String, String> descriptions() {
+            return descriptions;
         }
 
         public List<String> originalOrder() {

@@ -1,5 +1,6 @@
 package com.trading.drg.node;
 
+import com.trading.drg.api.DynamicState;
 import com.trading.drg.api.ScalarCutoff;
 
 /**
@@ -17,12 +18,27 @@ import com.trading.drg.api.ScalarCutoff;
  * Performance:
  * The JVM can often inline the lambda execution, making this very efficient.
  */
-public final class ScalarCalcNode extends ScalarNode {
+public final class ScalarCalcNode extends ScalarNode implements DynamicState {
     private final CalcFn fn;
+    private DynamicState stateExtractor;
 
     public ScalarCalcNode(String name, ScalarCutoff cutoff, CalcFn fn) {
         super(name, cutoff);
         this.fn = fn;
+    }
+
+    public ScalarCalcNode withStateExtractor(Object obj) {
+        if (obj instanceof com.trading.drg.api.DynamicState ds) {
+            this.stateExtractor = ds;
+        }
+        return this;
+    }
+
+    @Override
+    public void serializeDynamicState(StringBuilder sb) {
+        if (stateExtractor != null) {
+            stateExtractor.serializeDynamicState(sb);
+        }
     }
 
     @Override

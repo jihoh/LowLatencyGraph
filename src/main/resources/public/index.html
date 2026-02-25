@@ -7,7 +7,7 @@
     <title>Core Graph</title>
     <!-- Modern Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=13">
+    <link rel="stylesheet" href="styles.css?v=14">
 </head>
 
 <body>
@@ -258,6 +258,55 @@
     <!-- Node Context Menu -->
     <div id="node-context-menu" class="context-menu hidden">
         <div class="context-menu-item" id="ctx-add-chart">Add to Chart</div>
+        <div class="context-menu-item" id="ctx-view-details">🔍 View Details</div>
+    </div>
+
+    <!-- Node Details Modal -->
+    <div id="node-details-modal" class="modal hidden">
+        <div class="modal-content details-modal">
+            <span class="modal-close" id="details-close">&times;</span>
+            <h2 id="details-node-name">Node Name</h2>
+            <p id="details-node-desc" class="details-desc">Calculation description will appear here.</p>
+
+            <div class="details-grid">
+                <div class="details-section">
+                    <h3>Parents (Inputs)</h3>
+                    <ul id="details-parents-list" class="lineage-list"></ul>
+
+                    <div id="details-state-section" style="display: none; margin-top: 16px;">
+                        <h3
+                            style="margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
+                            Live Internal State</h3>
+                        <ul id="details-state-list" class="lineage-list"></ul>
+                    </div>
+                </div>
+
+                <div class="details-section">
+                    <h3>Children (Outputs)</h3>
+                    <ul id="details-children-list" class="lineage-list"></ul>
+
+                    <div class="details-quant" style="margin-top: 16px;">
+                        <h3>Live Metrics</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
+                            <div class="metric-small"><span class="label">Value</span><span class="value"
+                                    id="details-metric-value">0.00</span></div>
+                            <div class="metric-small"><span class="label">Update Epoch</span><span class="value"
+                                    id="details-metric-update">0</span></div>
+                            <div class="metric-small"><span class="label">Avg Latency (μs)</span><span class="value"
+                                    id="details-metric-avg">0.00</span></div>
+                            <div class="metric-small"><span class="label">NaN Count</span><span class="value"
+                                    id="details-metric-nan">0</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="details-section" id="details-properties-section" style="display: none; margin-top: 24px;">
+                <h3 style="margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
+                    Configuration Properties</h3>
+                <ul id="details-properties-list" class="lineage-list"></ul>
+            </div>
+        </div>
     </div>
 
     <!-- Load Mermaid & Dependencies -->
@@ -266,7 +315,7 @@
         crossorigin="anonymous"></script>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"
         crossorigin="anonymous"></script>
-    <script src="app.js?v=16"></script>
+    <script src="app.js?v=6"></script>
 </body>
 
 </html>

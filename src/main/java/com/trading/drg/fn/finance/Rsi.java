@@ -11,13 +11,13 @@ public class Rsi extends AbstractFn1 {
     private final double alpha; // 1/N for Wilder's
     private double avgGain;
     private double avgLoss;
-    private double prevPrice;
+    private double prevPrice = Double.NaN;
     private boolean initialized = false;
 
-    public Rsi(int period) {
-        if (period < 1)
-            throw new IllegalArgumentException("Period must be >= 1");
-        this.alpha = 1.0 / period;
+    public Rsi(int window) {
+        if (window < 1)
+            throw new IllegalArgumentException("Window must be >= 1");
+        this.alpha = 1.0 / window;
     }
 
     @Override

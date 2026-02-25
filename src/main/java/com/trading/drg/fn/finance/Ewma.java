@@ -6,7 +6,7 @@ package com.trading.drg.fn.finance;
  * Formula:
  * y[t] = alpha * x[t] + (1 - alpha) * y[t-1]
  */
-public class Ewma extends AbstractFn1 {
+public class Ewma extends AbstractFn1 implements com.trading.drg.api.DynamicState {
     private final double alpha;
     private double state;
     private boolean initialized = false;
@@ -33,4 +33,10 @@ public class Ewma extends AbstractFn1 {
         return state;
     }
 
+    @Override
+    public void serializeDynamicState(StringBuilder sb) {
+        sb.append("\"alpha\":").append(this.alpha);
+        sb.append(",\"state\":").append(this.state);
+        sb.append(",\"initialized\":").append(this.initialized);
+    }
 }

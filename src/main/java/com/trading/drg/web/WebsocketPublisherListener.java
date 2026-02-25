@@ -24,6 +24,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final String graphName;
     private final String graphVersion;
     private final String initialMermaid;
+    private final java.util.Map<String, String> descriptions;
     private final java.util.Map<String, java.util.Map<String, String>> edgeLabels;
     private final com.trading.drg.util.ErrorRateLimiter errLimiter = new com.trading.drg.util.ErrorRateLimiter(log,
             1000);
@@ -44,12 +45,14 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final StringBuilder jsonBuilder = new StringBuilder(1024);
 
     public WebsocketPublisherListener(StabilizationEngine engine, GraphDashboardServer server, String graphName,
-            String graphVersion, java.util.Map<String, String> logicalTypes, java.util.List<String> originalOrder,
+            String graphVersion, java.util.Map<String, String> logicalTypes, java.util.Map<String, String> descriptions,
+            java.util.List<String> originalOrder,
             java.util.Map<String, java.util.Map<String, String>> edgeLabels) {
         this.engine = engine;
         this.server = server;
         this.graphName = graphName;
         this.graphVersion = graphVersion;
+        this.descriptions = descriptions;
         this.edgeLabels = edgeLabels;
         this.initialMermaid = new com.trading.drg.util.GraphExplain(engine, logicalTypes, originalOrder, edgeLabels)
                 .toMermaid()
@@ -85,6 +88,19 @@ public class WebsocketPublisherListener implements StabilizationListener {
             initBuilder.append("]");
             if (i < nodeCount - 1)
                 initBuilder.append(",");
+        }
+        initBuilder.append("},");
+
+        initBuilder.append("\"descriptions\":{");
+        boolean firstDesc = true;
+        if (descriptions != null) {
+            for (var entry : descriptions.entrySet()) {
+                if (!firstDesc)
+                    initBuilder.append(",");
+                initBuilder.append("\"").append(entry.getKey()).append("\":\"")
+                        .append(entry.getValue().replace("\"", "\\\"")).append("\"");
+                firstDesc = false;
+            }
         }
         initBuilder.append("},");
 
@@ -169,6 +185,31 @@ public class WebsocketPublisherListener implements StabilizationListener {
             }
         }
 
+        jsonBuilder.append("}");
+
+        jsonBuilder.append(",\"states\":{");
+        boolean firstState = true;
+        for (int i = 0; i < nodeCount; i++) {
+            Node<?> node = topology.node(i);
+            if (node instanceof com.trading.drg.api.DynamicState ds) {
+                int lenBefore = jsonBuilder.length();
+                if (!firstState) {
+                    jsonBuilder.append(",");
+                }
+                jsonBuilder.append("\"").append(node.name()).append("\":{");
+                int lenBeforeState = jsonBuilder.length();
+
+                ds.serializeDynamicState(jsonBuilder);
+
+                if (jsonBuilder.length() == lenBeforeState) {
+                    // Node didn't append any state, rollback key append
+                    jsonBuilder.setLength(lenBefore);
+                } else {
+                    jsonBuilder.append("}");
+                    firstState = false;
+                }
+            }
+        }
         jsonBuilder.append("}");
 
         // 2. Append metrics

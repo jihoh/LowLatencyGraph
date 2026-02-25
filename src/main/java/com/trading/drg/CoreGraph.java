@@ -34,6 +34,7 @@ public class CoreGraph {
     private final String name;
     private final String version;
     private final Map<String, String> logicalTypes;
+    private final Map<String, String> descriptions;
     private final java.util.List<String> originalOrder;
     private final Map<String, Map<String, String>> edgeLabels;
 
@@ -80,6 +81,7 @@ public class CoreGraph {
         this.engine = compiled.engine();
         this.nodes = compiled.nodesByName();
         this.logicalTypes = compiled.logicalTypes();
+        this.descriptions = compiled.descriptions();
         this.originalOrder = compiled.originalOrder();
         this.edgeLabels = compiled.edgeLabels();
 
@@ -160,7 +162,8 @@ public class CoreGraph {
             this.dashboardServer = new com.trading.drg.web.GraphDashboardServer();
 
             var wsListener = new com.trading.drg.web.WebsocketPublisherListener(
-                    this.engine, this.dashboardServer, this.name, this.version, this.logicalTypes, this.originalOrder,
+                    this.engine, this.dashboardServer, this.name, this.version, this.logicalTypes, this.descriptions,
+                    this.originalOrder,
                     this.edgeLabels);
 
             if (this.latencyListener != null) {

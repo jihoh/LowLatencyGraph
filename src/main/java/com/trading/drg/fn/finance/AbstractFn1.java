@@ -30,5 +30,4 @@ public abstract class AbstractFn1 implements Fn1 {
      * Subclasses implement the actual logic here.
      */
     protected abstract double calculate(double input);
-
 }
