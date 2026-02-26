@@ -7,7 +7,8 @@
     <title>Core Graph</title>
     <!-- Modern Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=14">
+    <link rel="stylesheet" href="styles.css?v=16">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
 </head>
 
 <body>
@@ -33,8 +34,23 @@
         <div class="main-column">
             <div class="graph-container">
                 <div class="graph-header-overlay">
-                    <h1 id="graph-title">Loading Graph...</h1>
-                    <span id="graph-version" class="badge">v--</span>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <h1 id="graph-title">Loading Graph...</h1>
+                        <span id="graph-version" class="badge">v--</span>
+                    </div>
+                </div>
+                <div class="graph-header-overlay" style="left: auto; right: 1.25rem;">
+                    <button id="btn-snapshot" class="panel-btn"
+                        style="padding: 4px 8px; font-size: 0.85rem; background: transparent; border: none; color: var(--border-color); opacity: 0.3; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: opacity 0.2s;"
+                        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.3'">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z">
+                            </path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                        Snapshot
+                    </button>
                 </div>
                 <div class="graph-footer-left control-stack">
                     <div class="zoom-controls">
@@ -257,8 +273,8 @@
 
     <!-- Node Context Menu -->
     <div id="node-context-menu" class="context-menu hidden">
-        <div class="context-menu-item" id="ctx-add-chart">Add to Chart</div>
-        <div class="context-menu-item" id="ctx-view-details">🔍 View Details</div>
+        <div class="context-menu-item" id="ctx-add-chart">Add Chart</div>
+        <div class="context-menu-item" id="ctx-add-alert">Add Alert</div>
     </div>
 
     <!-- Node Details Modal -->
@@ -268,32 +284,46 @@
             <h2 id="details-node-name">Node Name</h2>
             <p id="details-node-desc" class="details-desc">Calculation description will appear here.</p>
 
-            <div class="details-grid">
-                <div class="details-section">
-                    <h3>Parents (Inputs)</h3>
-                    <ul id="details-parents-list" class="lineage-list"></ul>
+            <div style="display: flex; gap: 24px; margin-top: 24px;">
+                <!-- Left Column -->
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 24px;">
+                    <div class="details-section">
+                        <h3>Parents (Inputs)</h3>
+                        <ul id="details-parents-list" class="lineage-list"></ul>
+                    </div>
 
-                    <div id="details-state-section" style="display: none; margin-top: 16px;">
+                    <div class="details-section">
+                        <h3>Children (Outputs)</h3>
+                        <ul id="details-children-list" class="lineage-list"></ul>
+                    </div>
+
+                    <div class="details-section" id="details-state-section" style="display: none;">
                         <h3
                             style="margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
                             Live Internal State</h3>
-                        <ul id="details-state-list" class="lineage-list"></ul>
+                        <ul id="details-state-list" class="lineage-list state-list"></ul>
+                    </div>
+
+                    <div class="details-section" id="details-properties-section" style="display: none;">
+                        <h3
+                            style="margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
+                            Configuration Properties</h3>
+                        <ul id="details-properties-list" class="lineage-list"></ul>
                     </div>
                 </div>
 
-                <div class="details-section">
-                    <h3>Children (Outputs)</h3>
-                    <ul id="details-children-list" class="lineage-list"></ul>
-
-                    <div class="details-quant" style="margin-top: 16px;">
+                <!-- Right Column -->
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 24px;">
+                    <div class="details-section">
                         <h3>Live Metrics</h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
-                            <div class="metric-small"><span class="label">Value</span><span class="value"
-                                    id="details-metric-value">0.00</span></div>
-                            <div class="metric-small"><span class="label">Update Epoch</span><span class="value"
-                                    id="details-metric-update">0</span></div>
+                        <div
+                            style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; width: 100%;">
+                            <div class="metric-small"><span class="label">Latest Latency (μs)</span><span class="value"
+                                    id="details-metric-lat">0.00</span></div>
                             <div class="metric-small"><span class="label">Avg Latency (μs)</span><span class="value"
                                     id="details-metric-avg">0.00</span></div>
+                            <div class="metric-small"><span class="label">Update Epoch</span><span class="value"
+                                    id="details-metric-update">0</span></div>
                             <div class="metric-small"><span class="label">NaN Count</span><span class="value"
                                     id="details-metric-nan">0</span></div>
                         </div>
@@ -301,21 +331,66 @@
                 </div>
             </div>
 
-            <div class="details-section" id="details-properties-section" style="display: none; margin-top: 24px;">
+            <div class="details-section" id="details-source-section" style="display: none; margin-top: 24px;">
                 <h3 style="margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
-                    Configuration Properties</h3>
-                <ul id="details-properties-list" class="lineage-list"></ul>
+                    Calculator</h3>
+                <pre
+                    style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 0.85rem; color: var(--text-primary); border: 1px solid var(--border-color); margin: 0;"><code id="details-source-code" class="language-java"></code></pre>
+            </div>
+
+            <!-- Custom Resize Handle for sliding panel -->
+            <div id="details-resize-handle" class="resize-handle"></div>
+        </div>
+    </div>
+
+    <!-- Add Alert Modal -->
+    <div id="add-alert-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="modal-close" id="add-alert-close">&times;</span>
+            <h2 id="add-alert-title" style="margin-bottom: 16px;">Add Alert</h2>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <p style="font-size: 0.9rem; color: var(--text-secondary);">Target Node: <strong
+                        id="add-alert-node-name" style="color: var(--text-primary);"></strong></p>
+
+                <div>
+                    <label
+                        style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Condition</label>
+                    <select id="add-alert-condition" class="alert-input"
+                        style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); padding: 8px; border-radius: 4px;">
+                        <option value="<">drops below</option>
+                        <option value=">">goes above</option>
+                        <option value="=">equals</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label
+                        style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Threshold
+                        Value</label>
+                    <input type="number" id="add-alert-value" class="alert-input" placeholder="Value" step="any"
+                        style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); padding: 8px; border-radius: 4px;">
+                </div>
+
+                <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+                    <button id="add-alert-cancel" class="panel-btn"
+                        style="padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 4px; background: transparent; color: var(--text-primary); cursor: pointer;">Cancel</button>
+                    <button id="add-alert-create" class="panel-btn"
+                        style="padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 4px; background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); cursor: pointer; font-weight: bold;">Create</button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Load Mermaid & Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"
         crossorigin="anonymous"></script>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"
         crossorigin="anonymous"></script>
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=8"></script>
 </body>
 
 </html>

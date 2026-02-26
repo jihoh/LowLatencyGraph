@@ -51,34 +51,34 @@
                     {
                         "name": "{{tenor}}.wBid",
                         "type": "WEIGHTED_AVG",
-                        "dependencies": [
-                            "{{tenor}}.Btec.bid",
-                            "{{tenor}}.Btec.bidQty",
-                            "{{tenor}}.Fenics.bid",
-                            "{{tenor}}.Fenics.bidQty",
-                            "{{tenor}}.Dweb.bid",
-                            "{{tenor}}.Dweb.bidQty"
-                        ]
+                        "inputs": {
+                            "i0": "{{tenor}}.Btec.bid",
+                            "i1": "{{tenor}}.Btec.bidQty",
+                            "i2": "{{tenor}}.Fenics.bid",
+                            "i3": "{{tenor}}.Fenics.bidQty",
+                            "i4": "{{tenor}}.Dweb.bid",
+                            "i5": "{{tenor}}.Dweb.bidQty"
+                        }
                     },
                     {
                         "name": "{{tenor}}.wAsk",
                         "type": "WEIGHTED_AVG",
-                        "dependencies": [
-                            "{{tenor}}.Btec.ask",
-                            "{{tenor}}.Btec.askQty",
-                            "{{tenor}}.Fenics.ask",
-                            "{{tenor}}.Fenics.askQty",
-                            "{{tenor}}.Dweb.ask",
-                            "{{tenor}}.Dweb.askQty"
-                        ]
+                        "inputs": {
+                            "i0": "{{tenor}}.Btec.ask",
+                            "i1": "{{tenor}}.Btec.askQty",
+                            "i2": "{{tenor}}.Fenics.ask",
+                            "i3": "{{tenor}}.Fenics.askQty",
+                            "i4": "{{tenor}}.Dweb.ask",
+                            "i5": "{{tenor}}.Dweb.askQty"
+                        }
                     },
                     {
                         "name": "{{tenor}}.mid",
                         "type": "AVERAGE",
-                        "dependencies": [
-                            "{{tenor}}.wBid",
-                            "{{tenor}}.wAsk"
-                        ]
+                        "inputs": {
+                            "i0": "{{tenor}}.wBid",
+                            "i1": "{{tenor}}.wAsk"
+                        }
                     }
                 ]
             }
@@ -122,13 +122,20 @@
             {
                 "name": "Global.Score",
                 "type": "AVERAGE",
-                "dependencies": [
-                    "UST_2Y.mid",
-                    "UST_3Y.mid",
-                    "UST_5Y.mid",
-                    "UST_10Y.mid",
-                    "UST_30Y.mid"
-                ]
+                "inputs": {
+                    "i0": "UST_2Y.mid",
+                    "i1": "UST_3Y.mid",
+                    "i2": "UST_5Y.mid",
+                    "i3": "UST_10Y.mid",
+                    "i4": "UST_30Y.mid"
+                }
+            },
+            {
+                "name": "Global.Diff",
+                "type": "DIFF",
+                "inputs": {
+                    "input": "Global.Score"
+                }
             }
         ]
     }

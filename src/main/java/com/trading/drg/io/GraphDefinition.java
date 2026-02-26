@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
  * POJO representation of a Graph Topology.
@@ -27,8 +28,10 @@ public final class GraphDefinition {
 
     /** Meta-information about the graph. */
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public static final class GraphInfo {
         private String name, version;
+        private long epoch;
         private List<NodeDef> nodes;
         private List<TemplateDef> templates;
 
@@ -46,6 +49,14 @@ public final class GraphDefinition {
 
         public void setVersion(String v) {
             version = v;
+        }
+
+        public long getEpoch() {
+            return epoch;
+        }
+
+        public void setEpoch(long epoch) {
+            this.epoch = epoch;
         }
 
         public List<NodeDef> getNodes() {
@@ -90,12 +101,10 @@ public final class GraphDefinition {
 
     /** Definition of a single node in the graph. */
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public static final class NodeDef {
         private String name, type;
-        private boolean source;
-        @com.fasterxml.jackson.annotation.JsonAlias("dependencies")
         private Map<String, String> inputs;
-        private List<String> dependencies;
         private Map<String, Object> properties;
 
         public String getName() {
@@ -112,22 +121,6 @@ public final class GraphDefinition {
 
         public void setType(String v) {
             type = v;
-        }
-
-        public boolean isSource() {
-            return source;
-        }
-
-        public void setSource(boolean v) {
-            source = v;
-        }
-
-        public List<String> getDependencies() {
-            return dependencies;
-        }
-
-        public void setDependencies(List<String> v) {
-            dependencies = v;
         }
 
         public Map<String, String> getInputs() {

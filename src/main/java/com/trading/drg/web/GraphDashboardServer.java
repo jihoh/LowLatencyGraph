@@ -7,6 +7,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * A lightweight web server that hosts the real-time graph dashboard
@@ -24,12 +25,23 @@ public class GraphDashboardServer {
     // Cached heavy structural JSON sent strictly upon connection
     private volatile String initialGraphConfig = null;
 
+    // Supplier to build the snapshot JSON on demand
+    private Supplier<String> snapshotSupplier = null;
+
     /**
      * Injects the heavy static Graph Configuration payload (Topology and Routing)
      * which only needs to be sent once per client connection.
      */
     public void setInitialGraphConfig(String jsonPayload) {
         this.initialGraphConfig = jsonPayload;
+    }
+
+    /**
+     * Sets the supplier that generates the exact runtime state of the graph
+     * when the /api/snapshot endpoint is called.
+     */
+    public void setSnapshotSupplier(Supplier<String> supplier) {
+        this.snapshotSupplier = supplier;
     }
 
     /**
@@ -45,6 +57,16 @@ public class GraphDashboardServer {
             // Serve frontend files (HTML/JS/CSS) from the classpath 'public' directory
             config.staticFiles.add("/public");
         }).start(port);
+
+        // Snapshot API Endpoint
+        app.get("/api/snapshot", ctx -> {
+            if (snapshotSupplier != null) {
+                ctx.contentType("application/json");
+                ctx.result(snapshotSupplier.get());
+            } else {
+                ctx.status(503).result("{\"error\":\"Snapshot supplier not configured\"}");
+            }
+        });
 
         app.ws("/ws/graph", ws -> {
             ws.onConnect(ctx -> {

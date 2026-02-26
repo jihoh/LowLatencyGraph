@@ -2,6 +2,7 @@ package com.trading.drg.io;
 
 import com.trading.drg.api.*;
 import com.trading.drg.engine.*;
+import com.trading.drg.util.SourceExtractor;
 
 import java.util.*;
 
@@ -66,10 +67,20 @@ public final class JsonGraphCompiler {
         var topo = TopologicalOrder.builder();
 
         // 2. Instantiate and Build Topology
+        Map<String, String> sourceCodes = new HashMap<>(nodeDefs.size() * 2);
+
         for (var nd : nodeDefs) {
             NodeType type = NodeType.fromString(nd.getType());
             logicalTypes.put(nd.getName(), type.name());
             descriptions.put(nd.getName(), type.getDescription());
+
+            if (type.getNodeClass() != null) {
+                sourceCodes.put(nd.getName(), SourceExtractor.extractClassSource(type.getNodeClass().getName()));
+            }
+        }
+
+        for (var nd : nodeDefs) {
+            NodeType type = NodeType.fromString(nd.getType());
             NodeRegistry.NodeMetadata meta = registry.getMetadata(type);
             if (meta == null) {
                 throw new IllegalArgumentException("No NodeFactory for type " + type + " in node " + nd.getName());
@@ -78,38 +89,42 @@ public final class JsonGraphCompiler {
             // Resolve dependencies array
             Node<?>[] deps;
 
-            // 1. Array Dependencies (legacy)
-            if (nd.getDependencies() != null && !nd.getDependencies().isEmpty()) {
-                deps = new Node<?>[nd.getDependencies().size()];
-                for (int i = 0; i < deps.length; i++) {
-                    String depName = nd.getDependencies().get(i);
-                    Node<?> upstream = nodesByName.get(depName);
-                    if (upstream == null)
-                        throw new IllegalArgumentException(
-                                "Dependency " + depName + " not found for node " + nd.getName());
+            if (nd.getInputs() != null && !nd.getInputs().isEmpty()) {
+                if (meta.namedInputs() != null) {
+                    deps = new Node<?>[meta.namedInputs().length];
+                    for (int i = 0; i < deps.length; i++) {
+                        String inputKey = meta.namedInputs()[i];
+                        String depName = nd.getInputs().get(inputKey);
+                        if (depName == null) {
+                            throw new IllegalArgumentException(
+                                    "Missing @NamedInput '" + inputKey + "' in JSON inputs map for node "
+                                            + nd.getName());
+                        }
 
-                    deps[i] = upstream;
-                }
-            }
-            // 2. Named Map Inputs (new)
-            else if (nd.getInputs() != null && !nd.getInputs().isEmpty() && meta.namedInputs() != null) {
-                deps = new Node<?>[meta.namedInputs().length];
-                for (int i = 0; i < deps.length; i++) {
-                    String inputKey = meta.namedInputs()[i];
-                    String depName = nd.getInputs().get(inputKey);
-                    if (depName == null) {
-                        throw new IllegalArgumentException(
-                                "Missing @NamedInput '" + inputKey + "' in JSON inputs map for node " + nd.getName());
+                        edgeLabels.computeIfAbsent(nd.getName(), k -> new HashMap<>()).put(depName, inputKey);
+
+                        Node<?> upstream = nodesByName.get(depName);
+                        if (upstream == null)
+                            throw new IllegalArgumentException(
+                                    "Dependency " + depName + " not found for node " + nd.getName());
+
+                        deps[i] = upstream;
                     }
-
-                    edgeLabels.computeIfAbsent(nd.getName(), k -> new HashMap<>()).put(depName, inputKey);
-
-                    Node<?> upstream = nodesByName.get(depName);
-                    if (upstream == null)
-                        throw new IllegalArgumentException(
-                                "Dependency " + depName + " not found for node " + nd.getName());
-
-                    deps[i] = upstream;
+                } else {
+                    // Unbounded varargs node (e.g. AVERAGE)
+                    deps = new Node<?>[nd.getInputs().size()];
+                    int i = 0;
+                    List<String> sortedKeys = new ArrayList<>(nd.getInputs().keySet());
+                    Collections.sort(sortedKeys);
+                    for (String inputKey : sortedKeys) {
+                        String depName = nd.getInputs().get(inputKey);
+                        edgeLabels.computeIfAbsent(nd.getName(), k -> new HashMap<>()).put(depName, inputKey);
+                        Node<?> upstream = nodesByName.get(depName);
+                        if (upstream == null)
+                            throw new IllegalArgumentException(
+                                    "Dependency " + depName + " not found for node " + nd.getName());
+                        deps[i++] = upstream;
+                    }
                 }
             } else {
                 deps = new Node<?>[0];
@@ -121,14 +136,9 @@ public final class JsonGraphCompiler {
             nodesByName.put(nd.getName(), node);
 
             topo.addNode(node);
-            if (nd.isSource() || node instanceof SourceNode)
+            if (node instanceof SourceNode)
                 topo.markSource(nd.getName());
 
-            if (nd.getDependencies() != null) {
-                for (String dep : nd.getDependencies()) {
-                    topo.addEdge(dep, nd.getName());
-                }
-            }
             if (nd.getInputs() != null) {
                 for (String dep : nd.getInputs().values()) {
                     topo.addEdge(dep, nd.getName());
@@ -137,7 +147,8 @@ public final class JsonGraphCompiler {
         }
 
         return new CompiledGraph(graphInfo.getName(), graphInfo.getVersion(),
-                new StabilizationEngine(topo.build()), nodesByName, logicalTypes, descriptions, originalOrder,
+                new StabilizationEngine(topo.build()), nodesByName, logicalTypes, descriptions, sourceCodes,
+                originalOrder,
                 edgeLabels);
     }
 
@@ -153,16 +164,6 @@ public final class JsonGraphCompiler {
         }
 
         for (var n : nodes) {
-            // Track dependencies from legacy array
-            if (n.getDependencies() != null) {
-                for (String dep : n.getDependencies()) {
-                    if (!byName.containsKey(dep)) {
-                        throw new IllegalArgumentException("Unknown dependency: " + dep + " for node: " + n.getName());
-                    }
-                    outEdges.get(dep).add(n.getName());
-                    inDegree.put(n.getName(), inDegree.get(n.getName()) + 1);
-                }
-            }
 
             // Track dependencies from new Named Inputs map
             if (n.getInputs() != null) {
@@ -247,7 +248,8 @@ public final class JsonGraphCompiler {
             var node = queue.poll();
             if (NodeType.TEMPLATE.name().equalsIgnoreCase(node.getType())) {
                 // Expand
-                String templateName = (String) node.getProperties().get("template");
+                Map<String, Object> state = node.getProperties() != null ? node.getProperties() : Map.of();
+                String templateName = (String) state.get("template");
                 if (templateName == null)
                     throw new IllegalArgumentException("Template node missing 'template' property: " + node.getName());
 
@@ -255,28 +257,29 @@ public final class JsonGraphCompiler {
                 if (template == null)
                     throw new IllegalArgumentException("Unknown template: " + templateName);
 
-                Map<String, Object> params = node.getProperties();
+                Map<String, Object> params = state;
 
                 for (var tNode : template.getNodes()) {
                     var newNode = deepCopy(tNode);
                     // Substitute variables
                     newNode.setName(substitute(newNode.getName(), params));
-                    if (newNode.getDependencies() != null) {
-                        newNode.setDependencies(newNode.getDependencies().stream()
-                                .map(d -> substitute(d, params))
-                                .collect(java.util.stream.Collectors.toList()));
+                    if (newNode.getInputs() != null) {
+                        newNode.setInputs(newNode.getInputs().entrySet().stream()
+                                .collect(java.util.stream.Collectors.toMap(
+                                        Map.Entry::getKey,
+                                        e -> substitute(e.getValue(), params))));
                     }
                     if (newNode.getProperties() != null) {
-                        Map<String, Object> newProps = new HashMap<>();
+                        Map<String, Object> resolvedProps = new HashMap<>();
                         for (var entry : newNode.getProperties().entrySet()) {
                             Object val = entry.getValue();
-                            if (val instanceof String s) {
-                                newProps.put(entry.getKey(), substitute(s, params));
+                            if (val instanceof String s && s.contains("{{")) {
+                                resolvedProps.put(entry.getKey(), resolveTemplateString(s, params));
                             } else {
-                                newProps.put(entry.getKey(), val);
+                                resolvedProps.put(entry.getKey(), val);
                             }
                         }
-                        newNode.setProperties(newProps);
+                        newNode.setProperties(resolvedProps);
                     }
                     queue.add(newNode); // Add to queue to handle nested templates
                 }
@@ -299,13 +302,24 @@ public final class JsonGraphCompiler {
         return s;
     }
 
+    private String resolveTemplateString(String s, Map<String, Object> params) {
+        if (s == null || !s.contains("{{"))
+            return s;
+        for (var entry : params.entrySet()) {
+            String key = "{{" + entry.getKey() + "}}";
+            if (s.contains(key)) {
+                s = s.replace(key, String.valueOf(entry.getValue()));
+            }
+        }
+        return s;
+    }
+
     private GraphDefinition.NodeDef deepCopy(GraphDefinition.NodeDef original) {
         var copy = new GraphDefinition.NodeDef();
         copy.setName(original.getName());
         copy.setType(original.getType());
-        copy.setSource(original.isSource());
-        if (original.getDependencies() != null) {
-            copy.setDependencies(new ArrayList<>(original.getDependencies()));
+        if (original.getInputs() != null) {
+            copy.setInputs(new HashMap<>(original.getInputs()));
         }
         if (original.getProperties() != null) {
             copy.setProperties(new HashMap<>(original.getProperties()));
@@ -322,11 +336,13 @@ public final class JsonGraphCompiler {
         private final Map<String, Node<?>> nodesByName;
         private final Map<String, String> logicalTypes;
         private final Map<String, String> descriptions;
+        private final Map<String, String> sourceCodes;
         private final List<String> originalOrder;
         private final Map<String, Map<String, String>> edgeLabels;
 
         CompiledGraph(String name, String version, StabilizationEngine engine, Map<String, Node<?>> nodesByName,
-                Map<String, String> logicalTypes, Map<String, String> descriptions, List<String> originalOrder,
+                Map<String, String> logicalTypes, Map<String, String> descriptions, Map<String, String> sourceCodes,
+                List<String> originalOrder,
                 Map<String, Map<String, String>> edgeLabels) {
             this.name = name;
             this.version = version;
@@ -334,6 +350,7 @@ public final class JsonGraphCompiler {
             this.nodesByName = Collections.unmodifiableMap(nodesByName);
             this.logicalTypes = Collections.unmodifiableMap(logicalTypes);
             this.descriptions = Collections.unmodifiableMap(descriptions);
+            this.sourceCodes = Collections.unmodifiableMap(sourceCodes);
             this.originalOrder = Collections.unmodifiableList(originalOrder);
             this.edgeLabels = Collections.unmodifiableMap(edgeLabels);
         }
@@ -360,6 +377,10 @@ public final class JsonGraphCompiler {
 
         public Map<String, String> descriptions() {
             return descriptions;
+        }
+
+        public Map<String, String> sourceCodes() {
+            return sourceCodes;
         }
 
         public List<String> originalOrder() {

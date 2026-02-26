@@ -48,6 +48,7 @@ const stabRate = document.getElementById('stab-rate');
 const reactiveEff = document.getElementById('reactive-eff');
 
 let isGraphRendered = false;
+let sourceCodes = {};
 // Map to keep track of previous values to know when to trigger the flash animation
 const prevValues = new Map();
 // Stores the direct children of each node: { "NodeA": ["NodeB", "NodeC"] }
@@ -163,65 +164,87 @@ if (ctxAddChartBtn) {
     });
 }
 
+const ctxAddAlertBtn = document.getElementById('ctx-add-alert');
+if (ctxAddAlertBtn) {
+    ctxAddAlertBtn.addEventListener('click', () => {
+        const ctxMenu = document.getElementById('node-context-menu');
+        const nodeName = ctxMenu ? ctxMenu.dataset.contextNode : null;
+        if (nodeName) {
+            document.getElementById('add-alert-node-name').textContent = nodeName;
+            document.getElementById('add-alert-value').value = '';
+            document.getElementById('add-alert-modal').classList.remove('hidden');
+        }
+    });
+}
+
+function closeAddAlertModal() {
+    document.getElementById('add-alert-modal').classList.add('hidden');
+}
+
+document.getElementById('add-alert-close')?.addEventListener('click', closeAddAlertModal);
+document.getElementById('add-alert-cancel')?.addEventListener('click', closeAddAlertModal);
+
+document.getElementById('add-alert-create')?.addEventListener('click', () => {
+    const node = document.getElementById('add-alert-node-name').textContent;
+    const condition = document.getElementById('add-alert-condition').value;
+    const threshStr = document.getElementById('add-alert-value').value;
+
+    if (!node || !condition || threshStr === '') {
+        return;
+    }
+
+    const newAlert = {
+        id: ++alertIdCounter,
+        node: node,
+        condition: condition,
+        threshold: parseFloat(threshStr),
+        lastNotifiedEpoch: -1
+    };
+
+    activeAlerts.push(newAlert);
+    saveAlertState();
+    renderActiveAlerts();
+    closeAddAlertModal();
+});
+
 // Global Descriptions and Edge Labels Cache
 let nodeDescriptions = {};
 let edgeLabels = {};
 let expandedGroups = new Set();
 let activeDetailsNode = null;
 
-const ctxViewDetailsBtn = document.getElementById('ctx-view-details');
-if (ctxViewDetailsBtn) {
-    ctxViewDetailsBtn.addEventListener('click', () => {
-        const ctxMenu = document.getElementById('node-context-menu');
-        const nodeName = ctxMenu ? ctxMenu.dataset.contextNode : null;
-        if (nodeName) {
-            openDetailsModal(nodeName);
-        }
+document.getElementById('details-close').addEventListener('click', closeDetailsModal);
+
+// Details Sidebar Resizing Logic
+const detailsModalEl = document.querySelector('.details-modal');
+const detailsResizeHandle = document.getElementById('details-resize-handle');
+let isDetailsResizing = false;
+let detailsResizeStartX = 0;
+let detailsInitialWidth = 0;
+
+if (detailsResizeHandle) {
+    detailsResizeHandle.addEventListener('mousedown', (e) => {
+        isDetailsResizing = true;
+        detailsResizeStartX = e.clientX;
+        detailsInitialWidth = detailsModalEl.offsetWidth;
+        detailsResizeHandle.classList.add('active');
+        document.body.style.cursor = 'ew-resize';
+        e.preventDefault(); // Prevent text selection
     });
 }
 
-document.getElementById('details-close').addEventListener('click', closeDetailsModal);
-
-// Details Modal Draggable Logic
-const detailsModalEl = document.querySelector('.details-modal');
-const detailsHeaderEl = document.getElementById('details-node-name');
-let isDetailsDragging = false;
-let detailsDragStartX = 0;
-let detailsDragStartY = 0;
-let detailsInitialLeft = 0;
-let detailsInitialTop = 0;
-
-detailsHeaderEl.addEventListener('mousedown', (e) => {
-    isDetailsDragging = true;
-    detailsDragStartX = e.clientX;
-    detailsDragStartY = e.clientY;
-
-    // Bring to front
-    highestZIndex++;
-    document.getElementById('node-details-modal').style.zIndex = highestZIndex;
-
-    const rect = detailsModalEl.getBoundingClientRect();
-    detailsInitialLeft = rect.left;
-    detailsInitialTop = rect.top;
-
-    detailsModalEl.style.transform = 'none';
-    detailsModalEl.style.left = `${detailsInitialLeft}px`;
-    detailsModalEl.style.top = `${detailsInitialTop}px`;
-    detailsHeaderEl.style.cursor = 'grabbing';
-});
-
 document.addEventListener('mousemove', (e) => {
-    if (!isDetailsDragging) return;
-    const dx = e.clientX - detailsDragStartX;
-    const dy = e.clientY - detailsDragStartY;
-    detailsModalEl.style.left = `${detailsInitialLeft + dx}px`;
-    detailsModalEl.style.top = `${detailsInitialTop + dy}px`;
+    if (!isDetailsResizing) return;
+    const dx = e.clientX - detailsResizeStartX;
+    const newWidth = Math.max(300, Math.min(window.innerWidth * 0.9, detailsInitialWidth + dx));
+    detailsModalEl.style.width = `${newWidth}px`;
 });
 
 document.addEventListener('mouseup', () => {
-    if (isDetailsDragging) {
-        isDetailsDragging = false;
-        detailsHeaderEl.style.cursor = 'grab';
+    if (isDetailsResizing) {
+        isDetailsResizing = false;
+        if (detailsResizeHandle) detailsResizeHandle.classList.remove('active');
+        document.body.style.cursor = '';
     }
 });
 
@@ -254,7 +277,7 @@ function openDetailsModal(nodeName) {
             const labelMap = edgeLabels[nodeName];
             const label = labelMap ? labelMap[p] : null;
             const li = document.createElement('li');
-            li.innerHTML = `<strong>${p}</strong> ${label ? `<span style="color:var(--text-secondary); font-size: 0.8em; margin-left: 8px;">-> ${label}</span>` : ''}`;
+            li.innerHTML = `<strong class="clickable-node" onclick="openDetailsModal('${p}')">${p}</strong> ${label ? `<span style="color:var(--text-secondary); font-size: 0.8em; margin-left: 8px;">-> ${label}</span>` : ''}`;
             parentsList.appendChild(li);
         });
     }
@@ -267,7 +290,7 @@ function openDetailsModal(nodeName) {
             const labelMap = edgeLabels[nodeName];
             const label = labelMap ? labelMap[c] : null;
             const li = document.createElement('li');
-            li.innerHTML = `<strong>${c}</strong> ${label ? `<span style="color:var(--text-secondary); font-size: 0.8em; margin-left: 8px;">-> ${label}</span>` : ''}`;
+            li.innerHTML = `<strong class="clickable-node" onclick="openDetailsModal('${c}')">${c}</strong> ${label ? `<span style="color:var(--text-secondary); font-size: 0.8em; margin-left: 8px;">-> ${label}</span>` : ''}`;
             childrenList.appendChild(li);
         });
     }
@@ -289,10 +312,23 @@ function openDetailsModal(nodeName) {
         if (propsSection) propsSection.style.display = 'none';
     }
 
+    // Source Code
+    const sourceSection = document.getElementById('details-source-section');
+    const sourceCodePre = document.getElementById('details-source-code');
+    if (sourceSection && sourceCodePre) {
+        if (sourceCodes[nodeName] && sourceCodes[nodeName] !== "No underlying implementation class defined.") {
+            sourceSection.style.display = 'block';
+            sourceCodePre.textContent = sourceCodes[nodeName];
+            if (window.Prism) {
+                Prism.highlightElement(sourceCodePre);
+            }
+        } else {
+            sourceSection.style.display = 'none';
+        }
+    }
+
     // Reveal modal first so we can read its dimensions if needed
     modal.classList.remove('hidden');
-    highestZIndex++;
-    modal.style.zIndex = highestZIndex;
 
     activeDetailsNode = nodeName;
 }
@@ -402,9 +438,11 @@ function updateMetricsDOM(payload) {
             if (activeDetailsNode) {
                 const p = payload.metrics.profile.find(x => x.name === activeDetailsNode);
                 if (p) {
+                    const latEl = document.getElementById('details-metric-lat');
                     const updEl = document.getElementById('details-metric-update');
                     const avgEl = document.getElementById('details-metric-avg');
                     const nanEl = document.getElementById('details-metric-nan');
+                    if (latEl) latEl.textContent = formatVal(p.latest, 2);
                     if (updEl) updEl.textContent = p.evaluations;
                     if (avgEl) avgEl.textContent = formatVal(p.avg, 2);
                     if (nanEl) nanEl.textContent = p.nans;
@@ -413,18 +451,9 @@ function updateMetricsDOM(payload) {
         }
     }
 
-    // Re-hydrate the single node being viewed in the node details modal
+    // Re-hydrate internal state for the parsed node
     if (activeDetailsNode && payload.values) {
-        const val = payload.values[activeDetailsNode];
-        const valEl = document.getElementById('details-metric-value');
-        if (valEl && val !== undefined) {
-            valEl.textContent = val;
-            if (val === 'NaN') {
-                valEl.style.color = 'var(--status-down)';
-            } else {
-                valEl.style.color = 'var(--text-highlight)';
-            }
-        }
+
 
         // Update states
         if (payload.states && payload.states[activeDetailsNode]) {
@@ -572,6 +601,9 @@ function connect() {
                     if (payload.descriptions) {
                         nodeDescriptions = payload.descriptions;
                     }
+                    if (payload.sourceCodes) {
+                        sourceCodes = payload.sourceCodes;
+                    }
                     if (payload.edgeLabels) {
                         edgeLabels = payload.edgeLabels;
                     }
@@ -668,16 +700,16 @@ function connect() {
                                     body: `${alert.node} ${alert.condition} ${alert.threshold} (Val: ${valNum.toFixed(4)})`
                                 });
                                 alert.lastNotifiedEpoch = payload.epoch;
-
-                                // Record to History
-                                const timeStr = new Date().toLocaleTimeString();
-                                const msg = `${alert.node} ${alert.condition} ${alert.threshold} (Hit: ${valNum.toFixed(4)})`;
-                                alertHistory.unshift({ id: `${Date.now()}-${alert.node}`, time: timeStr, epoch: payload.epoch, message: msg });
-                                if (alertHistory.length > 50) alertHistory.pop(); // Cap history size
-
-                                saveAlertState();
-                                renderAlertHistory();
                             }
+
+                            // Always Record to History
+                            const timeStr = new Date().toLocaleTimeString();
+                            const msg = `${alert.node} ${alert.condition} ${alert.threshold} (Hit: ${valNum.toFixed(4)})`;
+                            alertHistory.unshift({ id: `${Date.now()}-${alert.node}`, time: timeStr, epoch: payload.epoch, message: msg });
+                            if (alertHistory.length > 50) alertHistory.pop(); // Cap history size
+
+                            saveAlertState();
+                            renderAlertHistory();
 
                             alertsToRemove.push(alert.id);
                         } else {
@@ -835,6 +867,10 @@ function renderProfileTable() {
 
             cells[0].textContent = displayName;
             cells[0].title = node.name;
+            // Ensure click handler is attached
+            cells[0].onclick = () => openDetailsModal(node.name);
+            cells[0].className = 'clickable-node';
+
             cells[1].textContent = node.evaluations;
             cells[2].textContent = formatVal(node.latest, 2);
             cells[3].textContent = formatVal(node.avg, 2);
@@ -851,7 +887,7 @@ function renderProfileTable() {
 
             html += `
                 <tr>
-                    <td title="${node.name}">${displayName}</td>
+                    <td title="${node.name}" class="clickable-node" onclick="openDetailsModal('${node.name}')">${displayName}</td>
                     <td class="right">${node.evaluations}</td>
                     <td class="right">${formatVal(node.latest, 2)}</td>
                     <td class="right">${formatVal(node.avg, 2)}</td>
@@ -1033,6 +1069,14 @@ function attachHoverListeners() {
             e.preventDefault(); // Prevent browser right-click menu
             const ctxMenu = document.getElementById('node-context-menu');
             if (ctxMenu) {
+                const addChartBtn = document.getElementById('ctx-add-chart');
+                if (addChartBtn) {
+                    if (activeChartSeries.has(nodeName)) {
+                        addChartBtn.textContent = 'Remove Chart';
+                    } else {
+                        addChartBtn.textContent = 'Add Chart';
+                    }
+                }
                 ctxMenu.style.left = `${e.clientX}px`;
                 ctxMenu.style.top = `${e.clientY}px`;
                 ctxMenu.classList.remove('hidden');
@@ -1045,6 +1089,8 @@ function attachHoverListeners() {
             if (ctxMenu && !ctxMenu.classList.contains('hidden')) {
                 ctxMenu.classList.add('hidden');
             }
+            // Left click now opens the node details directly
+            openDetailsModal(nodeName);
         });
         // Make it obviously clickable
         nodeGroup.style.cursor = 'pointer';
@@ -1675,6 +1721,14 @@ function setupOmnidirectionalResize(panelId) {
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
         });
+    });
+}
+
+// --- SNAPSHOT EXPORT ---
+const btnSnapshot = document.getElementById('btn-snapshot');
+if (btnSnapshot) {
+    btnSnapshot.addEventListener('click', () => {
+        window.open('/api/snapshot', '_blank');
     });
 }
 

@@ -35,6 +35,7 @@ public class CoreGraph {
     private final String version;
     private final Map<String, String> logicalTypes;
     private final Map<String, String> descriptions;
+    private final Map<String, String> sourceCodes;
     private final java.util.List<String> originalOrder;
     private final Map<String, Map<String, String>> edgeLabels;
 
@@ -76,12 +77,13 @@ public class CoreGraph {
 
         var info = graphDef.getGraph();
         this.name = info != null ? info.getName() : "Unknown";
-        this.version = info != null ? info.getVersion() : "1.0";
+        this.version = compiled.version();
 
         this.engine = compiled.engine();
         this.nodes = compiled.nodesByName();
         this.logicalTypes = compiled.logicalTypes();
         this.descriptions = compiled.descriptions();
+        this.sourceCodes = compiled.sourceCodes();
         this.originalOrder = compiled.originalOrder();
         this.edgeLabels = compiled.edgeLabels();
 
@@ -160,11 +162,13 @@ public class CoreGraph {
     public CoreGraph enableDashboardServer(int port) {
         if (this.dashboardServer == null) {
             this.dashboardServer = new com.trading.drg.web.GraphDashboardServer();
+            this.dashboardServer.setSnapshotSupplier(this::buildSnapshotJson);
 
             var wsListener = new com.trading.drg.web.WebsocketPublisherListener(
                     this.engine, this.dashboardServer, this.name, this.version, this.logicalTypes, this.descriptions,
                     this.originalOrder,
-                    this.edgeLabels);
+                    this.edgeLabels,
+                    this.sourceCodes);
 
             if (this.latencyListener != null) {
                 wsListener.setLatencyListener(this.latencyListener);
@@ -274,6 +278,93 @@ public class CoreGraph {
      */
     public int stabilize() {
         return engine.stabilize();
+    }
+
+    /**
+     * Serializes the current graph topology along with the internal dynamic state
+     * of every node
+     * into an expanded JSON string representing the exact runtime state.
+     */
+    public String buildSnapshotJson() {
+        GraphDefinition snapshot = new GraphDefinition();
+        var info = new GraphDefinition.GraphInfo();
+        info.setName(this.name + " (Snapshot)");
+        info.setVersion(this.version);
+        info.setEpoch(engine.epoch());
+        snapshot.setGraph(info);
+
+        java.util.List<GraphDefinition.NodeDef> expandedNodes = new java.util.ArrayList<>();
+        ObjectMapper mapper = new ObjectMapper();
+
+        for (String nodeName : originalOrder) {
+            Node<?> node = nodes.get(nodeName);
+            if (node == null)
+                continue;
+
+            GraphDefinition.NodeDef def = new GraphDefinition.NodeDef();
+            def.setName(nodeName);
+            def.setType(logicalTypes.get(nodeName));
+
+            // Reconstruct Inputs map from Edge Labels (Inverted: InputKey -> NodeName)
+            if (edgeLabels.containsKey(nodeName)) {
+                java.util.Map<String, String> original = edgeLabels.get(nodeName);
+                java.util.Map<String, String> inverted = new java.util.HashMap<>();
+                for (java.util.Map.Entry<String, String> entry : original.entrySet()) {
+                    inverted.put(entry.getValue(), entry.getKey());
+                }
+                def.setInputs(inverted);
+            }
+
+            // Extract dynamic state and value
+            StringBuilder sb = new StringBuilder("{");
+            if (node instanceof com.trading.drg.api.DynamicState ds) {
+                ds.serializeDynamicState(sb);
+            }
+            if (sb.length() > 1) {
+                sb.append(",");
+            }
+            sb.append("\"value\":");
+            Object val = node.value();
+            if (val == null) {
+                sb.append("null");
+            } else if (val instanceof double[] arr) {
+                sb.append("[");
+                for (int i = 0; i < arr.length; i++) {
+                    sb.append(Double.isNaN(arr[i]) ? "null" : arr[i]);
+                    if (i < arr.length - 1)
+                        sb.append(",");
+                }
+                sb.append("]");
+            } else if (val instanceof Double d) {
+                sb.append(d.isNaN() ? "null" : d);
+            } else {
+                sb.append(val);
+            }
+            sb.append("}");
+
+            try {
+                // Parse the constructed mini-JSON state block back into Java map to cleanly
+                // inject via Jackson
+                @SuppressWarnings("unchecked")
+                Map<String, Object> props = mapper.readValue(sb.toString(), Map.class);
+                if (!props.isEmpty()) {
+                    def.setProperties(props);
+                }
+            } catch (Exception e) {
+                // Fallback if dynamic state serialization broke
+                def.setProperties(Map.of("snapshotError", e.getMessage()));
+            }
+
+            expandedNodes.add(def);
+        }
+
+        info.setNodes(expandedNodes);
+
+        try {
+            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(snapshot);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return "{\"error\":\"Failed to serialize snapshot: " + e.getMessage() + "\"}";
+        }
     }
 
     // End of CoreGraph

@@ -24,7 +24,9 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final String graphName;
     private final String graphVersion;
     private final String initialMermaid;
+    private final java.util.Map<String, String> logicalTypes;
     private final java.util.Map<String, String> descriptions;
+    private final java.util.Map<String, String> sourceCodes;
     private final java.util.Map<String, java.util.Map<String, String>> edgeLabels;
     private final com.trading.drg.util.ErrorRateLimiter errLimiter = new com.trading.drg.util.ErrorRateLimiter(log,
             1000);
@@ -47,12 +49,15 @@ public class WebsocketPublisherListener implements StabilizationListener {
     public WebsocketPublisherListener(StabilizationEngine engine, GraphDashboardServer server, String graphName,
             String graphVersion, java.util.Map<String, String> logicalTypes, java.util.Map<String, String> descriptions,
             java.util.List<String> originalOrder,
-            java.util.Map<String, java.util.Map<String, String>> edgeLabels) {
+            java.util.Map<String, java.util.Map<String, String>> edgeLabels,
+            java.util.Map<String, String> sourceCodes) {
         this.engine = engine;
         this.server = server;
         this.graphName = graphName;
         this.graphVersion = graphVersion;
+        this.logicalTypes = logicalTypes;
         this.descriptions = descriptions;
+        this.sourceCodes = sourceCodes;
         this.edgeLabels = edgeLabels;
         this.initialMermaid = new com.trading.drg.util.GraphExplain(engine, logicalTypes, originalOrder, edgeLabels)
                 .toMermaid()
@@ -121,6 +126,26 @@ public class WebsocketPublisherListener implements StabilizationListener {
                 }
                 initBuilder.append("}");
                 firstEdge = false;
+            }
+        }
+        initBuilder.append("}");
+
+        // Add Source Codes
+        initBuilder.append(",\"sourceCodes\":{");
+        if (sourceCodes != null) {
+            boolean firstSource = true;
+            for (var entry : sourceCodes.entrySet()) {
+                if (!firstSource)
+                    initBuilder.append(",");
+                initBuilder.append("\"").append(entry.getKey()).append("\":\"")
+                        .append(entry.getValue()
+                                .replace("\\", "\\\\")
+                                .replace("\"", "\\\"")
+                                .replace("\n", "\\n")
+                                .replace("\r", "\\r")
+                                .replace("\t", "\\t"))
+                        .append("\"");
+                firstSource = false;
             }
         }
         initBuilder.append("}");

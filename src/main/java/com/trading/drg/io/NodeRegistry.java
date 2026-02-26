@@ -29,9 +29,14 @@ public final class NodeRegistry {
                     Parameter[] params = m.getParameters();
                     // Filter out empty/no-arg overrides
                     if (params.length > 0) {
-                        named = new String[params.length];
-                        for (int i = 0; i < params.length; i++) {
-                            named[i] = params[i].getName();
+                        // If it's a single array parameter, treat it as an unbounded varargs node
+                        if (params.length == 1 && params[0].getType().isArray()) {
+                            named = null;
+                        } else {
+                            named = new String[params.length];
+                            for (int i = 0; i < params.length; i++) {
+                                named[i] = params[i].getName();
+                            }
                         }
                         break;
                     }

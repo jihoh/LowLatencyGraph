@@ -1,5 +1,6 @@
 package com.trading.drg.fn.finance;
 
+import com.trading.drg.api.DynamicState;
 import com.trading.drg.fn.Fn2;
 import com.trading.drg.util.ErrorRateLimiter;
 import org.apache.logging.log4j.LogManager;
@@ -9,7 +10,7 @@ import org.apache.logging.log4j.Logger;
  * Base class for all Fn2 implementations.
  * Handles try-catch wrapping and error rate limiting automatically.
  */
-public abstract class AbstractFn2 implements Fn2 {
+public abstract class AbstractFn2 implements Fn2, DynamicState {
     private final Logger log = LogManager.getLogger(this.getClass());
     private final ErrorRateLimiter limiter = new ErrorRateLimiter(log, 1000);
 
