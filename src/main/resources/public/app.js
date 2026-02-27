@@ -374,6 +374,109 @@ function fitGraph() {
     }
 }
 
+let isDraggingMinimap = false;
+
+function initMinimap(mainSvg) {
+    const minimapSvg = document.getElementById('minimap-svg');
+    const minimapViewport = document.getElementById('minimap-viewport');
+    const minimapContainer = document.getElementById('minimap-container');
+
+    if (!minimapSvg || !minimapViewport || !minimapContainer || !panZoomInstance) return;
+
+    // Clone the static SVG content into the minimap
+    minimapSvg.innerHTML = mainSvg.innerHTML;
+
+    // Set the minimap viewBox to match the original graph's initial natural bounds
+    const bbox = mainSvg.getBBox();
+    const viewBoxStr = `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`;
+    minimapSvg.setAttribute('viewBox', viewBoxStr);
+
+    function updateViewport() {
+        const sizes = panZoomInstance.getSizes();
+        const pan = panZoomInstance.getPan();
+
+        // Map logical viewBox coords to minimap container pixels
+        const scale = Math.min(
+            minimapContainer.clientWidth / sizes.viewBox.width,
+            minimapContainer.clientHeight / sizes.viewBox.height
+        );
+
+        // Centering offsets due to preserveAspectRatio xMidYMid meet
+        const offsetX = (minimapContainer.clientWidth - sizes.viewBox.width * scale) / 2;
+        const offsetY = (minimapContainer.clientHeight - sizes.viewBox.height * scale) / 2;
+
+        // Visible area in logical coordinates
+        const viewWidth = sizes.width / sizes.realZoom;
+        const viewHeight = sizes.height / sizes.realZoom;
+        const viewX = -pan.x / sizes.realZoom;
+        const viewY = -pan.y / sizes.realZoom;
+
+        // Convert logical coordinates back to minimap container pixels
+        const vpLeft = (viewX * scale) + offsetX;
+        const vpTop = (viewY * scale) + offsetY;
+        const vpWidth = viewWidth * scale;
+        const vpHeight = viewHeight * scale;
+
+        minimapViewport.style.left = `${vpLeft}px`;
+        minimapViewport.style.top = `${vpTop}px`;
+        minimapViewport.style.width = `${vpWidth}px`;
+        minimapViewport.style.height = `${vpHeight}px`;
+    }
+
+    panZoomInstance.setOnPan(updateViewport);
+    panZoomInstance.setOnZoom(updateViewport);
+    setTimeout(updateViewport, 50);
+
+    // Drag to pan map logic
+    function handleMinimapDrag(e) {
+        if (!isDraggingMinimap) return;
+        const rect = minimapContainer.getBoundingClientRect();
+
+        // Mouse position in minimap container
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const sizes = panZoomInstance.getSizes();
+        const scale = Math.min(
+            minimapContainer.clientWidth / sizes.viewBox.width,
+            minimapContainer.clientHeight / sizes.viewBox.height
+        );
+        const offsetX = (minimapContainer.clientWidth - sizes.viewBox.width * scale) / 2;
+        const offsetY = (minimapContainer.clientHeight - sizes.viewBox.height * scale) / 2;
+
+        // Convert minimap mouse position back to logical graph coordinates
+        const logicalX = (mouseX - offsetX) / scale;
+        const logicalY = (mouseY - offsetY) / scale;
+
+        // We want logical center of the screen to be at logicalX, logicalY
+        const viewWidth = sizes.width / sizes.realZoom;
+        const viewHeight = sizes.height / sizes.realZoom;
+
+        const newViewX = logicalX - viewWidth / 2;
+        const newViewY = logicalY - viewHeight / 2;
+
+        panZoomInstance.pan({
+            x: -newViewX * sizes.realZoom,
+            y: -newViewY * sizes.realZoom
+        });
+    }
+
+    minimapContainer.addEventListener('mousedown', (e) => {
+        isDraggingMinimap = true;
+        minimapContainer.style.cursor = 'grabbing';
+        handleMinimapDrag(e);
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', handleMinimapDrag);
+    document.addEventListener('mouseup', () => {
+        if (isDraggingMinimap) {
+            isDraggingMinimap = false;
+            minimapContainer.style.cursor = 'crosshair';
+        }
+    });
+}
+
 // Text Scale controls
 let textScale = 1.0;
 // Set it immediately so it takes effect on load
@@ -526,6 +629,7 @@ function connect() {
                                 minZoom: 0.1,
                                 maxZoom: 50
                             });
+                            initMinimap(svgEl);
                             setTimeout(fitGraph, 10);
                         }
 
@@ -551,21 +655,27 @@ function connect() {
 
                             // Compute cached DOM queries upfront for 0-allocation updates natively in WebSockets
                             const svgNodeId = getMermaidNodeId(nodeName);
-                            const nodeGroup = document.querySelector(`[id^="flowchart-${svgNodeId}-"]`);
-                            let nodeValueEl = null;
-                            let textNodes = null;
+                            const nodeGroups = document.querySelectorAll(`[id^="flowchart-${svgNodeId}-"]`);
 
-                            if (nodeGroup) {
-                                nodeValueEl = nodeGroup.querySelector('.node-value');
+                            const cachedInstances = [];
+
+                            nodeGroups.forEach(nodeGroup => {
+                                let nodeValueEl = nodeGroup.querySelector('.node-value');
+                                let textNodesFallback = null;
+
                                 if (!nodeValueEl) {
-                                    textNodes = nodeGroup.querySelectorAll('tspan');
+                                    textNodesFallback = nodeGroup.querySelectorAll('tspan');
                                 }
-                            }
+
+                                cachedInstances.push({
+                                    group: nodeGroup,
+                                    valueEl: nodeValueEl,
+                                    textNodesFallback: textNodesFallback
+                                });
+                            });
 
                             graphElementsCache.set(nodeName, {
-                                group: nodeGroup,
-                                valueEl: nodeValueEl,
-                                textNodesFallback: textNodes,
+                                instances: cachedInstances,
                                 lsPaths: document.querySelectorAll(`.LS-${svgNodeId}`),
                                 lePaths: document.querySelectorAll(`.LE-${svgNodeId}`)
                             });
@@ -953,33 +1063,40 @@ function updateGraphDOM(newValues) {
         // Only touch the DOM if the value ACTUALLY changed contextually
         if (oldVal !== newVal) {
             const cachedDOM = graphElementsCache.get(nodeName);
-            if (cachedDOM && cachedDOM.group) {
-                const nodeGroup = cachedDOM.group;
-                const isNaN = newVal === "NaN";
+            if (cachedDOM && cachedDOM.instances && cachedDOM.instances.length > 0) {
+                const isValNaN = newVal === "NaN";
 
-                if (isNaN) {
-                    nodeGroup.classList.add('nan-node');
+                if (isValNaN) {
                     cachedDOM.lsPaths.forEach(e => e.dataset.sourceNan = "true");
                     cachedDOM.lePaths.forEach(e => e.dataset.targetNan = "true");
                 } else {
-                    nodeGroup.classList.remove('nan-node');
                     cachedDOM.lsPaths.forEach(e => e.dataset.sourceNan = "false");
                     cachedDOM.lePaths.forEach(e => e.dataset.targetNan = "false");
                 }
 
-                const displayVal = isNaN ? "NaN" : formatVal(newVal);
+                const displayVal = isValNaN ? "NaN" : formatVal(newVal);
 
-                if (cachedDOM.valueEl) {
-                    cachedDOM.valueEl.textContent = displayVal;
-                } else if (cachedDOM.textNodesFallback && cachedDOM.textNodesFallback.length > 1) {
-                    cachedDOM.textNodesFallback[cachedDOM.textNodesFallback.length - 1].textContent = displayVal;
-                }
+                cachedDOM.instances.forEach(instance => {
+                    const nodeGroup = instance.group;
 
-                // Trigger CSS flash animation
-                nodeGroup.classList.remove('node-flash');
-                // Force reflow to restart animation
-                void nodeGroup.offsetWidth;
-                nodeGroup.classList.add('node-flash');
+                    if (isValNaN) {
+                        nodeGroup.classList.add('nan-node');
+                    } else {
+                        nodeGroup.classList.remove('nan-node');
+                    }
+
+                    if (instance.valueEl) {
+                        instance.valueEl.textContent = displayVal;
+                    } else if (instance.textNodesFallback && instance.textNodesFallback.length > 1) {
+                        instance.textNodesFallback[instance.textNodesFallback.length - 1].textContent = displayVal;
+                    }
+
+                    // Trigger CSS flash animation
+                    nodeGroup.classList.remove('node-flash');
+                    // Force reflow to restart animation
+                    void nodeGroup.offsetWidth;
+                    nodeGroup.classList.add('node-flash');
+                });
             }
 
             prevValues.set(nodeName, newVal);
@@ -1017,13 +1134,17 @@ function highlightNodes(nodeNames, isHovered, type = 'downstream') {
         const cachedDOM = graphElementsCache.get(name);
         if (!cachedDOM) continue;
 
-        const nodeGroup = cachedDOM.group;
-        if (nodeGroup) {
-            if (isHovered) {
-                nodeGroup.classList.add(`node-hover-${type}`);
-            } else {
-                nodeGroup.classList.remove(`node-hover-${type}`);
-            }
+        if (cachedDOM.instances) {
+            cachedDOM.instances.forEach(instance => {
+                const nodeGroup = instance.group;
+                if (nodeGroup) {
+                    if (isHovered) {
+                        nodeGroup.classList.add(`node-hover-${type}`);
+                    } else {
+                        nodeGroup.classList.remove(`node-hover-${type}`);
+                    }
+                }
+            });
         }
 
         cachedDOM.lsPaths.forEach(e => {
@@ -1039,61 +1160,65 @@ function highlightNodes(nodeNames, isHovered, type = 'downstream') {
 function attachHoverListeners() {
     for (const nodeName of prevValues.keys()) {
         const cachedDOM = graphElementsCache.get(nodeName);
-        if (!cachedDOM || !cachedDOM.group) continue;
+        if (!cachedDOM || !cachedDOM.instances) continue;
 
-        const nodeGroup = cachedDOM.group;
+        cachedDOM.instances.forEach(instance => {
+            const nodeGroup = instance.group;
+            if (!nodeGroup) return;
 
-        nodeGroup.addEventListener('mouseenter', () => {
-            const downstream = getDownstreamNodes(nodeName).filter(n => n !== nodeName);
-            const upstream = getUpstreamNodes(nodeName).filter(n => n !== nodeName);
+            nodeGroup.addEventListener('mouseenter', () => {
+                const downstream = getDownstreamNodes(nodeName).filter(n => n !== nodeName);
+                const upstream = getUpstreamNodes(nodeName).filter(n => n !== nodeName);
 
-            highlightNodes(downstream, true, 'downstream');
-            highlightNodes(upstream, true, 'upstream');
-            highlightNodes([nodeName], true, 'self');
+                highlightNodes(downstream, true, 'downstream');
+                highlightNodes(upstream, true, 'upstream');
+                highlightNodes([nodeName], true, 'self');
 
-            const graphView = document.getElementById('graph-view');
-            if (graphView) graphView.classList.add('graph-hover-active');
-        });
-        nodeGroup.addEventListener('mouseleave', () => {
-            const downstream = getDownstreamNodes(nodeName).filter(n => n !== nodeName);
-            const upstream = getUpstreamNodes(nodeName).filter(n => n !== nodeName);
+                const graphView = document.getElementById('graph-view');
+                if (graphView) graphView.classList.add('graph-hover-active');
+            });
+            nodeGroup.addEventListener('mouseleave', () => {
+                const downstream = getDownstreamNodes(nodeName).filter(n => n !== nodeName);
+                const upstream = getUpstreamNodes(nodeName).filter(n => n !== nodeName);
 
-            highlightNodes(downstream, false, 'downstream');
-            highlightNodes(upstream, false, 'upstream');
-            highlightNodes([nodeName], false, 'self');
+                highlightNodes(downstream, false, 'downstream');
+                highlightNodes(upstream, false, 'upstream');
+                highlightNodes([nodeName], false, 'self');
 
-            const graphView = document.getElementById('graph-view');
-            if (graphView) graphView.classList.remove('graph-hover-active');
-        });
-        nodeGroup.addEventListener('contextmenu', (e) => {
-            e.preventDefault(); // Prevent browser right-click menu
-            const ctxMenu = document.getElementById('node-context-menu');
-            if (ctxMenu) {
-                const addChartBtn = document.getElementById('ctx-add-chart');
-                if (addChartBtn) {
-                    if (activeChartSeries.has(nodeName)) {
-                        addChartBtn.textContent = 'Remove Chart';
-                    } else {
-                        addChartBtn.textContent = 'Add Chart';
+                const graphView = document.getElementById('graph-view');
+                if (graphView) graphView.classList.remove('graph-hover-active');
+            });
+            nodeGroup.addEventListener('contextmenu', (e) => {
+                e.preventDefault(); // Prevent browser right-click menu
+                const ctxMenu = document.getElementById('node-context-menu');
+                if (ctxMenu) {
+                    const addChartBtn = document.getElementById('ctx-add-chart');
+                    if (addChartBtn) {
+                        if (activeChartSeries.has(nodeName)) {
+                            addChartBtn.textContent = 'Remove Chart';
+                        } else {
+                            addChartBtn.textContent = 'Add Chart';
+                        }
                     }
+                    ctxMenu.style.left = `${e.clientX}px`;
+                    ctxMenu.style.top = `${e.clientY}px`;
+                    ctxMenu.classList.remove('hidden');
+                    ctxMenu.dataset.contextNode = nodeName;
                 }
-                ctxMenu.style.left = `${e.clientX}px`;
-                ctxMenu.style.top = `${e.clientY}px`;
-                ctxMenu.classList.remove('hidden');
-                ctxMenu.dataset.contextNode = nodeName;
-            }
+            });
+            // We use mouseup instead of click, because svg-pan-zoom intercepts click loops
+            // if it thinks a pan or drag happened, but mouseup is cleaner.
+            nodeGroup.addEventListener('mouseup', (e) => {
+                if (e.button !== 0) return; // Only trigger for primary (left) button
+
+                // Also explicitly hide the context menu if they left-click the node itself
+                const ctxMenu = document.getElementById('node-context-menu');
+                if (ctxMenu) ctxMenu.classList.add('hidden');
+                openDetailsModal(nodeName);
+            });
+            // Make it obviously clickable
+            nodeGroup.style.cursor = 'pointer';
         });
-        nodeGroup.addEventListener('click', (e) => {
-            // Also explicitly hide the context menu if they left-click the node itself
-            const ctxMenu = document.getElementById('node-context-menu');
-            if (ctxMenu && !ctxMenu.classList.contains('hidden')) {
-                ctxMenu.classList.add('hidden');
-            }
-            // Left click now opens the node details directly
-            openDetailsModal(nodeName);
-        });
-        // Make it obviously clickable
-        nodeGroup.style.cursor = 'pointer';
     }
 }
 
@@ -1860,4 +1985,59 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Boot WebSocket strictly after DOM stabilizes
     connect();
+});
+
+// Graph Search functionality
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('node-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim().toLowerCase();
+            const svgEl = document.getElementById('graph-view');
+
+            if (!query) {
+                svgEl.classList.remove('graph-search-active');
+                const matchEls = svgEl.querySelectorAll('.node-search-match');
+                matchEls.forEach(el => el.classList.remove('node-search-match'));
+                return;
+            }
+
+            svgEl.classList.add('graph-search-active');
+
+            for (const [nodeName, cache] of graphElementsCache.entries()) {
+                let typeStr = "";
+                const titleStr = nodeName.toLowerCase();
+                const props = window.graphProperties ? window.graphProperties[nodeName] : {};
+
+                if (props && props.type) {
+                    typeStr = String(props.type).toLowerCase();
+                } else if (cache.instances && cache.instances.length > 0) {
+                    const typeEl = cache.instances[0].group.querySelector('.node-type');
+                    if (typeEl && typeEl.textContent) {
+                        typeStr = typeEl.textContent.trim().toLowerCase();
+                    }
+                }
+
+                const isMatch = titleStr.includes(query) || (typeStr && typeStr.includes(query));
+
+                if (cache.instances) {
+                    cache.instances.forEach(inst => {
+                        if (isMatch) {
+                            inst.group.classList.add('node-search-match');
+                        } else {
+                            inst.group.classList.remove('node-search-match');
+                        }
+                    });
+                }
+            }
+        });
+
+        // Blur the search input if the user clicks outside of it
+        // We use true for capture phase because svg-pan-zoom stops bubble propagation on SVG clicks
+        document.addEventListener('mousedown', (e) => {
+            if (document.activeElement === searchInput && !searchInput.contains(e.target)) {
+                searchInput.blur();
+            }
+        }, true);
+    }
 });

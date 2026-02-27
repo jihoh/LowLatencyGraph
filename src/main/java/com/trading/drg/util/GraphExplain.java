@@ -134,11 +134,11 @@ public final class GraphExplain {
             String safeName = sanitize(node.name());
 
             // Format the value nicely
-            double val = 0.0;
-            if (node instanceof ScalarNode sn) {
-                val = sn.doubleValue();
-            } else if (node instanceof ScalarSourceNode ssn) {
-                val = ssn.doubleValue();
+            double val = Double.NaN;
+            if (node instanceof com.trading.drg.api.ScalarValue sv) {
+                val = sv.doubleValue();
+            } else if (node.value() instanceof Number num) {
+                val = num.doubleValue();
             }
             String valueStr = String.format("%.4f", val);
             String nodeType = logicalTypes.get(node.name());

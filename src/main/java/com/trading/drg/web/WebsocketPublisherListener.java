@@ -4,8 +4,6 @@ import com.trading.drg.api.Node;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.api.StabilizationListener;
 import com.trading.drg.engine.TopologicalOrder;
-import com.trading.drg.node.ScalarNode;
-import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.util.LatencyTrackingListener;
 import com.trading.drg.util.NodeProfileListener;
 import org.apache.logging.log4j.LogManager;
@@ -191,11 +189,11 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
             Node<?> node = topology.node(i);
 
-            double val = 0.0;
-            if (node instanceof ScalarNode sn) {
-                val = sn.doubleValue();
-            } else if (node instanceof ScalarSourceNode ssn) {
-                val = ssn.doubleValue();
+            double val = Double.NaN;
+            if (node instanceof com.trading.drg.api.ScalarValue sv) {
+                val = sv.doubleValue();
+            } else if (node.value() instanceof Number num) {
+                val = num.doubleValue();
             }
 
             if (Double.isNaN(val)) {
