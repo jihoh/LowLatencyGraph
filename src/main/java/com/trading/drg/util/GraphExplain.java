@@ -24,7 +24,6 @@ public final class GraphExplain {
     private final TopologicalOrder topology;
     private final java.util.Map<String, String> logicalTypes;
     private final java.util.List<String> displayOrder;
-    private final java.util.Map<String, java.util.Map<String, String>> edgeLabels;
 
     public GraphExplain(StabilizationEngine engine) {
         this(engine, java.util.Collections.emptyMap(), java.util.Collections.emptyList(), null);
@@ -45,7 +44,6 @@ public final class GraphExplain {
         this.topology = engine.topology();
         this.logicalTypes = logicalTypes;
         this.displayOrder = displayOrder;
-        this.edgeLabels = edgeLabels;
     }
 
     /**
@@ -178,20 +176,7 @@ public final class GraphExplain {
                 Node<?> child = topology.node(topology.child(i, j));
                 String safeChild = sanitize(child.name());
 
-                String label = null;
-                if (edgeLabels != null) {
-                    var labelsForChild = edgeLabels.get(child.name());
-                    if (labelsForChild != null) {
-                        label = labelsForChild.get(node.name());
-                    }
-                }
-
-                if (label != null) {
-                    sb.append("  ").append(safeName).append(" -- \"").append(label).append("\" --> ").append(safeChild)
-                            .append(";\n");
-                } else {
-                    sb.append("  ").append(safeName).append(" --> ").append(safeChild).append(";\n");
-                }
+                sb.append("  ").append(safeName).append(" --> ").append(safeChild).append(";\n");
             }
         }
         return sb.toString();

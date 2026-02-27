@@ -189,18 +189,45 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
             Node<?> node = topology.node(i);
 
-            double val = Double.NaN;
+            double scalarVal = Double.NaN;
+            double[] vectorVal = null;
+            String[] headers = null;
+
             if (node instanceof com.trading.drg.api.ScalarValue sv) {
-                val = sv.doubleValue();
+                scalarVal = sv.doubleValue();
             } else if (node.value() instanceof Number num) {
-                val = num.doubleValue();
+                scalarVal = num.doubleValue();
+            } else if (node instanceof com.trading.drg.api.VectorValue vv) {
+                vectorVal = vv.value();
+                headers = vv.headers();
+            } else if (node.value() instanceof double[] arr) {
+                vectorVal = arr;
             }
 
-            if (Double.isNaN(val)) {
+            if (vectorVal != null) {
+                jsonBuilder.append("\"").append(node.name()).append("\":\"[");
+                for (int v = 0; v < vectorVal.length; v++) {
+                    double vVal = vectorVal[v];
+                    jsonBuilder.append(Double.isNaN(vVal) ? "null" : vVal);
+                    if (v < vectorVal.length - 1)
+                        jsonBuilder.append(",");
+                }
+                jsonBuilder.append("]\"");
+
+                if (headers != null) {
+                    jsonBuilder.append(",\"").append(node.name()).append("_headers\":\"[");
+                    for (int h = 0; h < headers.length; h++) {
+                        jsonBuilder.append("\\\"").append(headers[h]).append("\\\"");
+                        if (h < headers.length - 1)
+                            jsonBuilder.append(",");
+                    }
+                    jsonBuilder.append("]\"");
+                }
+            } else if (Double.isNaN(scalarVal)) {
                 nanCounters[i]++;
                 jsonBuilder.append("\"").append(node.name()).append("\":\"NaN\"");
             } else {
-                jsonBuilder.append("\"").append(node.name()).append("\":").append(val);
+                jsonBuilder.append("\"").append(node.name()).append("\":").append(scalarVal);
             }
 
             if (i < nodeCount - 1) {

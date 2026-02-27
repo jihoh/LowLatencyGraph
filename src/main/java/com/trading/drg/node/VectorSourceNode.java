@@ -25,6 +25,7 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorValue
     private double[] currentValues;
     private double[] previousValues;
     private boolean initialized = false;
+    private String[] headers = null;
 
     public VectorSourceNode(String name, int size, double tolerance) {
         this.name = name;
@@ -41,6 +42,20 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorValue
      */
     public VectorSourceNode(String name, int size) {
         this(name, size, 1e-15);
+    }
+
+    public VectorSourceNode withHeaders(String[] headers) {
+        if (headers != null && headers.length != size) {
+            throw new IllegalArgumentException(
+                    "Headers array length (" + headers.length + ") must match vector size (" + size + ")");
+        }
+        this.headers = headers;
+        return this;
+    }
+
+    @Override
+    public String[] headers() {
+        return headers;
     }
 
     @Override

@@ -285,6 +285,39 @@ public final class JsonGraphCompiler {
                 }
             } else {
                 expanded.add(node);
+
+                // Vector Auto-Expand Logic
+                if (node.getProperties() != null) {
+                    Object autoExpandObj = node.getProperties().get("auto_expand");
+                    boolean autoExpand = autoExpandObj != null && (autoExpandObj instanceof Boolean b ? b
+                            : Boolean.parseBoolean(autoExpandObj.toString()));
+
+                    if (autoExpand) {
+                        int size = getInt(node.getProperties(), "size", 0);
+                        String prefix = (String) node.getProperties().getOrDefault("auto_expand_prefix", "Elem");
+                        List<String> labels = null;
+                        Object labelsObj = node.getProperties().get("auto_expand_labels");
+                        if (labelsObj == null) {
+                            labelsObj = node.getProperties().get("headers");
+                        }
+
+                        if (labelsObj instanceof List<?> list) {
+                            labels = list.stream().map(Object::toString).toList();
+                        }
+
+                        for (int i = 0; i < size; i++) {
+                            GraphDefinition.NodeDef elem = new GraphDefinition.NodeDef();
+
+                            String suffix = (labels != null && i < labels.size()) ? labels.get(i) : (prefix + i);
+                            elem.setName(node.getName() + "." + suffix);
+
+                            elem.setType("vector_element");
+                            elem.setInputs(Map.of("i0", node.getName()));
+                            elem.setProperties(Map.of("index", i));
+                            expanded.add(elem);
+                        }
+                    }
+                }
             }
         }
         return expanded;

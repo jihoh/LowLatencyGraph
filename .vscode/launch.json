@@ -6,6 +6,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "CoreGraphVectorDemo",
+            "request": "launch",
+            "mainClass": "com.trading.drg.CoreGraphVectorDemo",
+            "projectName": "claude-graph"
+        },
+        {
+            "type": "java",
             "name": "CoreGraphSimpleDemo",
             "request": "launch",
             "mainClass": "com.trading.drg.CoreGraphSimpleDemo",

@@ -48,4 +48,15 @@ public interface VectorValue extends Node<double[]> {
      * @return The number of elements in the vector.
      */
     int size();
+
+    /**
+     * Returns an optional array of string headers (labels) for the vector elements.
+     * Often used by UIs or formatting utilities to display context (e.g. ["1M",
+     * "3M"]).
+     * 
+     * @return Array of string labels, or null if no headers are defined.
+     */
+    default String[] headers() {
+        return null;
+    }
 }

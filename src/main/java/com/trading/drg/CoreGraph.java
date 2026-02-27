@@ -340,6 +340,17 @@ public class CoreGraph {
             } else {
                 sb.append(val);
             }
+
+            if (node instanceof com.trading.drg.api.VectorValue vv && vv.headers() != null) {
+                sb.append(",\"headers\":[");
+                String[] hdrs = vv.headers();
+                for (int h = 0; h < hdrs.length; h++) {
+                    sb.append("\"").append(hdrs[h]).append("\"");
+                    if (h < hdrs.length - 1)
+                        sb.append(",");
+                }
+                sb.append("]");
+            }
             sb.append("}");
 
             try {

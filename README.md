@@ -85,6 +85,14 @@ long[] dirtyWords;    // Sparse BitSet leveraging hardware intrinsics
 
 When the engine walks the graph, it streams through these primitive arrays. Rather than visiting every node in an $O(N)$ sweep to check its boolean state, the engine uses `Long.numberOfTrailingZeros(dirtyWords[w])` to instantly hardware-jump strictly to the exact nodes that were updated in O(K) time complexity. This is significantly faster and more cache-friendly than chasing `Iterator` pointers or sweeping booleans.
 
+### 2.5 Vector Operations and Sparsity
+When dealing with large arrays like Yield Curves or Volatility Surfaces, CoreGraph uses `VectorNode` types. However, computation nodes (`Fn1`, `Fn2`, etc.) generally should **not** depend directly on the entire root vector unless they genuinely require every single element (like a PCA calculation).
+
+Instead, you should use `vector_element` intermediaries to extract specific scalars:
+1. **$O(K)$ Sparse Evaluation:** If a downstream node (like a Spread calculation) directly depends on a 100-tenor `MarketYieldCurve`, any single tick on *any* tenor marks the root vector dirty, forcing your Spread node to uselessly recompute. By using a `Yield2Y` (`vector_element`) intermediary, the Spread calculation is shielded and will *only* recompute if the specific 2Y or 1M tenors tick.
+2. **Interface Segregation:** It allows your core calculation functions to remain purely scalar (`double`), keeping them decoupled from array indexing logic and highly reusable.
+3. **Visual Transparency:** Explicit element extraction makes the graph topology self-documenting, showing exactly which risk algorithms depend on which specific tenors of a curve.
+
 ---
 
 ## 3. The CoreGraphDemo Walkthrough

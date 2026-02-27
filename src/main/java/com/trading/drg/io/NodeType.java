@@ -125,11 +125,42 @@ public enum NodeType {
                 JsonGraphCompiler.parseCutoff(props));
     }, "Produces a constant scalar value."),
     VECTOR_SOURCE(VectorSourceNode.class, (name, props, deps) -> {
-        int size = JsonGraphCompiler.getInt(props, "size", -1);
+        int size = JsonGraphCompiler.getInt(props, "size", 0);
         if (size <= 0)
             throw new IllegalArgumentException("vector_source needs positive 'size'");
-        return new VectorSourceNode(name, size, JsonGraphCompiler.getDouble(props, "tolerance", 1e-15));
+
+        double tolerance = JsonGraphCompiler.getDouble(props, "tolerance", 1e-15);
+        var node = new VectorSourceNode(name, size, tolerance);
+
+        Object headersObj = props.get("headers");
+        if (headersObj == null) {
+            headersObj = props.get("auto_expand_labels");
+        }
+
+        if (headersObj instanceof java.util.List<?> list) {
+            String[] headers = list.stream().map(Object::toString).toArray(String[]::new);
+            node.withHeaders(headers);
+        }
+        return node;
     }, "Produces a constant vector of values."),
+    VECTOR_ELEMENT(ScalarCalcNode.class, (name, props, deps) -> {
+        int index = JsonGraphCompiler.getInt(props, "index", 0);
+        return com.trading.drg.dsl.GraphBuilder.create("tmp").vectorElement(name,
+                (com.trading.drg.api.VectorValue) deps[0], index);
+    }, "Extracts a single scalar element from a vector node."),
+    COMPUTE_VECTOR(VectorCalcNode.class, (name, props, deps) -> {
+        int size = JsonGraphCompiler.getInt(props, "size", -1);
+        double tolerance = JsonGraphCompiler.getDouble(props, "tolerance", 1e-15);
+        // We provide a simple proxy VectorFn that just copies the first dependent
+        // vector
+        // In a real scenario, we'd use reflection or a registry to resolve 'fn'
+        return com.trading.drg.dsl.GraphBuilder.create("tmp").computeVector(name, size, tolerance, (inNodes, out) -> {
+            if (inNodes.length > 0 && inNodes[0] instanceof com.trading.drg.api.VectorValue v) {
+                for (int i = 0; i < Math.min(size, v.size()); i++)
+                    out[i] = v.valueAt(i);
+            }
+        }, deps);
+    }, "Computes a new vector based on inputs."),
     TEMPLATE(null, null, "Defines a template for node grouping.");
 
     private final Class<?> nodeClass;

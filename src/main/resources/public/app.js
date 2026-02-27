@@ -265,6 +265,9 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+let detailsVectorChart = null;
+let detailsVectorSeries = null;
+
 function openDetailsModal(nodeName) {
     const modal = document.getElementById('node-details-modal');
 
@@ -349,6 +352,100 @@ function openDetailsModal(nodeName) {
         }
     }
 
+    // Setup Vector Chart if applicable
+    const vectorSection = document.getElementById('details-vector-section');
+    const chartContainer = document.getElementById('tv-vector-chart');
+
+    let isVector = false;
+    let vectorData = [];
+    let vectorHeaders = [];
+
+    const latestVal = prevValues.get(nodeName);
+    if (typeof latestVal === 'string' && latestVal.startsWith('[') && latestVal.endsWith(']')) {
+        isVector = true;
+        try {
+            const arr = JSON.parse(latestVal);
+            const lastSnap = snapshots.size > 0 ? snapshots.get(snapshots.size - 1) : null;
+            let headersStr = lastSnap && lastSnap.values ? lastSnap.values[nodeName + "_headers"] : null;
+
+            if (headersStr && headersStr.startsWith('[') && headersStr.endsWith(']')) {
+                const headersArray = JSON.parse(headersStr);
+                vectorHeaders = headersArray;
+            }
+
+            vectorData = arr.map((v, i) => {
+                return { time: i + 1, value: Number.isNaN(Number(v)) || v === "NaN" || v === null ? NaN : Number(v) };
+            });
+        } catch (e) { }
+    }
+
+    if (isVector) {
+        vectorSection.style.display = 'block';
+
+        if (detailsVectorChart) {
+            detailsVectorChart.remove();
+            detailsVectorChart = null;
+            detailsVectorSeries = null;
+        }
+
+        detailsVectorChart = LightweightCharts.createChart(chartContainer, {
+            layout: {
+                background: { type: 'solid', color: 'transparent' },
+                textColor: '#94a3b8',
+            },
+            grid: {
+                vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
+                horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
+            },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+            },
+            rightPriceScale: {
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+            },
+            timeScale: {
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                timeVisible: false,
+                tickMarkFormatter: (time, tickMarkType, locale) => {
+                    const idx = Math.floor(time) - 1;
+                    if (vectorHeaders && vectorHeaders.length > idx && idx >= 0) {
+                        return vectorHeaders[idx];
+                    }
+                    return `${idx}`;
+                }
+            },
+        });
+
+        detailsVectorSeries = detailsVectorChart.addLineSeries({
+            color: '#58a6ff',
+            lineWidth: 2,
+            crosshairMarkerVisible: true,
+            lastValueVisible: false,
+            priceLineVisible: false,
+            pointMarkersVisible: true,
+        });
+
+        detailsVectorSeries.setData(vectorData);
+        detailsVectorChart.timeScale().fitContent();
+
+        const ro = new ResizeObserver(() => {
+            if (detailsVectorChart && chartContainer.clientWidth > 0 && chartContainer.clientHeight > 0) {
+                detailsVectorChart.resize(chartContainer.clientWidth, chartContainer.clientHeight);
+                detailsVectorChart.timeScale().fitContent();
+            }
+        });
+        ro.observe(chartContainer);
+        chartContainer._ro = ro;
+
+    } else {
+        vectorSection.style.display = 'none';
+        if (detailsVectorChart) {
+            detailsVectorChart.remove();
+            detailsVectorChart = null;
+            detailsVectorSeries = null;
+        }
+    }
+
     // Reveal modal first so we can read its dimensions if needed
     modal.classList.remove('hidden');
 
@@ -358,6 +455,12 @@ function openDetailsModal(nodeName) {
 function closeDetailsModal() {
     document.getElementById('node-details-modal').classList.add('hidden');
     activeDetailsNode = null;
+
+    if (detailsVectorChart) {
+        detailsVectorChart.remove();
+        detailsVectorChart = null;
+        detailsVectorSeries = null;
+    }
 }
 
 
@@ -1096,7 +1199,42 @@ function updateGraphDOM(newValues) {
                     cachedDOM.lePaths.forEach(e => e.dataset.targetNan = "false");
                 }
 
-                const displayVal = isValNaN ? "NaN" : formatVal(newVal);
+                // Determine if it's an Array representation like "[4.7, 4.8]"
+                let displayVal = "NaN";
+                if (!isValNaN) {
+                    if (typeof newVal === 'string' && newVal.startsWith('[') && newVal.endsWith(']')) {
+                        try {
+                            const arr = JSON.parse(newVal);
+                            const headersStr = newValues[nodeName + "_headers"];
+
+                            if (headersStr && headersStr.startsWith('[') && headersStr.endsWith(']')) {
+                                const headersArray = JSON.parse(headersStr);
+                                displayVal = "[" + arr.map((v, i) => {
+                                    const h = (i < headersArray.length) ? headersArray[i] : i;
+                                    return `${h}: ${formatVal(v)}`;
+                                }).join(", ") + "]";
+                            } else {
+                                displayVal = "[" + arr.map(v => formatVal(v)).join(", ") + "]";
+                            }
+                        } catch (e) {
+                            displayVal = newVal;
+                        }
+                    } else {
+                        displayVal = formatVal(newVal);
+                    }
+                }
+
+                if (activeDetailsNode === nodeName && detailsVectorSeries) {
+                    try {
+                        const arr = typeof newVal === 'string' ? JSON.parse(newVal) : newVal;
+                        if (Array.isArray(arr)) {
+                            const pointData = arr.map((v, i) => {
+                                return { time: i + 1, value: Number.isNaN(Number(v)) || v === "NaN" || v === null ? NaN : Number(v) };
+                            });
+                            detailsVectorSeries.setData(pointData);
+                        }
+                    } catch (e) { }
+                }
 
                 cachedDOM.instances.forEach(instance => {
                     const nodeGroup = instance.group;
@@ -1151,7 +1289,7 @@ function getUpstreamNodes(nodeName, visited = new Set()) {
 }
 
 // Apply or remove hover CSS mathematically 
-function highlightNodes(nodeNames, isHovered, type = 'downstream') {
+function highlightNodes(nodeNames, isHovered, type = 'downstream', lineageSet = null) {
     for (const name of nodeNames) {
         const cachedDOM = graphElementsCache.get(name);
         if (!cachedDOM) continue;
@@ -1170,10 +1308,32 @@ function highlightNodes(nodeNames, isHovered, type = 'downstream') {
         }
 
         cachedDOM.lsPaths.forEach(e => {
-            e.dataset[`sourceHover${type.charAt(0).toUpperCase() + type.slice(1)}`] = isHovered ? "true" : "false";
+            let shouldHighlight = isHovered;
+            if (isHovered && lineageSet) {
+                let targetInLineage = false;
+                for (const lineageNode of lineageSet) {
+                    if (e.classList.contains('LE-' + getMermaidNodeId(lineageNode))) {
+                        targetInLineage = true;
+                        break;
+                    }
+                }
+                shouldHighlight = targetInLineage;
+            }
+            e.dataset[`sourceHover${type.charAt(0).toUpperCase() + type.slice(1)}`] = shouldHighlight ? "true" : "false";
         });
         cachedDOM.lePaths.forEach(e => {
-            e.dataset[`targetHover${type.charAt(0).toUpperCase() + type.slice(1)}`] = isHovered ? "true" : "false";
+            let shouldHighlight = isHovered;
+            if (isHovered && lineageSet) {
+                let sourceInLineage = false;
+                for (const lineageNode of lineageSet) {
+                    if (e.classList.contains('LS-' + getMermaidNodeId(lineageNode))) {
+                        sourceInLineage = true;
+                        break;
+                    }
+                }
+                shouldHighlight = sourceInLineage;
+            }
+            e.dataset[`targetHover${type.charAt(0).toUpperCase() + type.slice(1)}`] = shouldHighlight ? "true" : "false";
         });
     }
 }
@@ -1191,10 +1351,11 @@ function attachHoverListeners() {
             nodeGroup.addEventListener('mouseenter', () => {
                 const downstream = getDownstreamNodes(nodeName).filter(n => n !== nodeName);
                 const upstream = getUpstreamNodes(nodeName).filter(n => n !== nodeName);
+                const lineage = new Set([...downstream, ...upstream, nodeName]);
 
-                highlightNodes(downstream, true, 'downstream');
-                highlightNodes(upstream, true, 'upstream');
-                highlightNodes([nodeName], true, 'self');
+                highlightNodes(downstream, true, 'downstream', lineage);
+                highlightNodes(upstream, true, 'upstream', lineage);
+                highlightNodes([nodeName], true, 'self', lineage);
 
                 const graphView = document.getElementById('graph-view');
                 if (graphView) graphView.classList.add('graph-hover-active');
@@ -2012,10 +2173,16 @@ window.addEventListener('DOMContentLoaded', () => {
 // Graph Search functionality
 document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('node-search-input');
+    const searchClear = document.getElementById('node-search-clear');
+
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             const query = e.target.value.trim().toLowerCase();
             const svgEl = document.getElementById('graph-view');
+
+            if (searchClear) {
+                searchClear.style.display = query.length > 0 ? 'block' : 'none';
+            }
 
             if (!query) {
                 svgEl.classList.remove('graph-search-active');
@@ -2054,12 +2221,27 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        if (searchClear) {
+            searchClear.addEventListener('click', () => {
+                searchInput.value = '';
+                searchInput.dispatchEvent(new Event('input'));
+                searchInput.focus();
+            });
+        }
+
         // Blur the search input if the user clicks outside of it
         // We use true for capture phase because svg-pan-zoom stops bubble propagation on SVG clicks
         document.addEventListener('mousedown', (e) => {
-            if (document.activeElement === searchInput && !searchInput.contains(e.target)) {
+            if (document.activeElement === searchInput && !searchInput.contains(e.target) && (!searchClear || !searchClear.contains(e.target))) {
                 searchInput.blur();
             }
         }, true);
+
+        // Blur the search input if the user presses ESC
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' || e.keyCode === 27) {
+                searchInput.blur();
+            }
+        });
     }
 });
