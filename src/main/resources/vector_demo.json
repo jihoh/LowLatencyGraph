@@ -11,7 +11,6 @@
                     "size": 5,
                     "tolerance": 1e-6,
                     "auto_expand": true,
-                    "auto_expand_prefix": "Yc",
                     "auto_expand_labels": [
                         "1M",
                         "3M",
@@ -26,8 +25,8 @@
                 "type": "spread",
                 "description": "Calculates the steepness of the curve (2Y - 1M).",
                 "inputs": {
-                    "minuend": "MarketYieldCurve.2Y",
-                    "subtrahend": "MarketYieldCurve.1M"
+                    "a": "MarketYieldCurve.2Y",
+                    "b": "MarketYieldCurve.1M"
                 }
             },
             {
@@ -35,8 +34,8 @@
                 "type": "spread",
                 "description": "Calculates the steepness of the curve (3M - 1M).",
                 "inputs": {
-                    "minuend": "MarketYieldCurve.3M",
-                    "subtrahend": "MarketYieldCurve.1M"
+                    "a": "MarketYieldCurve.3M",
+                    "b": "MarketYieldCurve.1M"
                 }
             },
             {
@@ -44,8 +43,8 @@
                 "type": "spread",
                 "description": "Calculates the steepness of the curve (6M - 1M).",
                 "inputs": {
-                    "minuend": "MarketYieldCurve.6M",
-                    "subtrahend": "MarketYieldCurve.1M"
+                    "a": "MarketYieldCurve.6M",
+                    "b": "MarketYieldCurve.1M"
                 }
             },
             {
@@ -53,8 +52,8 @@
                 "type": "spread",
                 "description": "Calculates the steepness of the curve (2Y - 3M).",
                 "inputs": {
-                    "minuend": "MarketYieldCurve.2Y",
-                    "subtrahend": "MarketYieldCurve.3M"
+                    "a": "MarketYieldCurve.2Y",
+                    "b": "MarketYieldCurve.3M"
                 }
             },
             {
@@ -62,8 +61,8 @@
                 "type": "spread",
                 "description": "Calculates the steepness of the curve (2Y - 6M).",
                 "inputs": {
-                    "minuend": "MarketYieldCurve.2Y",
-                    "subtrahend": "MarketYieldCurve.6M"
+                    "a": "MarketYieldCurve.2Y",
+                    "b": "MarketYieldCurve.6M"
                 }
             },
             {

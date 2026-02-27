@@ -133,12 +133,38 @@ public final class GraphExplain {
 
             // Format the value nicely
             double val = Double.NaN;
+            double[] vectorVal = null;
             if (node instanceof com.trading.drg.api.ScalarValue sv) {
                 val = sv.doubleValue();
             } else if (node.value() instanceof Number num) {
                 val = num.doubleValue();
+            } else if (node instanceof com.trading.drg.api.VectorValue vv) {
+                vectorVal = vv.value();
+            } else if (node.value() instanceof double[] arr) {
+                vectorVal = arr;
             }
-            String valueStr = String.format("%.4f", val);
+
+            String valueStr;
+            if (vectorVal != null) {
+                int maxItems = 2;
+                String[] headers = (node instanceof com.trading.drg.api.VectorValue vv) ? vv.headers() : null;
+                StringBuilder vsb = new StringBuilder("[");
+                for (int v = 0; v < Math.min(vectorVal.length, maxItems); v++) {
+                    String h = (headers != null && v < headers.length) ? headers[v] : String.valueOf(v);
+                    double vVal = vectorVal[v];
+                    vsb.append(h).append(": ").append(Double.isNaN(vVal) ? "NaN" : String.format("%.4f", vVal));
+                    if (v < Math.min(vectorVal.length, maxItems) - 1)
+                        vsb.append(", ");
+                }
+                if (vectorVal.length > maxItems) {
+                    vsb.append(", ...]");
+                } else {
+                    vsb.append("]");
+                }
+                valueStr = vsb.toString();
+            } else {
+                valueStr = String.format("%.4f", val);
+            }
             String nodeType = logicalTypes.get(node.name());
             if (nodeType == null) {
                 // Fallback for programmatic nodes without explicit JSON types
@@ -150,16 +176,26 @@ public final class GraphExplain {
             }
 
             // Stylize nodes with semantic span classes for CSS isolation
+            String innerStyle = "style='display: flex; flex-direction: column; align-items: center; justify-content: center; width: max-content; white-space: nowrap; text-align: center; padding: 8px;'";
+            String textStyle = "style='display: block; width: 100%; white-space: nowrap; text-align: center; margin: 0 auto;'";
+
             if (topology.isSource(i)) {
                 sb.append("  ").append(safeName)
-                        .append("[\"<div class='node-inner'><span class='node-title source-node'>").append(node.name())
-                        .append("</span><span class='node-type'>").append(nodeType).append("</span>")
-                        .append("<b class='node-value'>").append(valueStr).append("</b></div>\"];\n");
-            } else {
-                sb.append("  ").append(safeName).append("[\"<div class='node-inner'><span class='node-title'>")
+                        .append("[\"<div class='node-inner' ").append(innerStyle)
+                        .append("><span class='node-title source-node' ").append(textStyle).append(">")
                         .append(node.name())
-                        .append("</span><span class='node-type'>").append(nodeType).append("</span>")
-                        .append("<b class='node-value'>").append(valueStr).append("</b></div>\"];\n");
+                        .append("</span><span class='node-type' ").append(textStyle).append(">").append(nodeType)
+                        .append("</span>")
+                        .append("<b class='node-value' ").append(textStyle).append(">").append(valueStr)
+                        .append("</b></div>\"];\n");
+            } else {
+                sb.append("  ").append(safeName)
+                        .append("[\"<div class='node-inner' ").append(innerStyle).append("><span class='node-title' ")
+                        .append(textStyle).append(">").append(node.name())
+                        .append("</span><span class='node-type' ").append(textStyle).append(">").append(nodeType)
+                        .append("</span>")
+                        .append("<b class='node-value' ").append(textStyle).append(">").append(valueStr)
+                        .append("</b></div>\"];\n");
             }
         }
 

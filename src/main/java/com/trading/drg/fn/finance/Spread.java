@@ -8,8 +8,8 @@ package com.trading.drg.fn.finance;
 public class Spread extends AbstractFn2 {
 
     @Override
-    protected double calculate(double minuend, double subtrahend) {
-        return minuend - subtrahend;
+    protected double calculate(double a, double b) {
+        return a - b;
     }
 
 }

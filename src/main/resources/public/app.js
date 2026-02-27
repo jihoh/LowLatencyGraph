@@ -302,7 +302,7 @@ function openDetailsModal(nodeName) {
             const labelMap = edgeLabels[nodeName];
             const label = labelMap ? labelMap[p] : null;
             const li = document.createElement('li');
-            li.innerHTML = `<strong class="clickable-node" onclick="openDetailsModal('${p}')">${p}</strong> ${label ? `<span style="color:var(--text-secondary); font-size: 0.8em; margin-left: 8px;">-> ${label}</span>` : ''}`;
+            li.innerHTML = `<strong class="clickable-node" onclick="openDetailsModal('${p}')">${p}</strong> ${label ? `<span style="color:var(--text-secondary); font-size: 0.8em; margin-left: 8px;">-> ${label}</span>` : ''} <span class="details-value-tick" data-node-id="${p}" style="float: right; font-family: monospace; color: var(--text-highlight);"></span>`;
             parentsList.appendChild(li);
         });
     }
@@ -315,7 +315,7 @@ function openDetailsModal(nodeName) {
             const labelMap = edgeLabels[nodeName];
             const label = labelMap ? labelMap[c] : null;
             const li = document.createElement('li');
-            li.innerHTML = `<strong class="clickable-node" onclick="openDetailsModal('${c}')">${c}</strong> ${label ? `<span style="color:var(--text-secondary); font-size: 0.8em; margin-left: 8px;">-> ${label}</span>` : ''}`;
+            li.innerHTML = `<strong class="clickable-node" onclick="openDetailsModal('${c}')">${c}</strong> ${label ? `<span style="color:var(--text-secondary); font-size: 0.8em; margin-left: 8px;">-> ${label}</span>` : ''} <span class="details-value-tick" data-node-id="${c}" style="float: right; font-family: monospace; color: var(--text-highlight);"></span>`;
             childrenList.appendChild(li);
         });
     }
@@ -1209,12 +1209,24 @@ function updateGraphDOM(newValues) {
 
                             if (headersStr && headersStr.startsWith('[') && headersStr.endsWith(']')) {
                                 const headersArray = JSON.parse(headersStr);
-                                displayVal = "[" + arr.map((v, i) => {
+                                const maxItems = 2;
+                                const items = arr.slice(0, maxItems).map((v, i) => {
                                     const h = (i < headersArray.length) ? headersArray[i] : i;
                                     return `${h}: ${formatVal(v)}`;
-                                }).join(", ") + "]";
+                                });
+                                if (arr.length > maxItems) {
+                                    displayVal = "[" + items.join(", ") + ", ...]";
+                                } else {
+                                    displayVal = "[" + items.join(", ") + "]";
+                                }
                             } else {
-                                displayVal = "[" + arr.map(v => formatVal(v)).join(", ") + "]";
+                                const maxItems = 2;
+                                const items = arr.slice(0, maxItems).map((v, i) => `${i}: ${formatVal(v)}`);
+                                if (arr.length > maxItems) {
+                                    displayVal = "[" + items.join(", ") + ", ...]";
+                                } else {
+                                    displayVal = "[" + items.join(", ") + "]";
+                                }
                             }
                         } catch (e) {
                             displayVal = newVal;
@@ -1257,6 +1269,19 @@ function updateGraphDOM(newValues) {
                     void nodeGroup.offsetWidth;
                     nodeGroup.classList.add('node-flash');
                 });
+            }
+
+            // Also update any details panel ticks
+            const detailsTicks = document.querySelectorAll(`.details-value-tick[data-node-id="${nodeName}"]`);
+            if (detailsTicks.length > 0) {
+                // Formatting for display in sidebar - we can just use the DOM string if parsed, or format newVal
+                let tickVal = newVal;
+                if (typeof tickVal === 'string' && tickVal.startsWith('[') && tickVal.endsWith(']')) {
+                    tickVal = "[Vector]"; // Simplify for sidebar view
+                } else if (tickVal !== "NaN" && !Number.isNaN(Number(tickVal))) {
+                    tickVal = Number(tickVal).toFixed(4);
+                }
+                detailsTicks.forEach(span => span.textContent = tickVal);
             }
 
             prevValues.set(nodeName, newVal);
