@@ -255,6 +255,16 @@ document.getElementById('node-details-modal').addEventListener('click', (e) => {
     }
 });
 
+// Close modal on Escape key press
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('node-details-modal');
+        if (modal && !modal.classList.contains('hidden')) {
+            closeDetailsModal();
+        }
+    }
+});
+
 function openDetailsModal(nodeName) {
     const modal = document.getElementById('node-details-modal');
 
@@ -272,7 +282,19 @@ function openDetailsModal(nodeName) {
     if (parents.length === 0) {
         parentsList.innerHTML = '<li style="color: var(--text-secondary)">None (Source Node)</li>';
     } else {
-        parents.forEach(p => {
+        [].concat(parents).sort((a, b) => {
+            const labelMap = edgeLabels[nodeName];
+            if (!labelMap) return 0;
+
+            // Extract the 'i0', 'i1' label into a comparable integer.
+            const labelA = labelMap[a] || "";
+            const labelB = labelMap[b] || "";
+
+            const indexA = parseInt(labelA.replace('i', '')) || 0;
+            const indexB = parseInt(labelB.replace('i', '')) || 0;
+
+            return indexA - indexB;
+        }).forEach(p => {
             // edgeLabels is populated as Child -> Parent -> Label
             const labelMap = edgeLabels[nodeName];
             const label = labelMap ? labelMap[p] : null;
@@ -286,7 +308,7 @@ function openDetailsModal(nodeName) {
     if (children.length === 0) {
         childrenList.innerHTML = '<li style="color: var(--text-secondary)">None (Terminal Node)</li>';
     } else {
-        children.forEach(c => {
+        [].concat(children).sort().forEach(c => {
             const labelMap = edgeLabels[nodeName];
             const label = labelMap ? labelMap[c] : null;
             const li = document.createElement('li');
