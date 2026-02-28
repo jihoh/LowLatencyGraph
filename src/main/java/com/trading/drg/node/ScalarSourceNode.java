@@ -66,22 +66,15 @@ public final class ScalarSourceNode implements SourceNode<Double>, ScalarValue {
 
     @Override
     public boolean stabilize() {
-        // Source nodes stabilize by checking if their updated value
-        // is significantly different from the previous stabilized value.
+        double prev = previousValue;
+        previousValue = currentValue;
 
-        // Fix: If previous value is NaN (initial state), always propagate.
-        if (Double.isNaN(previousValue)) {
-            previousValue = currentValue; // Capture state
+        // First run: always propagate
+        if (Double.isNaN(prev)) {
             return true;
         }
 
-        // Even if marked dirty, if the value didn't change (e.g. 100.0 -> 100.0),
-        // we return false to stop propagation.
-        boolean changed = cutoff.hasChanged(previousValue, currentValue);
-        if (changed) {
-            previousValue = currentValue; // Capture state only on change
-        }
-        return changed;
+        return cutoff.hasChanged(prev, currentValue);
     }
 
     @Override
