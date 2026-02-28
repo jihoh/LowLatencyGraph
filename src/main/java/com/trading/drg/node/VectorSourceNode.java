@@ -108,10 +108,16 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorValue
             return true;
         }
 
-        // Check for changes
+        // Check for changes, including NaN transitions.
+        // Math.abs(NaN - x) returns NaN, which is never > tolerance, so
+        // a NaN<->real transition would be silently missed without the explicit
+        // isNaN checks below (matching the behaviour of ScalarSourceNode).
         boolean changed = false;
         for (int i = 0; i < size; i++) {
-            if (Math.abs(currentValues[i] - previousValues[i]) > tolerance) {
+            double cur = currentValues[i];
+            double prev = previousValues[i];
+            if (Double.isNaN(cur) != Double.isNaN(prev)
+                    || (!Double.isNaN(cur) && Math.abs(cur - prev) > tolerance)) {
                 changed = true;
                 break;
             }
