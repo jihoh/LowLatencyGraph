@@ -2,7 +2,6 @@ package com.trading.drg.io;
 
 import com.trading.drg.api.*;
 import com.trading.drg.engine.*;
-import com.trading.drg.util.SourceExtractor;
 
 import java.util.*;
 
@@ -67,8 +66,6 @@ public final class JsonGraphCompiler {
         var topo = TopologicalOrder.builder();
 
         // 2. Instantiate and Build Topology
-        Map<String, String> sourceCodes = new HashMap<>(nodeDefs.size() * 2);
-
         for (var nd : nodeDefs) {
             NodeType type = NodeType.fromString(nd.getType());
             logicalTypes.put(nd.getName(), type.name());
@@ -76,10 +73,6 @@ public final class JsonGraphCompiler {
             String configDesc = nd.getDescription();
             if (configDesc != null) {
                 descriptions.put(nd.getName(), configDesc);
-            }
-
-            if (type.getNodeClass() != null) {
-                sourceCodes.put(nd.getName(), SourceExtractor.extractClassSource(type.getNodeClass().getName()));
             }
         }
 
@@ -151,7 +144,7 @@ public final class JsonGraphCompiler {
         }
 
         return new CompiledGraph(graphInfo.getName(), graphInfo.getVersion(),
-                new StabilizationEngine(topo.build()), nodesByName, logicalTypes, descriptions, sourceCodes,
+                new StabilizationEngine(topo.build()), nodesByName, logicalTypes, descriptions,
                 originalOrder,
                 edgeLabels);
     }
@@ -374,12 +367,11 @@ public final class JsonGraphCompiler {
         private final Map<String, Node<?>> nodesByName;
         private final Map<String, String> logicalTypes;
         private final Map<String, String> descriptions;
-        private final Map<String, String> sourceCodes;
         private final List<String> originalOrder;
         private final Map<String, Map<String, String>> edgeLabels;
 
         CompiledGraph(String name, String version, StabilizationEngine engine, Map<String, Node<?>> nodesByName,
-                Map<String, String> logicalTypes, Map<String, String> descriptions, Map<String, String> sourceCodes,
+                Map<String, String> logicalTypes, Map<String, String> descriptions,
                 List<String> originalOrder,
                 Map<String, Map<String, String>> edgeLabels) {
             this.name = name;
@@ -388,7 +380,6 @@ public final class JsonGraphCompiler {
             this.nodesByName = Collections.unmodifiableMap(nodesByName);
             this.logicalTypes = Collections.unmodifiableMap(logicalTypes);
             this.descriptions = Collections.unmodifiableMap(descriptions);
-            this.sourceCodes = Collections.unmodifiableMap(sourceCodes);
             this.originalOrder = Collections.unmodifiableList(originalOrder);
             this.edgeLabels = Collections.unmodifiableMap(edgeLabels);
         }
@@ -415,10 +406,6 @@ public final class JsonGraphCompiler {
 
         public Map<String, String> descriptions() {
             return descriptions;
-        }
-
-        public Map<String, String> sourceCodes() {
-            return sourceCodes;
         }
 
         public List<String> originalOrder() {

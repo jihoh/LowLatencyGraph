@@ -54,7 +54,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
         this.descriptions = descriptions;
         this.sourceCodes = sourceCodes;
         this.edgeLabels = edgeLabels;
-        this.initialMermaid = new com.trading.drg.util.GraphExplain(engine, logicalTypes, originalOrder, edgeLabels)
+        this.initialMermaid = new com.trading.drg.util.GraphExplain(engine, logicalTypes, originalOrder)
                 .toMermaid()
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n");

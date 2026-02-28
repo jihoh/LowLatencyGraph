@@ -28,7 +28,6 @@ public class CoreGraph {
     private final String version;
     private final Map<String, String> logicalTypes;
     private final Map<String, String> descriptions;
-    private final Map<String, String> sourceCodes;
     private final List<String> originalOrder;
     private final Map<String, Map<String, String>> edgeLabels;
 
@@ -66,7 +65,6 @@ public class CoreGraph {
         this.nodes = compiled.nodesByName();
         this.logicalTypes = compiled.logicalTypes();
         this.descriptions = compiled.descriptions();
-        this.sourceCodes = compiled.sourceCodes();
         this.originalOrder = compiled.originalOrder();
         this.edgeLabels = compiled.edgeLabels();
 
@@ -117,10 +115,6 @@ public class CoreGraph {
 
     public Map<String, String> getDescriptions() {
         return descriptions;
-    }
-
-    public Map<String, String> getSourceCodes() {
-        return sourceCodes;
     }
 
     public List<String> getOriginalOrder() {

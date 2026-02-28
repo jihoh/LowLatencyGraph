@@ -4,8 +4,10 @@ import com.trading.drg.CoreGraph;
 import com.trading.drg.api.Node;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.io.GraphDefinition;
+import com.trading.drg.io.NodeType;
 import com.trading.drg.util.LatencyTrackingListener;
 import com.trading.drg.util.NodeProfileListener;
+import com.trading.drg.util.SourceExtractor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Map;
@@ -59,11 +61,14 @@ public final class DashboardWiring {
             this.dashboardServer = new GraphDashboardServer();
             this.dashboardServer.setSnapshotSupplier(this::buildSnapshotJson);
 
+            // Lazily extract source codes only when dashboard is needed
+            var sourceCodes = buildSourceCodes();
+
             var wsListener = new WebsocketPublisherListener(
                     graph.getEngine(), this.dashboardServer, graph.getName(), graph.getVersion(),
                     graph.getLogicalTypes(), graph.getDescriptions(),
                     graph.getOriginalOrder(), graph.getEdgeLabels(),
-                    graph.getSourceCodes());
+                    sourceCodes);
 
             if (this.latencyListener != null) {
                 wsListener.setLatencyListener(this.latencyListener);
@@ -76,6 +81,26 @@ public final class DashboardWiring {
             this.dashboardServer.start(port);
         }
         return this;
+    }
+
+    /**
+     * Lazily builds source code map from logicalTypes + NodeType.getNodeClass().
+     * Only called when dashboard is enabled — never during graph compilation.
+     */
+    private Map<String, String> buildSourceCodes() {
+        var logicalTypes = graph.getLogicalTypes();
+        var result = new java.util.HashMap<String, String>(logicalTypes.size());
+        for (var entry : logicalTypes.entrySet()) {
+            try {
+                NodeType type = NodeType.fromString(entry.getValue());
+                if (type.getNodeClass() != null) {
+                    result.put(entry.getKey(), SourceExtractor.extractClassSource(type.getNodeClass().getName()));
+                }
+            } catch (IllegalArgumentException e) {
+                // Skip unknown types
+            }
+        }
+        return result;
     }
 
     public LatencyTrackingListener getLatencyListener() {

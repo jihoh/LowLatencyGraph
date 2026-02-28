@@ -26,20 +26,11 @@ public final class GraphExplain {
     private final java.util.List<String> displayOrder;
 
     public GraphExplain(StabilizationEngine engine) {
-        this(engine, java.util.Collections.emptyMap(), java.util.Collections.emptyList(), null);
-    }
-
-    public GraphExplain(StabilizationEngine engine, java.util.Map<String, String> logicalTypes) {
-        this(engine, logicalTypes, java.util.Collections.emptyList(), null);
+        this(engine, java.util.Collections.emptyMap(), java.util.Collections.emptyList());
     }
 
     public GraphExplain(StabilizationEngine engine, java.util.Map<String, String> logicalTypes,
             java.util.List<String> displayOrder) {
-        this(engine, logicalTypes, displayOrder, null);
-    }
-
-    public GraphExplain(StabilizationEngine engine, java.util.Map<String, String> logicalTypes,
-            java.util.List<String> displayOrder, java.util.Map<String, java.util.Map<String, String>> edgeLabels) {
         this.engine = engine;
         this.topology = engine.topology();
         this.logicalTypes = logicalTypes;
@@ -175,26 +166,24 @@ public final class GraphExplain {
                 nodeType = className.replaceAll("([a-z])([A-Z]+)", "$1_$2").toUpperCase();
             }
 
-            // Stylize nodes with semantic span classes for CSS isolation
-            String innerStyle = "style='display: flex; flex-direction: column; align-items: center; justify-content: center; width: max-content; white-space: nowrap; text-align: center; padding: 8px;'";
-            String textStyle = "style='display: block; width: 100%; white-space: nowrap; text-align: center; margin: 0 auto;'";
-
+            // Use CSS classes only — no inline styles
             if (topology.isSource(i)) {
                 sb.append("  ").append(safeName)
-                        .append("[\"<div class='node-inner' ").append(innerStyle)
-                        .append("><span class='node-title source-node' ").append(textStyle).append(">")
+                        .append("[\"<div class='node-inner'>")
+                        .append("<span class='node-title source-node'>")
                         .append(node.name())
-                        .append("</span><span class='node-type' ").append(textStyle).append(">").append(nodeType)
+                        .append("</span><span class='node-type'>").append(nodeType)
                         .append("</span>")
-                        .append("<b class='node-value' ").append(textStyle).append(">").append(valueStr)
+                        .append("<b class='node-value'>").append(valueStr)
                         .append("</b></div>\"];\n");
             } else {
                 sb.append("  ").append(safeName)
-                        .append("[\"<div class='node-inner' ").append(innerStyle).append("><span class='node-title' ")
-                        .append(textStyle).append(">").append(node.name())
-                        .append("</span><span class='node-type' ").append(textStyle).append(">").append(nodeType)
+                        .append("[\"<div class='node-inner'>")
+                        .append("<span class='node-title'>")
+                        .append(node.name())
+                        .append("</span><span class='node-type'>").append(nodeType)
                         .append("</span>")
-                        .append("<b class='node-value' ").append(textStyle).append(">").append(valueStr)
+                        .append("<b class='node-value'>").append(valueStr)
                         .append("</b></div>\"];\n");
             }
         }
