@@ -9,10 +9,16 @@ import com.trading.drg.util.NodeProfileListener;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * A listener that observes the graph engine and broadcasts the
  * entire graph state (node values) along with optional telemetry
  * metrics via WebSockets at the end of every stabilization cycle.
+ * <p>
+ * Performance: JSON construction and WebSocket I/O are offloaded to
+ * a dedicated daemon thread. The engine thread only copies raw primitive
+ * values into pre-allocated double-buffered arrays (zero allocation).
  */
 public class WebsocketPublisherListener implements StabilizationListener {
     private static final Logger log = LogManager.getLogger(WebsocketPublisherListener.class);
@@ -29,17 +35,39 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final com.trading.drg.util.ErrorRateLimiter errLimiter = new com.trading.drg.util.ErrorRateLimiter(log,
             1000);
 
-    // Track NaNs natively via topoIndex without Object boxing
-    private long[] nanCounters = new long[0];
+    // Pre-computed JSON key prefixes indexed by topoIndex, e.g. "\"UST_10Y\":"
+    private final String[] jsonKeys;
+    // Pre-computed header key prefixes, e.g. ",\"UST_10Y_headers\":"
+    private final String[] jsonHeaderKeys;
+    // Node type flags: 0=scalar, 1=vector — instanceof only at construction
+    private final byte[] nodeKinds;
+    private static final byte KIND_SCALAR = 0;
+    private static final byte KIND_VECTOR = 1;
+
+    // Track NaNs natively via topoIndex
+    private final long[] nanCounters;
 
     // Optional metrics listeners
     private LatencyTrackingListener latencyListener;
     private NodeProfileListener profileListener;
 
-    // We reuse a StringBuilder to minimize GC overhead when constructing the JSON
-    // payload.
-    // Note: Since StabilizationEngine is single-threaded, this is safe.
-    private final StringBuilder jsonBuilder = new StringBuilder(1024);
+    // ── Double-Buffered Snapshot (ZERO allocation on hot path) ────
+    // Two pre-allocated buffers: engine writes to one, I/O thread reads the other.
+    private final int nodeCount;
+    private final double[][] bufScalars = new double[2][];
+    private final double[][][] bufVectors = new double[2][][];
+    private final String[][][] bufHeaders = new String[2][][];
+    private final long[] bufEpoch = new long[2];
+    private final int[] bufNodesStabilized = new int[2];
+    private final int[] bufSourceCount = new int[2];
+    private final long[] bufTotalEvents = new long[2];
+    private final long[] bufEpochEvents = new long[2];
+    private final double[] bufLastLatency = new double[2];
+    private final double[] bufAvgLatency = new double[2];
+
+    // Engine thread writes to buffers[writeSlot], then publishes via readySlot
+    // readySlot: -1 = nothing ready, 0 or 1 = slot ready for I/O thread
+    private final AtomicInteger readySlot = new AtomicInteger(-1);
 
     public WebsocketPublisherListener(StabilizationEngine engine, GraphDashboardServer server, String graphName,
             String graphVersion, java.util.Map<String, String> logicalTypes, java.util.Map<String, String> descriptions,
@@ -59,16 +87,44 @@ public class WebsocketPublisherListener implements StabilizationListener {
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n");
 
-        // Construct and push the Heavy Static Config directly into the WebServer cache
-        // This completely eliminates generating and broadcasting JSON routing data
-        // every 100ms tick.
+        // Pre-compute JSON keys and node kinds
+        TopologicalOrder topology = engine.topology();
+        this.nodeCount = topology.nodeCount();
+        this.jsonKeys = new String[nodeCount];
+        this.jsonHeaderKeys = new String[nodeCount];
+        this.nodeKinds = new byte[nodeCount];
+        this.nanCounters = new long[nodeCount];
+
+        for (int i = 0; i < nodeCount; i++) {
+            String name = topology.node(i).name();
+            jsonKeys[i] = "\"" + name + "\":";
+            jsonHeaderKeys[i] = ",\"" + name + "_headers\":";
+            if (topology.node(i) instanceof com.trading.drg.api.VectorValue) {
+                nodeKinds[i] = KIND_VECTOR;
+            } else {
+                nodeKinds[i] = KIND_SCALAR;
+            }
+        }
+
+        // Pre-allocate double buffers
+        for (int b = 0; b < 2; b++) {
+            bufScalars[b] = new double[nodeCount];
+            bufVectors[b] = new double[nodeCount][];
+            bufHeaders[b] = new String[nodeCount][];
+        }
+
+        // Start the dedicated I/O thread
+        Thread ioThread = new Thread(this::ioLoop, "ws-publisher-io");
+        ioThread.setDaemon(true);
+        ioThread.start();
+
+        // Construct and push the static config
         cacheInitialGraphConfig();
     }
 
     private void cacheInitialGraphConfig() {
         StringBuilder initBuilder = new StringBuilder(2048);
         TopologicalOrder topology = engine.topology();
-        int nodeCount = topology.nodeCount();
 
         initBuilder.append("{\"type\":\"init\",")
                 .append("\"graphName\":\"").append(graphName).append("\",")
@@ -141,16 +197,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
         initBuilder.append("}");
 
         initBuilder.append("}");
-
-        String initPayload = initBuilder.toString();
-        try {
-            java.nio.file.Files.write(
-                    java.nio.file.Paths.get("/tmp/init_config.json"),
-                    initPayload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        } catch (Exception e) {
-        }
-
-        server.setInitialGraphConfig(initPayload);
+        server.setInitialGraphConfig(initBuilder.toString());
     }
 
     private String escapeJsonString(String value) {
@@ -173,182 +220,224 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
     @Override
     public void onStabilizationStart(long epoch) {
-        // No action needed on start
+        // No action needed
     }
 
+    /**
+     * Engine-thread hot path. ZERO allocation.
+     * Copies raw primitive values into a pre-allocated buffer slot
+     * and publishes the slot index atomically.
+     */
     @Override
     public void onStabilizationEnd(long epoch, int nodesStabilized) {
-        // 1. Build a compact JSON payload representing the high-frequency tick state
-        jsonBuilder.setLength(0);
-        jsonBuilder.append("{\"type\":\"tick\",")
-                .append("\"epoch\":").append(epoch)
-                .append(",\"values\":{");
+        // Pick the write slot: always the one NOT currently being read
+        // Simple toggle: if readySlot is 0, write to 1; if 1 or -1, write to 0
+        int ws = (readySlot.get() == 0) ? 1 : 0;
 
         TopologicalOrder topology = engine.topology();
-        int nodeCount = topology.nodeCount();
-        int sourceCount = 0;
+        int srcCount = 0;
 
-        // Ensure static array capacity dynamically expands if the graph loads hot
-        if (nanCounters.length < nodeCount) {
-            nanCounters = new long[nodeCount];
-        }
+        double[] scalars = bufScalars[ws];
+        double[][] vectors = bufVectors[ws];
+        String[][] headers = bufHeaders[ws];
 
         for (int i = 0; i < nodeCount; i++) {
             if (topology.isSource(i))
-                sourceCount++;
+                srcCount++;
 
             Node<?> node = topology.node(i);
-
-            double scalarVal = Double.NaN;
-            double[] vectorVal = null;
-            String[] headers = null;
-
-            if (node instanceof com.trading.drg.api.ScalarValue sv) {
-                scalarVal = sv.doubleValue();
-            } else if (node.value() instanceof Number num) {
-                scalarVal = num.doubleValue();
-            } else if (node instanceof com.trading.drg.api.VectorValue vv) {
-                vectorVal = vv.value();
-                headers = vv.headers();
-            } else if (node.value() instanceof double[] arr) {
-                vectorVal = arr;
-            }
-
-            if (vectorVal != null) {
-                jsonBuilder.append("\"").append(node.name()).append("\":[");
-                for (int v = 0; v < vectorVal.length; v++) {
-                    double vVal = vectorVal[v];
-                    if (!Double.isFinite(vVal)) {
-                        jsonBuilder.append("null");
-                    } else {
-                        jsonBuilder.append(vVal);
-                    }
-                    if (v < vectorVal.length - 1)
-                        jsonBuilder.append(",");
-                }
-                jsonBuilder.append("]");
-
-                if (headers != null) {
-                    jsonBuilder.append(",\"").append(node.name()).append("_headers\":[");
-                    for (int h = 0; h < headers.length; h++) {
-                        jsonBuilder.append("\"").append(headers[h]).append("\"");
-                        if (h < headers.length - 1)
-                            jsonBuilder.append(",");
-                    }
-                    jsonBuilder.append("]");
-                }
-            } else if (!Double.isFinite(scalarVal)) {
-                if (Double.isNaN(scalarVal))
-                    nanCounters[i]++;
-                jsonBuilder.append("\"").append(node.name()).append("\":\"").append(scalarVal).append("\"");
+            if (nodeKinds[i] == KIND_VECTOR) {
+                var vv = (com.trading.drg.api.VectorValue) node;
+                vectors[i] = vv.value(); // reference copy — zero alloc
+                headers[i] = vv.headers();
+                scalars[i] = Double.NaN;
             } else {
-                jsonBuilder.append("\"").append(node.name()).append("\":").append(scalarVal);
-            }
-
-            if (i < nodeCount - 1) {
-                jsonBuilder.append(",");
-            }
-        }
-
-        // 2. Append metrics
-        jsonBuilder.append("},\"metrics\":{")
-                .append("\"nodesUpdated\":").append(nodesStabilized).append(",")
-                .append("\"totalNodes\":").append(nodeCount).append(",")
-                .append("\"totalSourceNodes\":").append(sourceCount).append(",")
-                .append("\"eventsProcessed\":").append(engine.totalEventsProcessed()).append(",")
-                .append("\"epochEvents\":").append(engine.lastEpochEvents());
-
-        if (latencyListener != null) {
-            jsonBuilder.append(",\"latency\":{")
-                    .append("\"latest\":").append(formatDouble(latencyListener.lastLatencyMicros())).append(",")
-                    .append("\"avg\":").append(formatDouble(latencyListener.avgLatencyMicros()))
-                    .append("}");
-        }
-
-        if (profileListener != null) {
-            jsonBuilder.append(",\"profile\":[");
-            NodeProfileListener.NodeStats[] rawStats = profileListener.getStatsArray();
-
-            int limit = 50; // default top 50
-            if (rawStats.length < limit) {
-                limit = rawStats.length;
-            }
-
-            NodeProfileListener.NodeStats[] sortBuffer = new NodeProfileListener.NodeStats[rawStats.length];
-            int validCount = 0;
-            for (int i = 0; i < rawStats.length; i++) {
-                if (rawStats[i] != null && rawStats[i].count > 0) {
-                    sortBuffer[validCount++] = rawStats[i];
+                vectors[i] = null;
+                headers[i] = null;
+                if (node instanceof com.trading.drg.api.ScalarValue sv) {
+                    scalars[i] = sv.doubleValue();
+                } else if (node.value() instanceof Number num) {
+                    scalars[i] = num.doubleValue();
+                } else {
+                    scalars[i] = Double.NaN;
+                }
+                if (Double.isNaN(scalars[i])) {
+                    nanCounters[i]++;
                 }
             }
-
-            java.util.Arrays.sort(sortBuffer, 0, validCount,
-                    (s1, s2) -> Long.compare(s2.totalDurationNanos, s1.totalDurationNanos));
-
-            limit = Math.min(limit, validCount);
-            for (int i = 0; i < limit; i++) {
-                if (i > 0)
-                    jsonBuilder.append(",");
-                NodeProfileListener.NodeStats s = sortBuffer[i];
-
-                // Lookup index generically based on object equality to grab the NaN array
-                // counter
-                int localTopoId = -1;
-                for (int t = 0; t < rawStats.length; t++) {
-                    if (rawStats[t] == s) {
-                        localTopoId = t;
-                        break;
-                    }
-                }
-
-                long nanCount = localTopoId != -1 && localTopoId < nanCounters.length ? nanCounters[localTopoId] : 0;
-
-                jsonBuilder.append("{")
-                        .append("\"name\":\"").append(s.name).append("\",")
-                        .append("\"latest\":").append(formatDouble(s.lastDurationNanos / 1000.0)).append(",")
-                        .append("\"avg\":").append(formatDouble(s.avgMicros())).append(",")
-                        .append("\"evaluations\":").append(s.count).append(",")
-                        .append("\"nans\":").append(nanCount)
-                        .append("}");
-            }
-            jsonBuilder.append("]");
         }
-        jsonBuilder.append("}"); // close metrics
-        jsonBuilder.append("}"); // close tick object
 
-        // 3. Broadcast to all connected web clients
-        String payload = jsonBuilder.toString();
-        // Dump the first 10 payloads to disk to catch the parse error
-        try {
-            java.io.File dump = new java.io.File("/tmp/ws_payload.json");
-            if (dump.length() < 100000) {
-                java.nio.file.Files.write(
-                        dump.toPath(),
-                        (payload + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8),
-                        java.nio.file.StandardOpenOption.CREATE,
-                        java.nio.file.StandardOpenOption.APPEND);
-            }
-        } catch (Exception e) {
-        }
-        server.broadcast(payload);
+        // Write metadata into flat arrays (zero object alloc)
+        bufEpoch[ws] = epoch;
+        bufNodesStabilized[ws] = nodesStabilized;
+        bufSourceCount[ws] = srcCount;
+        bufTotalEvents[ws] = engine.totalEventsProcessed();
+        bufEpochEvents[ws] = engine.lastEpochEvents();
+        bufLastLatency[ws] = latencyListener != null ? latencyListener.lastLatencyMicros() : Double.NaN;
+        bufAvgLatency[ws] = latencyListener != null ? latencyListener.avgLatencyMicros() : Double.NaN;
+
+        // Publish: atomically make this slot visible to I/O thread
+        readySlot.set(ws);
     }
 
-    private Object formatDouble(double val) {
-        if (!Double.isFinite(val)) {
-            return "\"" + val + "\""; // "NaN" or "Infinity" correctly quoted for JSON
+    /**
+     * Dedicated I/O thread. Polls for ready snapshots and builds JSON + broadcasts.
+     * Completely decoupled from the engine stabilization thread.
+     */
+    private void ioLoop() {
+        StringBuilder jsonBuilder = new StringBuilder(2048);
+
+        while (!Thread.currentThread().isInterrupted()) {
+            int slot = readySlot.getAndSet(-1);
+            if (slot < 0) {
+                try {
+                    Thread.sleep(1); // yield briefly, re-check
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                continue;
+            }
+
+            // Read from the published slot
+            double[] scalars = bufScalars[slot];
+            double[][] vectors = bufVectors[slot];
+            String[][] headers = bufHeaders[slot];
+            long epoch = bufEpoch[slot];
+            int nodesStabilized = bufNodesStabilized[slot];
+            int srcCount = bufSourceCount[slot];
+            long totalEvents = bufTotalEvents[slot];
+            long epochEvents = bufEpochEvents[slot];
+            double lastLat = bufLastLatency[slot];
+            double avgLat = bufAvgLatency[slot];
+
+            // Build JSON
+            jsonBuilder.setLength(0);
+            jsonBuilder.append("{\"type\":\"tick\",")
+                    .append("\"epoch\":").append(epoch)
+                    .append(",\"values\":{");
+
+            for (int i = 0; i < nodeCount; i++) {
+                if (i > 0)
+                    jsonBuilder.append(",");
+                jsonBuilder.append(jsonKeys[i]);
+
+                if (vectors[i] != null) {
+                    double[] vec = vectors[i];
+                    jsonBuilder.append("[");
+                    for (int v = 0; v < vec.length; v++) {
+                        if (v > 0)
+                            jsonBuilder.append(",");
+                        if (!Double.isFinite(vec[v])) {
+                            jsonBuilder.append("null");
+                        } else {
+                            jsonBuilder.append(vec[v]);
+                        }
+                    }
+                    jsonBuilder.append("]");
+
+                    if (headers[i] != null) {
+                        jsonBuilder.append(jsonHeaderKeys[i]).append("[");
+                        for (int h = 0; h < headers[i].length; h++) {
+                            if (h > 0)
+                                jsonBuilder.append(",");
+                            jsonBuilder.append("\"").append(headers[i][h]).append("\"");
+                        }
+                        jsonBuilder.append("]");
+                    }
+                } else {
+                    double val = scalars[i];
+                    if (!Double.isFinite(val)) {
+                        jsonBuilder.append("\"").append(val).append("\"");
+                    } else {
+                        jsonBuilder.append(val);
+                    }
+                }
+            }
+
+            // Metrics
+            jsonBuilder.append("},\"metrics\":{")
+                    .append("\"nodesUpdated\":").append(nodesStabilized).append(",")
+                    .append("\"totalNodes\":").append(nodeCount).append(",")
+                    .append("\"totalSourceNodes\":").append(srcCount).append(",")
+                    .append("\"eventsProcessed\":").append(totalEvents).append(",")
+                    .append("\"epochEvents\":").append(epochEvents);
+
+            if (latencyListener != null) {
+                jsonBuilder.append(",\"latency\":{\"latest\":");
+                appendDouble(jsonBuilder, lastLat);
+                jsonBuilder.append(",\"avg\":");
+                appendDouble(jsonBuilder, avgLat);
+                jsonBuilder.append("}");
+            }
+
+            if (profileListener != null) {
+                jsonBuilder.append(",\"profile\":[");
+                NodeProfileListener.NodeStats[] rawStats = profileListener.getStatsArray();
+
+                int limit = Math.min(50, rawStats.length);
+                NodeProfileListener.NodeStats[] sortBuffer = new NodeProfileListener.NodeStats[rawStats.length];
+                int validCount = 0;
+                for (int i = 0; i < rawStats.length; i++) {
+                    if (rawStats[i] != null && rawStats[i].count > 0) {
+                        sortBuffer[validCount++] = rawStats[i];
+                    }
+                }
+
+                java.util.Arrays.sort(sortBuffer, 0, validCount,
+                        (s1, s2) -> Long.compare(s2.totalDurationNanos, s1.totalDurationNanos));
+
+                limit = Math.min(limit, validCount);
+                for (int i = 0; i < limit; i++) {
+                    if (i > 0)
+                        jsonBuilder.append(",");
+                    NodeProfileListener.NodeStats s = sortBuffer[i];
+
+                    int localTopoId = -1;
+                    for (int t = 0; t < rawStats.length; t++) {
+                        if (rawStats[t] == s) {
+                            localTopoId = t;
+                            break;
+                        }
+                    }
+                    long nanCount = localTopoId != -1 && localTopoId < nanCounters.length ? nanCounters[localTopoId]
+                            : 0;
+
+                    jsonBuilder.append("{\"name\":\"").append(s.name).append("\",\"latest\":");
+                    appendDouble(jsonBuilder, s.lastDurationNanos / 1000.0);
+                    jsonBuilder.append(",\"avg\":");
+                    appendDouble(jsonBuilder, s.avgMicros());
+                    jsonBuilder.append(",\"evaluations\":").append(s.count)
+                            .append(",\"nans\":").append(nanCount)
+                            .append("}");
+                }
+                jsonBuilder.append("]");
+            }
+            jsonBuilder.append("}"); // close metrics
+            jsonBuilder.append("}"); // close tick
+
+            server.broadcast(jsonBuilder.toString());
         }
-        return val;
+    }
+
+    /**
+     * Appends a double to StringBuilder without autoboxing.
+     */
+    private static void appendDouble(StringBuilder sb, double val) {
+        if (!Double.isFinite(val)) {
+            sb.append("\"").append(val).append("\"");
+        } else {
+            sb.append(val);
+        }
     }
 
     @Override
     public void onNodeStabilized(long epoch, int topoIndex, String nodeName, boolean changed, long durationNanos) {
-        // We only care about the final state at the end of the epoch,
-        // so we ignore individual node compute completions.
+        // We only care about the final state at the end of the epoch
     }
 
     @Override
     public void onNodeError(long epoch, int topoIndex, String nodeName, Throwable error) {
-        // In a real system, we might broadcast a special error payload here
         errLimiter.log(String.format("Dashboard Publisher observed Node Error in %s: %s", nodeName, error.getMessage()),
                 null);
     }
