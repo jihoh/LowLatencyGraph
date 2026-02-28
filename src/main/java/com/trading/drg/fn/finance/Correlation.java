@@ -83,5 +83,4 @@ public class Correlation extends AbstractFn2 {
 
         return num / Math.sqrt(denX * denY);
     }
-
 }

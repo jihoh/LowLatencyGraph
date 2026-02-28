@@ -28,6 +28,18 @@ public interface DynamicState {
 
                 if (value == null) {
                     sb.append("null");
+                } else if (value instanceof Double d) {
+                    if (d.isNaN() || d.isInfinite()) {
+                        sb.append("\"").append(d.toString()).append("\"");
+                    } else {
+                        sb.append(d);
+                    }
+                } else if (value instanceof Float f) {
+                    if (f.isNaN() || f.isInfinite()) {
+                        sb.append("\"").append(f.toString()).append("\"");
+                    } else {
+                        sb.append(f);
+                    }
                 } else if (value instanceof Number || value instanceof Boolean) {
                     sb.append(value);
                 } else {

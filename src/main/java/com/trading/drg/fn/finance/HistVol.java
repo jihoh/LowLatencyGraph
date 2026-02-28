@@ -66,5 +66,4 @@ public class HistVol extends AbstractFn1 {
         // Assuming it should return the standard deviation directly if not provided.
         return Math.sqrt(variance);
     }
-
 }

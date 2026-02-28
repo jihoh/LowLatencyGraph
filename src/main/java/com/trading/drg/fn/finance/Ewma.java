@@ -32,5 +32,4 @@ public class Ewma extends AbstractFn1 {
         state = alpha * input + (1.0 - alpha) * state;
         return state;
     }
-
 }

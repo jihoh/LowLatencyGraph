@@ -315,55 +315,50 @@ public class CoreGraph {
                 def.setInputs(inverted);
             }
 
-            // Extract dynamic state and value
-            StringBuilder sb = new StringBuilder("{");
+            // Extract dynamic state and value natively via Map
+            Map<String, Object> props = new java.util.HashMap<>();
             if (node instanceof com.trading.drg.api.DynamicState ds) {
-                ds.serializeDynamicState(sb);
+                // To keep backwards compatibility with the existing DynamicState interface
+                // which writes to a StringBuilder, we will parse just the state block.
+                // Or better, since this is just the snapshot, we don't *really* need the
+                // internal
+                // DynamicState of pure mathematical nodes for the visual representation,
+                // but we will keep extracting it if present.
+                StringBuilder stateSb = new StringBuilder("{");
+                ds.serializeDynamicState(stateSb);
+                stateSb.append("}");
+                if (stateSb.length() > 2) {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> parsedState = mapper.readValue(stateSb.toString(), Map.class);
+                        props.putAll(parsedState);
+                    } catch (Exception e) {
+                        props.put("stateError", e.getMessage());
+                    }
+                }
             }
-            if (sb.length() > 1) {
-                sb.append(",");
-            }
-            sb.append("\"value\":");
+
             Object val = node.value();
             if (val == null) {
-                sb.append("null");
+                props.put("value", null);
             } else if (val instanceof double[] arr) {
-                sb.append("[");
-                for (int i = 0; i < arr.length; i++) {
-                    sb.append(Double.isNaN(arr[i]) ? "null" : arr[i]);
-                    if (i < arr.length - 1)
-                        sb.append(",");
-                }
-                sb.append("]");
+                // Ensure NaNs serialize cleanly for JSON
+                Double[] safeArr = new Double[arr.length];
+                for (int i = 0; i < arr.length; i++)
+                    safeArr[i] = Double.isNaN(arr[i]) ? null : arr[i];
+                props.put("value", safeArr);
             } else if (val instanceof Double d) {
-                sb.append(d.isNaN() ? "null" : d);
+                props.put("value", d.isNaN() ? null : d);
             } else {
-                sb.append(val);
+                props.put("value", val);
             }
 
             if (node instanceof com.trading.drg.api.VectorValue vv && vv.headers() != null) {
-                sb.append(",\"headers\":[");
-                String[] hdrs = vv.headers();
-                for (int h = 0; h < hdrs.length; h++) {
-                    sb.append("\"").append(hdrs[h]).append("\"");
-                    if (h < hdrs.length - 1)
-                        sb.append(",");
-                }
-                sb.append("]");
+                props.put("headers", vv.headers());
             }
-            sb.append("}");
 
-            try {
-                // Parse the constructed mini-JSON state block back into Java map to cleanly
-                // inject via Jackson
-                @SuppressWarnings("unchecked")
-                Map<String, Object> props = mapper.readValue(sb.toString(), Map.class);
-                if (!props.isEmpty()) {
-                    def.setProperties(props);
-                }
-            } catch (Exception e) {
-                // Fallback if dynamic state serialization broke
-                def.setProperties(Map.of("snapshotError", e.getMessage()));
+            if (!props.isEmpty()) {
+                def.setProperties(props);
             }
 
             expandedNodes.add(def);

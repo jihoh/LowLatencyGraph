@@ -32,9 +32,6 @@ public class WebsocketPublisherListener implements StabilizationListener {
     // Track NaNs natively via topoIndex without Object boxing
     private long[] nanCounters = new long[0];
 
-    // Pre-allocated buffer for in-place sorting
-    private NodeProfileListener.NodeStats[] sortBuffer = new NodeProfileListener.NodeStats[0];
-
     // Optional metrics listeners
     private LatencyTrackingListener latencyListener;
     private NodeProfileListener profileListener;
@@ -101,7 +98,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
                 if (!firstDesc)
                     initBuilder.append(",");
                 initBuilder.append("\"").append(entry.getKey()).append("\":\"")
-                        .append(entry.getValue().replace("\"", "\\\"")).append("\"");
+                        .append(escapeJsonString(entry.getValue())).append("\"");
                 firstDesc = false;
             }
         }
@@ -119,7 +116,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
                     if (!firstChild)
                         initBuilder.append(",");
                     initBuilder.append("\"").append(childEntry.getKey()).append("\":\"")
-                            .append(childEntry.getValue().replace("\"", "\\\"")).append("\"");
+                            .append(escapeJsonString(childEntry.getValue())).append("\"");
                     firstChild = false;
                 }
                 initBuilder.append("}");
@@ -136,12 +133,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
                 if (!firstSource)
                     initBuilder.append(",");
                 initBuilder.append("\"").append(entry.getKey()).append("\":\"")
-                        .append(entry.getValue()
-                                .replace("\\", "\\\\")
-                                .replace("\"", "\\\"")
-                                .replace("\n", "\\n")
-                                .replace("\r", "\\r")
-                                .replace("\t", "\\t"))
+                        .append(escapeJsonString(entry.getValue()))
                         .append("\"");
                 firstSource = false;
             }
@@ -150,7 +142,25 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
         initBuilder.append("}");
 
-        server.setInitialGraphConfig(initBuilder.toString());
+        String initPayload = initBuilder.toString();
+        try {
+            java.nio.file.Files.write(
+                    java.nio.file.Paths.get("/tmp/init_config.json"),
+                    initPayload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (Exception e) {
+        }
+
+        server.setInitialGraphConfig(initPayload);
+    }
+
+    private String escapeJsonString(String value) {
+        if (value == null)
+            return "";
+        return value.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 
     public void setLatencyListener(LatencyTrackingListener latencyListener) {
@@ -205,27 +215,32 @@ public class WebsocketPublisherListener implements StabilizationListener {
             }
 
             if (vectorVal != null) {
-                jsonBuilder.append("\"").append(node.name()).append("\":\"[");
+                jsonBuilder.append("\"").append(node.name()).append("\":[");
                 for (int v = 0; v < vectorVal.length; v++) {
                     double vVal = vectorVal[v];
-                    jsonBuilder.append(Double.isNaN(vVal) ? "null" : vVal);
+                    if (!Double.isFinite(vVal)) {
+                        jsonBuilder.append("null");
+                    } else {
+                        jsonBuilder.append(vVal);
+                    }
                     if (v < vectorVal.length - 1)
                         jsonBuilder.append(",");
                 }
-                jsonBuilder.append("]\"");
+                jsonBuilder.append("]");
 
                 if (headers != null) {
-                    jsonBuilder.append(",\"").append(node.name()).append("_headers\":\"[");
+                    jsonBuilder.append(",\"").append(node.name()).append("_headers\":[");
                     for (int h = 0; h < headers.length; h++) {
-                        jsonBuilder.append("\\\"").append(headers[h]).append("\\\"");
+                        jsonBuilder.append("\"").append(headers[h]).append("\"");
                         if (h < headers.length - 1)
                             jsonBuilder.append(",");
                     }
-                    jsonBuilder.append("]\"");
+                    jsonBuilder.append("]");
                 }
-            } else if (Double.isNaN(scalarVal)) {
-                nanCounters[i]++;
-                jsonBuilder.append("\"").append(node.name()).append("\":\"NaN\"");
+            } else if (!Double.isFinite(scalarVal)) {
+                if (Double.isNaN(scalarVal))
+                    nanCounters[i]++;
+                jsonBuilder.append("\"").append(node.name()).append("\":\"").append(scalarVal).append("\"");
             } else {
                 jsonBuilder.append("\"").append(node.name()).append("\":").append(scalarVal);
             }
@@ -235,35 +250,8 @@ public class WebsocketPublisherListener implements StabilizationListener {
             }
         }
 
-        jsonBuilder.append("}");
-
-        jsonBuilder.append(",\"states\":{");
-        boolean firstState = true;
-        for (int i = 0; i < nodeCount; i++) {
-            Node<?> node = topology.node(i);
-            if (node instanceof com.trading.drg.api.DynamicState ds) {
-                int lenBefore = jsonBuilder.length();
-                if (!firstState) {
-                    jsonBuilder.append(",");
-                }
-                jsonBuilder.append("\"").append(node.name()).append("\":{");
-                int lenBeforeState = jsonBuilder.length();
-
-                ds.serializeDynamicState(jsonBuilder);
-
-                if (jsonBuilder.length() == lenBeforeState) {
-                    // Node didn't append any state, rollback key append
-                    jsonBuilder.setLength(lenBefore);
-                } else {
-                    jsonBuilder.append("}");
-                    firstState = false;
-                }
-            }
-        }
-        jsonBuilder.append("}");
-
         // 2. Append metrics
-        jsonBuilder.append(",\"metrics\":{")
+        jsonBuilder.append("},\"metrics\":{")
                 .append("\"nodesUpdated\":").append(nodesStabilized).append(",")
                 .append("\"totalNodes\":").append(nodeCount).append(",")
                 .append("\"totalSourceNodes\":").append(sourceCount).append(",")
@@ -272,25 +260,23 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
         if (latencyListener != null) {
             jsonBuilder.append(",\"latency\":{")
-                    .append("\"latest\":").append(latencyListener.lastLatencyMicros()).append(",")
-                    .append("\"avg\":").append(latencyListener.avgLatencyMicros())
+                    .append("\"latest\":").append(formatDouble(latencyListener.lastLatencyMicros())).append(",")
+                    .append("\"avg\":").append(formatDouble(latencyListener.avgLatencyMicros()))
                     .append("}");
         }
 
         if (profileListener != null) {
             jsonBuilder.append(",\"profile\":[");
-
-            // Build snapshot from the native array without Streams or Boxing
             NodeProfileListener.NodeStats[] rawStats = profileListener.getStatsArray();
-            int limit = Math.min(rawStats.length, nodeCount);
 
-            if (sortBuffer.length < limit) {
-                sortBuffer = new NodeProfileListener.NodeStats[limit * 2];
+            int limit = 50; // default top 50
+            if (rawStats.length < limit) {
+                limit = rawStats.length;
             }
 
-            // Collect valid non-null stats up to node count
+            NodeProfileListener.NodeStats[] sortBuffer = new NodeProfileListener.NodeStats[rawStats.length];
             int validCount = 0;
-            for (int i = 0; i < limit; i++) {
+            for (int i = 0; i < rawStats.length; i++) {
                 if (rawStats[i] != null && rawStats[i].count > 0) {
                     sortBuffer[validCount++] = rawStats[i];
                 }
@@ -298,9 +284,11 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
             java.util.Arrays.sort(sortBuffer, 0, validCount,
                     (s1, s2) -> Long.compare(s2.totalDurationNanos, s1.totalDurationNanos));
-            int topK = Math.min(validCount, 50);
 
-            for (int i = 0; i < topK; i++) {
+            limit = Math.min(limit, validCount);
+            for (int i = 0; i < limit; i++) {
+                if (i > 0)
+                    jsonBuilder.append(",");
                 NodeProfileListener.NodeStats s = sortBuffer[i];
 
                 // Lookup index generically based on object equality to grab the NaN array
@@ -317,30 +305,39 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
                 jsonBuilder.append("{")
                         .append("\"name\":\"").append(s.name).append("\",")
-                        .append("\"latest\":").append(s.lastDurationNanos / 1000.0).append(",")
-                        .append("\"avg\":").append(s.avgMicros()).append(",")
+                        .append("\"latest\":").append(formatDouble(s.lastDurationNanos / 1000.0)).append(",")
+                        .append("\"avg\":").append(formatDouble(s.avgMicros())).append(",")
                         .append("\"evaluations\":").append(s.count).append(",")
                         .append("\"nans\":").append(nanCount)
                         .append("}");
-
-                if (i < topK - 1) {
-                    jsonBuilder.append(",");
-                }
             }
             jsonBuilder.append("]");
-
-            // Clean up buffer references
-            for (int i = 0; i < validCount; i++) {
-                sortBuffer[i] = null;
-            }
         }
-
         jsonBuilder.append("}"); // close metrics
         jsonBuilder.append("}"); // close tick object
 
         // 3. Broadcast to all connected web clients
         String payload = jsonBuilder.toString();
+        // Dump the first 10 payloads to disk to catch the parse error
+        try {
+            java.io.File dump = new java.io.File("/tmp/ws_payload.json");
+            if (dump.length() < 100000) {
+                java.nio.file.Files.write(
+                        dump.toPath(),
+                        (payload + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        java.nio.file.StandardOpenOption.CREATE,
+                        java.nio.file.StandardOpenOption.APPEND);
+            }
+        } catch (Exception e) {
+        }
         server.broadcast(payload);
+    }
+
+    private Object formatDouble(double val) {
+        if (!Double.isFinite(val)) {
+            return "\"" + val + "\""; // "NaN" or "Infinity" correctly quoted for JSON
+        }
+        return val;
     }
 
     @Override

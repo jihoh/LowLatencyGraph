@@ -56,6 +56,12 @@ public class GraphDashboardServer {
         app = Javalin.create(config -> {
             // Serve frontend files (HTML/JS/CSS) from the classpath 'public' directory
             config.staticFiles.add("/public");
+
+            // Allow massive JSON payloads to pass through WebSocket initialized graph
+            // configs.
+            config.jetty.modifyWebSocketServletFactory(factory -> {
+                factory.setMaxTextMessageSize(10_000_000L);
+            });
         }).start(port);
 
         // Snapshot API Endpoint

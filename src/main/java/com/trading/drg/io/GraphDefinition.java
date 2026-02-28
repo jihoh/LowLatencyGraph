@@ -103,7 +103,7 @@ public final class GraphDefinition {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public static final class NodeDef {
-        private String name, type;
+        private String name, type, description;
         private Map<String, String> inputs;
         private Map<String, Object> properties;
 
@@ -121,6 +121,14 @@ public final class GraphDefinition {
 
         public void setType(String v) {
             type = v;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public void setDescription(String v) {
+            description = v;
         }
 
         public Map<String, String> getInputs() {

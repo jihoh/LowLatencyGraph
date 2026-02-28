@@ -10,6 +10,8 @@ window.addEventListener('error', function (e) {
 mermaid.initialize({
     startOnLoad: false,
     theme: 'dark',
+    securityLevel: 'loose',
+    maxTextSize: 9999999, // Uncap max length for massive generated graphs
     fontFamily: 'Inter',
     themeVariables: {
         primaryColor: 'transparent',
@@ -273,7 +275,8 @@ function openDetailsModal(nodeName) {
 
     // Set Header and Description
     document.getElementById('details-node-name').textContent = nodeName;
-    document.getElementById('details-node-desc').textContent = nodeDescriptions[nodeName] || "No description available for this calculation type.";
+    document.getElementById('details-node-desc').textContent = nodeDescriptions[nodeName] || "";
+    document.getElementById('details-value').textContent = '--'; // Clear value initially
 
     // Set Lineage
     const parentsList = document.getElementById('details-parents-list');
@@ -361,16 +364,17 @@ function openDetailsModal(nodeName) {
     let vectorHeaders = [];
 
     const latestVal = prevValues.get(nodeName);
-    if (typeof latestVal === 'string' && latestVal.startsWith('[') && latestVal.endsWith(']')) {
+    if (Array.isArray(latestVal) || (typeof latestVal === 'string' && latestVal.startsWith('[') && latestVal.endsWith(']'))) {
         isVector = true;
         try {
-            const arr = JSON.parse(latestVal);
+            const arr = Array.isArray(latestVal) ? latestVal : JSON.parse(latestVal);
             const lastSnap = snapshots.size > 0 ? snapshots.get(snapshots.size - 1) : null;
-            let headersStr = lastSnap && lastSnap.values ? lastSnap.values[nodeName + "_headers"] : null;
+            let headers = lastSnap && lastSnap.values ? lastSnap.values[nodeName + "_headers"] : null;
 
-            if (headersStr && headersStr.startsWith('[') && headersStr.endsWith(']')) {
-                const headersArray = JSON.parse(headersStr);
-                vectorHeaders = headersArray;
+            if (Array.isArray(headers)) {
+                vectorHeaders = headers;
+            } else if (typeof headers === 'string' && headers.startsWith('[') && headers.endsWith(']')) {
+                vectorHeaders = JSON.parse(headers);
             }
 
             vectorData = arr.map((v, i) => {
@@ -681,26 +685,32 @@ function updateMetricsDOM(payload) {
 
     // Re-hydrate internal state for the parsed node
     if (activeDetailsNode && payload.values) {
+        if (payload.values && payload.values[activeDetailsNode] !== undefined) {
+            const val = payload.values[activeDetailsNode];
 
+            if (Array.isArray(val)) {
+                // Vectors are visualized in the bottom chart; show '[...]' as the text value.
+                document.getElementById('details-value').textContent = '[...]';
 
-        // Update states
-        if (payload.states && payload.states[activeDetailsNode]) {
-            const stateObj = payload.states[activeDetailsNode];
-            const stateSection = document.getElementById('details-state-section');
-            const stateList = document.getElementById('details-state-list');
+                // Mini sparkline for vectors
+                if (nodeHistory.has(activeDetailsNode) && nodeHistory.get(activeDetailsNode).size > 0) {
+                    const latestArr = nodeHistory.get(activeDetailsNode).last().value;
+                    drawVectorSparkline('details-sparkline-canvas', latestArr);
+                    const sparkContainer = document.getElementById('details-sparkline');
+                    if (sparkContainer) sparkContainer.style.display = 'block';
+                }
+            } else {
+                // Scalar value format
+                document.getElementById('details-value').textContent = Number(val).toFixed(4);
 
-            if (stateSection && stateList) {
-                stateSection.style.display = 'block';
-                stateList.innerHTML = '';
-                for (const [key, stateVal] of Object.entries(stateObj)) {
-                    const li = document.createElement('li');
-                    li.innerHTML = `<span style="color:var(--text-secondary); font-family: monospace; font-size: 0.9em; display:inline-block; width: 120px;">${key}</span> <strong style="color:var(--text-highlight); font-family: monospace; font-size: 0.9em;">${typeof stateVal === 'number' ? Number(stateVal).toFixed(4) : stateVal}</strong>`;
-                    stateList.appendChild(li);
+                // Line chart for history
+                if (nodeHistory.has(activeDetailsNode) && nodeHistory.get(activeDetailsNode).size > 0) {
+                    const data = nodeHistory.get(activeDetailsNode).toArray().map(d => d.value);
+                    drawScalarSparkline('details-sparkline-canvas', data);
+                    const sparkContainer = document.getElementById('details-sparkline');
+                    if (sparkContainer) sparkContainer.style.display = 'block';
                 }
             }
-        } else {
-            const stateSection = document.getElementById('details-state-section');
-            if (stateSection) stateSection.style.display = 'none';
         }
     }
 }
@@ -722,7 +732,16 @@ function connect() {
 
     ws.onmessage = async (event) => {
         try {
-            const payload = JSON.parse(event.data);
+            let payload;
+            try {
+                payload = JSON.parse(event.data);
+            } catch (e) {
+                console.error("JSON PARSE ERROR! Length:", event.data.length);
+                const match = e.message.match(/position (\d+)/);
+                const pos = match ? parseInt(match[1]) : 0;
+                console.error(`Event data around pos ${pos}:`, event.data.substring(Math.max(0, pos - 50), pos + 50));
+                throw e;
+            }
 
             // Branch 1: Heavy Static Initializer Payload
             if (payload.type === 'init') {
@@ -985,45 +1004,47 @@ function connect() {
 
             // Live History Tracking & Chart Updating
             // The Java backend pushes updates every epoch.
-            for (const [key, cs] of activeChartSeries.entries()) {
-                const val = payload.values[key];
-                if (val === undefined) continue;
+            if (payload.values) {
+                for (const [key, cs] of activeChartSeries.entries()) {
+                    const val = payload.values[key];
+                    if (val === undefined) continue;
 
-                if (!nodeHistory.has(key)) {
-                    nodeHistory.set(key, new RingBuffer(globalHistoryDepth));
-                    nodeNaNHistory.set(key, new RingBuffer(globalHistoryDepth));
-                }
-                const historyArr = nodeHistory.get(key);
-                const nanArr = nodeNaNHistory.get(key);
-
-                const isNaNVal = (val === 'NaN' || Number.isNaN(Number(val)));
-
-                // Bridge the graph using the last known good value if current payload is NaN
-                let plotVal = val;
-                if (isNaNVal) {
-                    plotVal = historyArr.size > 0 ? historyArr.last().value : 0;
-                }
-
-                const point = { time: payload.epoch, value: plotVal };
-
-                historyArr.push(point);
-
-                // Track continuous NaN statuses for the chart's red overlay background
-                if (isNaNVal) {
-                    const nanPoint = { time: payload.epoch, value: 1 };
-                    nanArr.push(nanPoint);
-                } else {
-                    nanArr.push({ time: payload.epoch, value: NaN });
-                }
-
-                // Explicitly push the live tick
-                try {
-                    if (!isScrubbing) {
-                        if (cs.lineSeries) cs.lineSeries.update(point);
-                        if (cs.nanSeries && isNaNVal) cs.nanSeries.update({ time: payload.epoch, value: 1 });
+                    if (!nodeHistory.has(key)) {
+                        nodeHistory.set(key, new RingBuffer(globalHistoryDepth));
+                        nodeNaNHistory.set(key, new RingBuffer(globalHistoryDepth));
                     }
-                } catch (e) {
-                    document.getElementById('chart-title').textContent = "UPD ERR: " + e.message;
+                    const historyArr = nodeHistory.get(key);
+                    const nanArr = nodeNaNHistory.get(key);
+
+                    const isNaNVal = (val === 'NaN' || val === 'Infinity' || val === '-Infinity' || !Number.isFinite(Number(val)));
+
+                    // Bridge the graph using the last known good value if current payload is NaN or Infinite
+                    let plotVal = val;
+                    if (isNaNVal) {
+                        plotVal = historyArr.size > 0 ? historyArr.last().value : 0;
+                    }
+
+                    const point = { time: payload.epoch, value: plotVal };
+
+                    historyArr.push(point);
+
+                    // Track continuous NaN statuses for the chart's red overlay background
+                    if (isNaNVal) {
+                        const nanPoint = { time: payload.epoch, value: 1 };
+                        nanArr.push(nanPoint);
+                    } else {
+                        nanArr.push({ time: payload.epoch, value: NaN });
+                    }
+
+                    // Explicitly push the live tick
+                    try {
+                        if (!isScrubbing) {
+                            if (cs.lineSeries) cs.lineSeries.update(point);
+                            if (cs.nanSeries && isNaNVal) cs.nanSeries.update({ time: payload.epoch, value: 1 });
+                        }
+                    } catch (e) {
+                        document.getElementById('chart-title').textContent = "UPD ERR: " + e.message;
+                    }
                 }
             }
         } catch (error) {
@@ -1202,34 +1223,20 @@ function updateGraphDOM(newValues) {
                 // Determine if it's an Array representation like "[4.7, 4.8]"
                 let displayVal = "NaN";
                 if (!isValNaN) {
-                    if (typeof newVal === 'string' && newVal.startsWith('[') && newVal.endsWith(']')) {
-                        try {
-                            const arr = JSON.parse(newVal);
-                            const headersStr = newValues[nodeName + "_headers"];
+                    if (Array.isArray(newVal)) {
+                        const arr = newVal;
+                        const headersArray = Array.isArray(newValues[nodeName + "_headers"]) ? newValues[nodeName + "_headers"] : null;
 
-                            if (headersStr && headersStr.startsWith('[') && headersStr.endsWith(']')) {
-                                const headersArray = JSON.parse(headersStr);
-                                const maxItems = 2;
-                                const items = arr.slice(0, maxItems).map((v, i) => {
-                                    const h = (i < headersArray.length) ? headersArray[i] : i;
-                                    return `${h}: ${formatVal(v)}`;
-                                });
-                                if (arr.length > maxItems) {
-                                    displayVal = "[" + items.join(", ") + ", ...]";
-                                } else {
-                                    displayVal = "[" + items.join(", ") + "]";
-                                }
-                            } else {
-                                const maxItems = 2;
-                                const items = arr.slice(0, maxItems).map((v, i) => `${i}: ${formatVal(v)}`);
-                                if (arr.length > maxItems) {
-                                    displayVal = "[" + items.join(", ") + ", ...]";
-                                } else {
-                                    displayVal = "[" + items.join(", ") + "]";
-                                }
-                            }
-                        } catch (e) {
-                            displayVal = newVal;
+                        const maxItems = 2;
+                        const items = arr.slice(0, maxItems).map((v, i) => {
+                            const h = (headersArray && i < headersArray.length) ? headersArray[i] : i;
+                            return `${h}: ${formatVal(v)}`;
+                        });
+
+                        if (arr.length > maxItems) {
+                            displayVal = "[" + items.join(", ") + ", ...]";
+                        } else {
+                            displayVal = "[" + items.join(", ") + "]";
                         }
                     } else {
                         displayVal = formatVal(newVal);
@@ -1238,7 +1245,7 @@ function updateGraphDOM(newValues) {
 
                 if (activeDetailsNode === nodeName && detailsVectorSeries) {
                     try {
-                        const arr = typeof newVal === 'string' ? JSON.parse(newVal) : newVal;
+                        const arr = newVal;
                         if (Array.isArray(arr)) {
                             const pointData = arr.map((v, i) => {
                                 return { time: i + 1, value: Number.isNaN(Number(v)) || v === "NaN" || v === null ? NaN : Number(v) };
@@ -1276,7 +1283,7 @@ function updateGraphDOM(newValues) {
             if (detailsTicks.length > 0) {
                 // Formatting for display in sidebar - we can just use the DOM string if parsed, or format newVal
                 let tickVal = newVal;
-                if (typeof tickVal === 'string' && tickVal.startsWith('[') && tickVal.endsWith(']')) {
+                if (Array.isArray(tickVal)) {
                     tickVal = "[Vector]"; // Simplify for sidebar view
                 } else if (tickVal !== "NaN" && !Number.isNaN(Number(tickVal))) {
                     tickVal = Number(tickVal).toFixed(4);

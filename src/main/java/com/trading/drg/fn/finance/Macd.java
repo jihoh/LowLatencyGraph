@@ -24,5 +24,4 @@ public class Macd extends AbstractFn1 {
         double s = slow.apply(input);
         return f - s;
     }
-
 }

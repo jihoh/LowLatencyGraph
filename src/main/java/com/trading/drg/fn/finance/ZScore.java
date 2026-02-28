@@ -61,5 +61,4 @@ public class ZScore extends AbstractFn1 {
         double stdDev = Math.sqrt(variance);
         return (input - mean) / stdDev;
     }
-
 }

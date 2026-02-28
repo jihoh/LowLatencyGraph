@@ -72,7 +72,11 @@ public final class JsonGraphCompiler {
         for (var nd : nodeDefs) {
             NodeType type = NodeType.fromString(nd.getType());
             logicalTypes.put(nd.getName(), type.name());
-            descriptions.put(nd.getName(), type.getDescription());
+
+            String configDesc = nd.getDescription();
+            if (configDesc != null) {
+                descriptions.put(nd.getName(), configDesc);
+            }
 
             if (type.getNodeClass() != null) {
                 sourceCodes.put(nd.getName(), SourceExtractor.extractClassSource(type.getNodeClass().getName()));
@@ -351,6 +355,7 @@ public final class JsonGraphCompiler {
         var copy = new GraphDefinition.NodeDef();
         copy.setName(original.getName());
         copy.setType(original.getType());
+        copy.setDescription(original.getDescription());
         if (original.getInputs() != null) {
             copy.setInputs(new HashMap<>(original.getInputs()));
         }

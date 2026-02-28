@@ -300,7 +300,9 @@
     <div id="node-details-modal" class="modal hidden">
         <div class="modal-content details-modal">
             <span class="modal-close" id="details-close">&times;</span>
-            <h2 id="details-node-name">Node Name</h2>
+            <div style="display: flex; align-items: baseline; justify-content: space-between;">
+                <h2 id="details-node-name" style="margin: 0;">Node Name</h2>
+            </div>
             <p id="details-node-desc" class="details-desc">Calculation description will appear here.</p>
 
             <div style="display: flex; gap: 24px; margin-top: 24px;">
@@ -314,13 +316,6 @@
                     <div class="details-section">
                         <h3>Children (Outputs)</h3>
                         <ul id="details-children-list" class="lineage-list"></ul>
-                    </div>
-
-                    <div class="details-section" id="details-state-section" style="display: none;">
-                        <h3
-                            style="margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
-                            Live Internal State</h3>
-                        <ul id="details-state-list" class="lineage-list state-list"></ul>
                     </div>
 
                     <div class="details-section" id="details-properties-section" style="display: none;">
@@ -337,87 +332,100 @@
                         <h3>Live Metrics</h3>
                         <div
                             style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; width: 100%;">
+                            <div class="metric-small"><span class="label">Value</span><span class="value"
+                                    id="details-value">--</span></div>
+                            <div class="metric-small"><span class="label">Update Count</span><span class="value"
+                                    id="details-metric-update">0</span></div>
                             <div class="metric-small"><span class="label">Latest Latency (μs)</span><span class="value"
                                     id="details-metric-lat">0.00</span></div>
                             <div class="metric-small"><span class="label">Avg Latency (μs)</span><span class="value"
                                     id="details-metric-avg">0.00</span></div>
-                            <div class="metric-small"><span class="label">Update Epoch</span><span class="value"
-                                    id="details-metric-update">0</span></div>
                             <div class="metric-small"><span class="label">NaN Count</span><span class="value"
                                     id="details-metric-nan">0</span></div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Custom Resize Handle for sliding panel -->
+                <div id="details-resize-handle" class="resize-handle"></div>
             </div>
 
-            <div class="details-section" id="details-vector-section" style="display: none; margin-top: 24px;">
-                <h3 style="margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
-                    Vector Data</h3>
-                <div id="tv-vector-chart"
-                    style="width: 100%; height: 200px; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; position: relative;">
+            <div class="details-full-width-stack"
+                style="display: flex; flex-direction: column; gap: 24px; margin-top: 24px;">
+                <div class="details-section" id="details-sparkline" style="display: none;">
+                    <h3 style="margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
+                        Value Trajectory</h3>
+                    <div style="width: 100%; height: 60px; margin-top: 8px;">
+                        <canvas id="details-sparkline-canvas" width="300" height="60"
+                            style="width: 100%; height: 100%; display: block;"></canvas>
+                    </div>
+                </div>
+
+                <div class="details-section" id="details-vector-section" style="display: none;">
+                    <h3 style="margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
+                        Vector Data</h3>
+                    <div id="tv-vector-chart"
+                        style="width: 100%; height: 200px; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; position: relative;">
+                    </div>
+                </div>
+
+                <div class="details-section" id="details-source-section" style="display: none;">
+                    <h3 style="margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
+                        Calculator</h3>
+                    <pre
+                        style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 0.85rem; color: var(--text-primary); border: 1px solid var(--border-color); margin: 0;"><code id="details-source-code" class="language-java"></code></pre>
                 </div>
             </div>
 
-            <div class="details-section" id="details-source-section" style="display: none; margin-top: 24px;">
-                <h3 style="margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
-                    Calculator</h3>
-                <pre
-                    style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 0.85rem; color: var(--text-primary); border: 1px solid var(--border-color); margin: 0;"><code id="details-source-code" class="language-java"></code></pre>
-            </div>
+            <!-- Add Alert Modal -->
+            <div id="add-alert-modal" class="modal hidden">
+                <div class="modal-content" style="max-width: 400px;">
+                    <span class="modal-close" id="add-alert-close">&times;</span>
+                    <h2 id="add-alert-title" style="margin-bottom: 16px;">Add Alert</h2>
 
-            <!-- Custom Resize Handle for sliding panel -->
-            <div id="details-resize-handle" class="resize-handle"></div>
-        </div>
-    </div>
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <p style="font-size: 0.9rem; color: var(--text-secondary);">Target Node: <strong
+                                id="add-alert-node-name" style="color: var(--text-primary);"></strong></p>
 
-    <!-- Add Alert Modal -->
-    <div id="add-alert-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 400px;">
-            <span class="modal-close" id="add-alert-close">&times;</span>
-            <h2 id="add-alert-title" style="margin-bottom: 16px;">Add Alert</h2>
+                        <div>
+                            <label
+                                style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Condition</label>
+                            <select id="add-alert-condition" class="alert-input"
+                                style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); padding: 8px; border-radius: 4px;">
+                                <option value="<">drops below</option>
+                                <option value=">">goes above</option>
+                                <option value="=">equals</option>
+                            </select>
+                        </div>
 
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-                <p style="font-size: 0.9rem; color: var(--text-secondary);">Target Node: <strong
-                        id="add-alert-node-name" style="color: var(--text-primary);"></strong></p>
+                        <div>
+                            <label
+                                style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Threshold
+                                Value</label>
+                            <input type="number" id="add-alert-value" class="alert-input" placeholder="Value" step="any"
+                                style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); padding: 8px; border-radius: 4px;">
+                        </div>
 
-                <div>
-                    <label
-                        style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Condition</label>
-                    <select id="add-alert-condition" class="alert-input"
-                        style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); padding: 8px; border-radius: 4px;">
-                        <option value="<">drops below</option>
-                        <option value=">">goes above</option>
-                        <option value="=">equals</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label
-                        style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Threshold
-                        Value</label>
-                    <input type="number" id="add-alert-value" class="alert-input" placeholder="Value" step="any"
-                        style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); padding: 8px; border-radius: 4px;">
-                </div>
-
-                <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
-                    <button id="add-alert-cancel" class="panel-btn"
-                        style="padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 4px; background: transparent; color: var(--text-primary); cursor: pointer;">Cancel</button>
-                    <button id="add-alert-create" class="panel-btn"
-                        style="padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 4px; background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); cursor: pointer; font-weight: bold;">Create</button>
+                        <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+                            <button id="add-alert-cancel" class="panel-btn"
+                                style="padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 4px; background: transparent; color: var(--text-primary); cursor: pointer;">Cancel</button>
+                            <button id="add-alert-create" class="panel-btn"
+                                style="padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 4px; background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); cursor: pointer; font-weight: bold;">Create</button>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Load Mermaid & Dependencies -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"
-        crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"
-        crossorigin="anonymous"></script>
-    <script src="app.js?v=8"></script>
+            <!-- Load Mermaid & Dependencies -->
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"
+                crossorigin="anonymous"></script>
+            <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"
+                crossorigin="anonymous"></script>
+            <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"
+                crossorigin="anonymous"></script>
+            <script src="app.js?v=8"></script>
 </body>
 
 </html>
