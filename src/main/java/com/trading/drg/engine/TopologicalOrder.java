@@ -59,17 +59,17 @@ public final class TopologicalOrder {
     // Lookup map for name resolution
     private final Map<String, Integer> nameToIndex;
 
-    // Bitset-like array to quickly identify source nodes
-    private final boolean[] isSource;
+    // Bitset: packs 64 source flags per long, matching dirtyWords layout
+    private final long[] sourceWords;
 
     private TopologicalOrder(Node<?>[] topoOrder, int[] childrenOffset, int[] childrenList,
-            int[] parentCount, Map<String, Integer> nameToIndex, boolean[] isSource) {
+            int[] parentCount, Map<String, Integer> nameToIndex, long[] sourceWords) {
         this.topoOrder = topoOrder;
         this.childrenOffset = childrenOffset;
         this.childrenList = childrenList;
         this.parentCount = parentCount;
         this.nameToIndex = nameToIndex;
-        this.isSource = isSource;
+        this.sourceWords = sourceWords;
     }
 
     public int nodeCount() {
@@ -90,7 +90,7 @@ public final class TopologicalOrder {
     }
 
     public boolean isSource(int ti) {
-        return isSource[ti];
+        return (sourceWords[ti >> 6] & (1L << ti)) != 0;
     }
 
     public int childCount(int ti) {
@@ -117,9 +117,7 @@ public final class TopologicalOrder {
         return parentCount[ti];
     }
 
-    public Node<?>[] topoOrder() {
-        return topoOrder;
-    }
+    // Internal array is not exposed to prevent mutation of immutable topology.
 
     public static Builder builder() {
         return new Builder();
@@ -146,6 +144,8 @@ public final class TopologicalOrder {
         }
 
         public Builder addEdge(String from, String to) {
+            if (from.equals(to))
+                throw new IllegalArgumentException("Self-edge not allowed: " + from);
             forwardEdges.get(requireIndex(from)).add(requireIndex(to));
             return this;
         }
@@ -200,14 +200,16 @@ public final class TopologicalOrder {
 
             // 4. Construct compact arrays
             Node<?>[] orderedNodes = new Node<?>[n];
-            boolean[] isSrc = new boolean[n];
+            long[] srcWords = new long[(n + 63) / 64];
             int[] parentCounts = new int[n];
             Map<String, Integer> newNameToIndex = new HashMap<>(n * 2);
 
             for (int ti = 0; ti < n; ti++) {
                 int origIdx = reverseMap[ti];
                 orderedNodes[ti] = nodes.get(origIdx);
-                isSrc[ti] = sourceIndices.contains(origIdx);
+                if (sourceIndices.contains(origIdx)) {
+                    srcWords[ti >> 6] |= (1L << ti);
+                }
                 newNameToIndex.put(orderedNodes[ti].name(), ti);
             }
 
@@ -230,7 +232,7 @@ public final class TopologicalOrder {
                     parentCounts[childTi]++;
                 }
             }
-            return new TopologicalOrder(orderedNodes, offsets, flatChildren, parentCounts, newNameToIndex, isSrc);
+            return new TopologicalOrder(orderedNodes, offsets, flatChildren, parentCounts, newNameToIndex, srcWords);
         }
     }
 }

@@ -376,56 +376,57 @@
                         style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 0.85rem; color: var(--text-primary); border: 1px solid var(--border-color); margin: 0;"><code id="details-source-code" class="language-java"></code></pre>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- Add Alert Modal -->
-            <div id="add-alert-modal" class="modal hidden">
-                <div class="modal-content" style="max-width: 400px;">
-                    <span class="modal-close" id="add-alert-close">&times;</span>
-                    <h2 id="add-alert-title" style="margin-bottom: 16px;">Add Alert</h2>
+    <!-- Add Alert Modal (top-level, not inside details modal) -->
+    <div id="add-alert-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="modal-close" id="add-alert-close">&times;</span>
+            <h2 id="add-alert-title" style="margin-bottom: 16px;">Add Alert</h2>
 
-                    <div style="display: flex; flex-direction: column; gap: 12px;">
-                        <p style="font-size: 0.9rem; color: var(--text-secondary);">Target Node: <strong
-                                id="add-alert-node-name" style="color: var(--text-primary);"></strong></p>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <p style="font-size: 0.9rem; color: var(--text-secondary);">Target Node: <strong
+                        id="add-alert-node-name" style="color: var(--text-primary);"></strong></p>
 
-                        <div>
-                            <label
-                                style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Condition</label>
-                            <select id="add-alert-condition" class="alert-input"
-                                style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); padding: 8px; border-radius: 4px;">
-                                <option value="<">drops below</option>
-                                <option value=">">goes above</option>
-                                <option value="=">equals</option>
-                            </select>
-                        </div>
+                <div>
+                    <label
+                        style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Condition</label>
+                    <select id="add-alert-condition" class="alert-input"
+                        style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); padding: 8px; border-radius: 4px;">
+                        <option value="<">drops below</option>
+                        <option value=">">goes above</option>
+                        <option value="=">equals</option>
+                    </select>
+                </div>
 
-                        <div>
-                            <label
-                                style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Threshold
-                                Value</label>
-                            <input type="number" id="add-alert-value" class="alert-input" placeholder="Value" step="any"
-                                style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); padding: 8px; border-radius: 4px;">
-                        </div>
+                <div>
+                    <label
+                        style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">Threshold
+                        Value</label>
+                    <input type="number" id="add-alert-value" class="alert-input" placeholder="Value" step="any"
+                        style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary); padding: 8px; border-radius: 4px;">
+                </div>
 
-                        <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
-                            <button id="add-alert-cancel" class="panel-btn"
-                                style="padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 4px; background: transparent; color: var(--text-primary); cursor: pointer;">Cancel</button>
-                            <button id="add-alert-create" class="panel-btn"
-                                style="padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 4px; background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); cursor: pointer; font-weight: bold;">Create</button>
-                        </div>
-                    </div>
+                <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+                    <button id="add-alert-cancel" class="panel-btn"
+                        style="padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 4px; background: transparent; color: var(--text-primary); cursor: pointer;">Cancel</button>
+                    <button id="add-alert-create" class="panel-btn"
+                        style="padding: 8px 16px; border: 1px solid var(--border-color); border-radius: 4px; background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); cursor: pointer; font-weight: bold;">Create</button>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- Load Mermaid & Dependencies -->
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"
-                crossorigin="anonymous"></script>
-            <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"
-                crossorigin="anonymous"></script>
-            <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"
-                crossorigin="anonymous"></script>
-            <script src="app.js?v=8"></script>
+    <!-- Load Mermaid & Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"
+        crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"
+        crossorigin="anonymous"></script>
+    <script src="app.js?v=8"></script>
 </body>
 
 </html>

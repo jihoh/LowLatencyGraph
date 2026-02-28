@@ -56,8 +56,8 @@ const prevValues = new Map();
 // Stores the direct children of each node: { "NodeA": ["NodeB", "NodeC"] }
 let graphRouting = {};
 let reverseGraphRouting = {}; // Stores direct parents: { "NodeB": ["NodeA"] }
-// Array to track message arrival times for Stabilization Rate calculation
-const messageTimes = [];
+const downstreamCache = new Map(); // Pre-computed transitive children per node
+const upstreamCache = new Map();   // Pre-computed transitive parents per node
 let panZoomInstance = null;
 const graphElementsCache = new Map(); // O(1) memory bindings for static Graph SVG elements
 
@@ -119,6 +119,9 @@ class RingBuffer {
     }
 }
 
+// Stabilization Rate sliding window (must be after RingBuffer class)
+const messageTimes = new RingBuffer(100);
+
 // Settings Configs
 let globalHistoryDepth = 3000;
 
@@ -145,6 +148,12 @@ let chartInstance = null;
 const activeChartSeries = new Map(); // nodeId -> { lineSeries, nanSeries, color }
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#eab308', '#ef4444'];
 let chartColorIndex = 0;
+
+// Shared SVG icon constants (deduped from toggle handlers)
+const SVG_CHEVRON_RIGHT = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+const SVG_CHEVRON_LEFT = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+const SVG_CHEVRON_UP = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>';
+const SVG_CHEVRON_DOWN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
 
 // Global Context Menu Listeners
 document.addEventListener('click', (e) => {
@@ -212,7 +221,6 @@ document.getElementById('add-alert-create')?.addEventListener('click', () => {
 // Global Descriptions and Edge Labels Cache
 let nodeDescriptions = {};
 let edgeLabels = {};
-let expandedGroups = new Set();
 let activeDetailsNode = null;
 
 document.getElementById('details-close').addEventListener('click', closeDetailsModal);
@@ -630,9 +638,6 @@ function updateMetricsDOM(payload) {
     if (payload.epoch !== undefined) {
         epochValue.textContent = payload.epoch;
     }
-    if (payload.graphName) {
-        // Updated via init block now
-    }
     if (payload.graphVersion) {
         document.getElementById('graph-version').textContent = 'v' + payload.graphVersion;
     }
@@ -787,6 +792,14 @@ function connect() {
                                     reverseGraphRouting[child].push(parent);
                                 }
                             }
+
+                            // Pre-compute lineage caches (one-time DFS per node)
+                            downstreamCache.clear();
+                            upstreamCache.clear();
+                            for (const nodeName of Object.keys(graphRouting)) {
+                                getDownstreamNodes(nodeName); // populates downstreamCache
+                                getUpstreamNodes(nodeName);   // populates upstreamCache
+                            }
                         }
 
                         // Populate Select Node dropdown dynamically
@@ -873,24 +886,17 @@ function connect() {
                 let currentHz = 0;
                 const now = performance.now();
                 messageTimes.push(now);
-                if (messageTimes.length > 50) {
-                    messageTimes.shift();
-                }
-                if (messageTimes.length > 1) {
-                    const elapsedSc = (now - messageTimes[0]) / 1000.0;
-                    currentHz = Math.round((messageTimes.length - 1) / elapsedSc);
+                if (messageTimes.size > 1) {
+                    const elapsedSc = (now - messageTimes.get(0)) / 1000.0;
+                    currentHz = Math.round((messageTimes.size - 1) / elapsedSc);
                 }
 
                 if (!payload.metrics) payload.metrics = {};
                 payload.metrics.frontendHz = currentHz;
 
-                // Ensure updateMetricsDOM runs smoothly without `prevValues` locking
+                // Hot Path: update metrics and DOM only when live
                 if (!isScrubbing) {
                     updateMetricsDOM(payload);
-                }
-
-                // Hot Path: Do NOT re-render Mermaid. Just manipulate the DOM.
-                if (!isScrubbing) {
                     updateGraphDOM(payload.values);
                 }
             }
@@ -1060,6 +1066,16 @@ function formatVal(val, places = 4) {
     return Number(val).toFixed(places);
 }
 
+// Formats epoch integer to HH:MM:SS using the real-time mapping
+function formatEpochTime(time) {
+    const realTimeMs = epochToRealTime.get(time) || Date.now();
+    const d = new Date(realTimeMs);
+    const hh = d.getHours().toString().padStart(2, '0');
+    const mm = d.getMinutes().toString().padStart(2, '0');
+    const ss = d.getSeconds().toString().padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
+}
+
 // Globals for Profile Table Sorting
 let latestProfileData = [];
 let profileSortCol = 'evaluations';
@@ -1161,11 +1177,9 @@ function renderProfileTable() {
     }
 }
 
-// Bind sorting listeners on initial load
-document.addEventListener('DOMContentLoaded', () => {
+function initProfileSorting() {
     const tableHeaders = document.querySelectorAll('#profile-table th');
     tableHeaders.forEach(th => {
-        // Add pointer cursor to indicate clickability
         th.style.cursor = 'pointer';
         th.title = 'Click to sort';
 
@@ -1175,10 +1189,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 profileSortAsc = !profileSortAsc;
             } else {
                 profileSortCol = colName;
-                profileSortAsc = false; // default to descending for new columns (makes sense for latency/count)
+                profileSortAsc = false;
             }
 
-            // Update header UI carets
             tableHeaders.forEach(h => h.innerHTML = h.innerHTML.replace(/ [▲▼]/g, ''));
             th.innerHTML += profileSortAsc ? ' ▲' : ' ▼';
 
@@ -1189,11 +1202,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalCloseBtn = document.getElementById('alert-modal-close');
     if (modalCloseBtn) {
         modalCloseBtn.addEventListener('click', () => {
-            const modal = document.getElementById('alert-modal');
-            modal.classList.add('hidden');
+            document.getElementById('alert-modal').classList.add('hidden');
         });
     }
-});
+}
 
 // Sanitize name to match Mermaid's internal ID generator
 function getMermaidNodeId(nodeName) {
@@ -1278,17 +1290,18 @@ function updateGraphDOM(newValues) {
                 });
             }
 
-            // Also update any details panel ticks
-            const detailsTicks = document.querySelectorAll(`.details-value-tick[data-node-id="${nodeName}"]`);
-            if (detailsTicks.length > 0) {
-                // Formatting for display in sidebar - we can just use the DOM string if parsed, or format newVal
-                let tickVal = newVal;
-                if (Array.isArray(tickVal)) {
-                    tickVal = "[Vector]"; // Simplify for sidebar view
-                } else if (tickVal !== "NaN" && !Number.isNaN(Number(tickVal))) {
-                    tickVal = Number(tickVal).toFixed(4);
+            // Also update any details panel ticks (only query DOM when modal is open)
+            if (activeDetailsNode) {
+                const detailsTicks = document.querySelectorAll(`.details-value-tick[data-node-id="${nodeName}"]`);
+                if (detailsTicks.length > 0) {
+                    let tickVal = newVal;
+                    if (Array.isArray(tickVal)) {
+                        tickVal = "[Vector]";
+                    } else if (tickVal !== "NaN" && !Number.isNaN(Number(tickVal))) {
+                        tickVal = Number(tickVal).toFixed(4);
+                    }
+                    detailsTicks.forEach(span => span.textContent = tickVal);
                 }
-                detailsTicks.forEach(span => span.textContent = tickVal);
             }
 
             prevValues.set(nodeName, newVal);
@@ -1296,20 +1309,24 @@ function updateGraphDOM(newValues) {
     }
 }
 
-// Recursively find all downstream components
+// Recursively find all downstream components (cached after init)
 function getDownstreamNodes(nodeName, visited = new Set()) {
+    if (downstreamCache.has(nodeName)) return downstreamCache.get(nodeName);
     if (visited.has(nodeName)) return [];
     visited.add(nodeName);
     const children = graphRouting[nodeName] || [];
-    let allDownstream = [nodeName, ...children]; // Includes the node itself
+    let allDownstream = [nodeName, ...children];
     for (const child of children) {
         allDownstream = allDownstream.concat(getDownstreamNodes(child, visited));
     }
-    return Array.from(new Set(allDownstream));
+    const result = Array.from(new Set(allDownstream));
+    downstreamCache.set(nodeName, result);
+    return result;
 }
 
-// Recursively find all upstream components
+// Recursively find all upstream components (cached after init)
 function getUpstreamNodes(nodeName, visited = new Set()) {
+    if (upstreamCache.has(nodeName)) return upstreamCache.get(nodeName);
     if (visited.has(nodeName)) return [];
     visited.add(nodeName);
     const parents = reverseGraphRouting[nodeName] || [];
@@ -1317,7 +1334,9 @@ function getUpstreamNodes(nodeName, visited = new Set()) {
     for (const parent of parents) {
         allUpstream = allUpstream.concat(getUpstreamNodes(parent, visited));
     }
-    return Array.from(new Set(allUpstream));
+    const result = Array.from(new Set(allUpstream));
+    upstreamCache.set(nodeName, result);
+    return result;
 }
 
 // Apply or remove hover CSS mathematically 
@@ -1469,24 +1488,10 @@ function initChart() {
             secondsVisible: true,
             rightOffset: 12,
             barSpacing: 15,
-            tickMarkFormatter: (time, tickMarkType, locale) => {
-                const realTimeMs = epochToRealTime.get(time) || Date.now();
-                const d = new Date(realTimeMs);
-                const hh = d.getHours().toString().padStart(2, '0');
-                const mm = d.getMinutes().toString().padStart(2, '0');
-                const ss = d.getSeconds().toString().padStart(2, '0');
-                return `${hh}:${mm}:${ss}`;
-            }
+            tickMarkFormatter: formatEpochTime
         },
         localization: {
-            timeFormatter: (time) => {
-                const realTimeMs = epochToRealTime.get(time) || Date.now();
-                const d = new Date(realTimeMs);
-                const hh = d.getHours().toString().padStart(2, '0');
-                const mm = d.getMinutes().toString().padStart(2, '0');
-                const ss = d.getSeconds().toString().padStart(2, '0');
-                return `${hh}:${mm}:${ss}`;
-            }
+            timeFormatter: formatEpochTime
         }
     });
 
@@ -1496,7 +1501,7 @@ function initChart() {
     // Track manual panning
     chartInstance.timeScale().subscribeVisibleTimeRangeChange(range => {
         if (!range || isScrubbing) return;
-        const maxEpoch = snapshots.length > 0 ? snapshots[snapshots.length - 1].epoch : 0;
+        const maxEpoch = snapshots.size > 0 ? snapshots.last().epoch : 0;
         const btnAutoTrack = document.getElementById('btn-auto-track');
         if (btnAutoTrack) {
             // Show the button if the user has scrolled left such that the latest point is off screen
@@ -1569,16 +1574,15 @@ function initChart() {
 
 document.getElementById('toggle-metrics').addEventListener('click', () => {
     const metricsContent = document.getElementById('metrics-content');
-    const panel = document.getElementById('metrics-panel');
     const btn = document.getElementById('toggle-metrics');
 
     if (metricsContent.style.display === 'none') {
         metricsContent.style.display = '';
-        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+        btn.innerHTML = SVG_CHEVRON_RIGHT;
         btn.title = 'Minimize';
     } else {
         metricsContent.style.display = 'none';
-        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+        btn.innerHTML = SVG_CHEVRON_LEFT;
         btn.title = 'Expand';
     }
 });
@@ -2092,8 +2096,8 @@ function setupDockingControls() {
             }
         }
 
-        const svgExpand = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
-        const svgMinimize = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+        const svgExpand = SVG_CHEVRON_LEFT;
+        const svgMinimize = SVG_CHEVRON_RIGHT;
         e.target.innerHTML = isMinimized ? svgExpand : svgMinimize;
         e.target.title = isMinimized ? 'Expand' : 'Minimize';
     });
@@ -2109,8 +2113,8 @@ function setupDockingControls() {
             bottomDock.style.height = '';
         }
 
-        const svgExpand = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>';
-        const svgMinimize = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+        const svgExpand = SVG_CHEVRON_UP;
+        const svgMinimize = SVG_CHEVRON_DOWN;
         e.target.innerHTML = isMinimized ? svgExpand : svgMinimize;
         e.target.title = isMinimized ? 'Expand' : 'Minimize';
         if (chartInstance && !isMinimized) {
@@ -2195,15 +2199,14 @@ window.addEventListener('DOMContentLoaded', () => {
     setupOmnidirectionalResize('metrics-panel');
     setupDockingControls();
     setupDockResizers();
-
-
+    initProfileSorting();
+    initGraphSearch();
 
     // Boot WebSocket strictly after DOM stabilizes
     connect();
 });
 
-// Graph Search functionality
-document.addEventListener('DOMContentLoaded', () => {
+function initGraphSearch() {
     const searchInput = document.getElementById('node-search-input');
     const searchClear = document.getElementById('node-search-clear');
 
@@ -2261,19 +2264,16 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Blur the search input if the user clicks outside of it
-        // We use true for capture phase because svg-pan-zoom stops bubble propagation on SVG clicks
         document.addEventListener('mousedown', (e) => {
             if (document.activeElement === searchInput && !searchInput.contains(e.target) && (!searchClear || !searchClear.contains(e.target))) {
                 searchInput.blur();
             }
         }, true);
 
-        // Blur the search input if the user presses ESC
         searchInput.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' || e.keyCode === 27) {
                 searchInput.blur();
             }
         });
     }
-});
+}
