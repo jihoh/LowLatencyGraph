@@ -651,7 +651,7 @@ function updateMetricsDOM(payload) {
             if (el) el.textContent = payload.metrics.epochEvents;
         }
         if (payload.metrics.totalNodes !== undefined) {
-            reactiveEff.textContent = `${payload.metrics.nodesUpdated} / ${payload.metrics.totalNodes}`;
+            reactiveEff.textContent = payload.metrics.nodesUpdated;
             document.getElementById('graph-total-nodes').textContent = payload.metrics.totalNodes;
         }
         if (payload.metrics.totalSourceNodes !== undefined) {

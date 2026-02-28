@@ -107,17 +107,18 @@ public class CoreGraphComplexDemo {
     public static class MarketDataEventHandler implements EventHandler<MarketDataEvent> {
 
         private final CoreGraph graph;
+        private final com.trading.drg.api.GraphAutoRouter router;
 
         public MarketDataEventHandler(CoreGraph graph) {
             this.graph = graph;
+            this.router = new com.trading.drg.api.GraphAutoRouter(graph)
+                    .registerClass(MarketDataEvent.class);
         }
 
         @Override
         public void onEvent(MarketDataEvent event, long sequence, boolean endOfBatch) throws Exception {
-            graph.update(buildNodeName(event, "bid"), event.getBid());
-            graph.update(buildNodeName(event, "bidQty"), event.getBidQty());
-            graph.update(buildNodeName(event, "ask"), event.getAsk());
-            graph.update(buildNodeName(event, "askQty"), event.getAskQty());
+            // Zero-allocation, Zero GC topological update based purely on Trie routing
+            router.route(event);
 
             // The beauty of the Disruptor is endOfBatch.
             // It guarantees we only stabilize the graph ONCE per burst,
@@ -126,20 +127,22 @@ public class CoreGraphComplexDemo {
                 graph.stabilize();
             }
         }
-
-        private String buildNodeName(MarketDataEvent event, String field) {
-            // Example: UST_2Y.Btec.bid
-            return event.getInstrument() + "." + event.getVenue() + "." + field;
-        }
     }
 
     @lombok.Getter
     public static class MarketDataEvent {
-        private String venue;
+        @com.trading.drg.api.GraphAutoRouter.RoutingKey(order = 1)
         private String instrument;
+        @com.trading.drg.api.GraphAutoRouter.RoutingKey(order = 2)
+        private String venue;
+
+        @com.trading.drg.api.GraphAutoRouter.RoutingValue("bid")
         private double bid;
+        @com.trading.drg.api.GraphAutoRouter.RoutingValue("bidQty")
         private double bidQty;
+        @com.trading.drg.api.GraphAutoRouter.RoutingValue("ask")
         private double ask;
+        @com.trading.drg.api.GraphAutoRouter.RoutingValue("askQty")
         private double askQty;
 
         public MarketDataEvent() {

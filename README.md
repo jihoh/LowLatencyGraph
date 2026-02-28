@@ -287,6 +287,47 @@ disruptor.handleEventsWith(new MarketDataEventHandler(graph));
 
 This demo boots a unified websocket listener rendering a live Javascript dashboard (accessible at `http://localhost:9090`), capable of ingesting millions of binary quotes and visualizing millisecond micro-shock latencies in real-time.
 
+### 3.5 Zero-Allocation Event Routing (`GraphAutoRouter`)
+
+When dealing with thousands of nodes, manually binding string names like `graph.update("UST_2Y.Btec.bid", event.getBid())` is tedious, error-prone, and generates garbage via String concatenation.
+
+CoreGraph provides `GraphAutoRouter<T>` to completely map your POJOs to the graph at startup using reflection. On the hot path, it navigates a Zero-GC Trie using the object's native String references, finding pre-cached topological `int` IDs instantly.
+
+**1. Annotate your Event POJO:**
+Use `@RoutingKey` to define the structural prefix, and `@RoutingValue` to map your fields:
+```java
+public class MarketDataEvent {
+    @RoutingKey(order = 1) private String instrument; // e.g. "UST_2Y"
+    @RoutingKey(order = 2) private String venue;      // e.g. "Btec"
+
+    @RoutingValue("bid") private double bid;          // maps to -> "UST_2Y.Btec.bid"
+    @RoutingValue("ask") private double ask;          // maps to -> "UST_2Y.Btec.ask"
+}
+```
+
+**2. Register your Event Classes:**
+You can register as many different Event payload types as you want. The router maintains a map of highly optimized zero-GC `RouterCache` Tries tailored specifically for each registered `Class`.
+
+```java
+GraphAutoRouter router = new GraphAutoRouter(graph)
+    .registerClass(TradeEvent.class)
+    .registerClass(QuoteEvent.class);
+```
+
+**3. Route complex Envelope feeds natively without strings or casting:**
+If you have an `EnvelopeEvent` containing heterogeneous payloads coming off the network, you can blindly pass the active object to the router:
+
+```java
+// Inside your hot loop (e.g. Disruptor onEvent)
+EnvelopeEvent envelope = event;
+Object payload = envelope.getPayload(); // e.g. a QuoteEvent or TradeEvent instance
+
+// Zero-allocation, dynamic dispatch purely based on Object.getClass()
+router.route(payload); 
+```
+
+This single line elegantly updates every matched node natively in $O(1)$ constant time with absolutely zero memory allocations or `instanceof` checks!
+
 ---
 
 ## 4. Developing Custom Logic
