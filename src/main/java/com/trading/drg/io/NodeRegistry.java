@@ -3,7 +3,6 @@ package com.trading.drg.io;
 import com.trading.drg.api.ScalarValue;
 import com.trading.drg.fn.finance.*;
 import com.trading.drg.node.*;
-import com.trading.drg.util.ScalarCutoffs;
 
 import java.util.HashMap;
 import java.util.Map;

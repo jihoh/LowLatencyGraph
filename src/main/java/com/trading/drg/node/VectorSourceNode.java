@@ -74,12 +74,9 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorValue
             throw new IllegalArgumentException(
                     "Vector length mismatch: expected " + size + ", got " + values.length + " for node: " + name);
         }
-        for (double v : values) {
-            if (!Double.isFinite(v)) {
-                throw new IllegalArgumentException("Invalid value in vector update: " + v + " for node: " + name);
-            }
-        }
         // Zero-Allocation Single-Threaded Update: Assign array reference directly.
+        // Data validation (isFinite checks) should be done at the boundary before
+        // calling update().
         this.currentValues = values;
     }
 
