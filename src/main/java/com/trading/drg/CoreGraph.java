@@ -162,27 +162,45 @@ public class CoreGraph {
 
     /**
      * Updates a Scalar source node by ID. Does NOT trigger stabilization.
+     *
+     * @throws IllegalArgumentException if {@code nodeId} is out of range or does
+     *                                  not refer to a scalar source node.
      */
     public void update(int nodeId, double value) {
-        if (nodeId < 0 || nodeId >= sourceNodes.length)
-            return;
+        if (nodeId < 0 || nodeId >= sourceNodes.length) {
+            throw new IllegalArgumentException(
+                    "nodeId " + nodeId + " is out of range [0, " + sourceNodes.length + ")");
+        }
         Node<?> node = sourceNodes[nodeId];
         if (node instanceof com.trading.drg.node.ScalarSourceNode sn) {
             sn.updateDouble(value);
             engine.markDirty(nodeId);
+        } else {
+            throw new IllegalArgumentException(
+                    "Node at id " + nodeId + " is not a scalar source node" +
+                    (node != null ? " (it is: " + node.name() + ")" : " (not a source node)"));
         }
     }
 
     /**
      * Updates a single element of a Vector source node by ID.
+     *
+     * @throws IllegalArgumentException if {@code nodeId} is out of range or does
+     *                                  not refer to a vector source node.
      */
     public void update(int nodeId, int index, double value) {
-        if (nodeId < 0 || nodeId >= sourceNodes.length)
-            return;
+        if (nodeId < 0 || nodeId >= sourceNodes.length) {
+            throw new IllegalArgumentException(
+                    "nodeId " + nodeId + " is out of range [0, " + sourceNodes.length + ")");
+        }
         Node<?> node = sourceNodes[nodeId];
         if (node instanceof com.trading.drg.node.VectorSourceNode vsn) {
             vsn.updateAt(index, value);
             engine.markDirty(nodeId);
+        } else {
+            throw new IllegalArgumentException(
+                    "Node at id " + nodeId + " is not a vector source node" +
+                    (node != null ? " (it is: " + node.name() + ")" : " (not a source node)"));
         }
     }
 

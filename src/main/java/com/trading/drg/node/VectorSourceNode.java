@@ -70,6 +70,9 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorValue
 
     @Override
     public void update(double[] values) {
+        if (values == null) {
+            throw new IllegalArgumentException("Values array cannot be null for node: " + name);
+        }
         if (values.length != size) {
             throw new IllegalArgumentException(
                     "Vector length mismatch: expected " + size + ", got " + values.length + " for node: " + name);

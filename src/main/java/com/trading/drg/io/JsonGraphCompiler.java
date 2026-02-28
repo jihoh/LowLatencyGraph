@@ -39,7 +39,13 @@ public final class JsonGraphCompiler {
      * @return A container holding the engine and name lookup map.
      */
     public CompiledGraph compile(GraphDefinition def) {
+        if (def == null) {
+            throw new IllegalArgumentException("GraphDefinition cannot be null");
+        }
         var graphInfo = def.getGraph();
+        if (graphInfo == null) {
+            throw new IllegalArgumentException("GraphDefinition is missing the 'graph' section");
+        }
 
         // 0. Pre-process templates
         Map<String, GraphDefinition.TemplateDef> templateMap = new HashMap<>();

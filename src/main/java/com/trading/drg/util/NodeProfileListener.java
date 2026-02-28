@@ -38,7 +38,9 @@ public class NodeProfileListener implements StabilizationListener {
 
     // Flat array mapping topoIndex -> Stats
     // Completely eliminates Map hashing overhead from the hot path.
-    private NodeStats[] statsArray = new NodeStats[0];
+    // Volatile ensures the monitoring thread always sees the latest reference
+    // after a resize performed by the graph thread.
+    private volatile NodeStats[] statsArray = new NodeStats[0];
 
     // Read by external telemetry threads. Returns a safe snapshot reference.
     public NodeStats[] getStatsArray() {

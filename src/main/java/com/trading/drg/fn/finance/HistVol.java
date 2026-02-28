@@ -2,14 +2,18 @@ package com.trading.drg.fn.finance;
 
 /**
  * Historical Volatility (Rolling Standard Deviation).
- * 
- * Uses Welford's algorithm or Sum of Squares to compute rolling variance in
- * O(1).
- * Here we use the naive sum-of-squares method for performance, suitable for
- * small windows (N < 1000).
- * For extreme precision or large N, Welford is better but slower.
- * 
- * Var = (Sum(x^2) / N) - (Sum(x) / N)^2
+ *
+ * Uses a two-stage approach for numerical stability:
+ * - Stage 1 (O(1)): Maintains a rolling sum to compute the mean cheaply.
+ * - Stage 2 (O(N)): Computes variance by summing (x - mean)^2 over the window.
+ *
+ * This avoids the catastrophic cancellation that occurs in the naive formula
+ * Var = (Sum(x^2) / N) - mean^2 when values are large relative to the
+ * variance (e.g., prices in the thousands with tiny variance).
+ *
+ * For log-return inputs the naive formula is numerically adequate, but the
+ * compensated pass is cheap (window sizes are typically 20-252) and keeps the
+ * implementation correct for all inputs.
  */
 
 public class HistVol extends AbstractFn1 {
@@ -19,7 +23,6 @@ public class HistVol extends AbstractFn1 {
     private int count = 0;
 
     private double sum = 0.0;
-    private double sumSq = 0.0;
 
     public HistVol(int size) {
         if (size < 2)
@@ -30,24 +33,18 @@ public class HistVol extends AbstractFn1 {
 
     @Override
     protected double calculate(double logReturn) {
-        // Standard Deviation of Log Returns * Sqrt(AnnualizationFactor)
-
-        // 1. Update Sum and SumSq
-        // Remove old
+        // 1. Evict oldest element from rolling sum
         if (count >= size) {
-            double old = window[head];
-            sum -= old;
-            sumSq -= old * old;
+            sum -= window[head];
         } else {
             count++;
         }
 
-        // Add new
+        // 2. Insert new value
         window[head] = logReturn;
         sum += logReturn;
-        sumSq += logReturn * logReturn;
 
-        // Advance pointer
+        // Advance circular pointer
         head++;
         if (head >= size)
             head = 0;
@@ -55,15 +52,19 @@ public class HistVol extends AbstractFn1 {
         if (count < 2)
             return 0.0; // Need at least 2 points for variance
 
+        // 3. Compute variance using compensated sum of squared deviations.
+        //    Subtracting the mean before squaring prevents catastrophic cancellation.
         double mean = sum / count;
-        double variance = (sumSq / count) - (mean * mean);
+        double compensatedSumSq = 0.0;
+        // Iterate only over the filled portion of the circular buffer
+        int start = (head + size - count) % size;
+        for (int i = 0; i < count; i++) {
+            double dev = window[(start + i) % size] - mean;
+            compensatedSumSq += dev * dev;
+        }
 
-        // Numerical stability check
-        if (variance < 0)
-            variance = 0.0;
+        double variance = compensatedSumSq / count;
 
-        // The original code did not have an annualizationFactor.
-        // Assuming it should return the standard deviation directly if not provided.
         return Math.sqrt(variance);
     }
 }
