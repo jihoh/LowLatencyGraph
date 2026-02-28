@@ -22,7 +22,6 @@ import java.util.*;
  * ...
  */
 public final class GraphBuilder {
-    private final String graphName;
 
     // Accumulate nodes and edges in lists before compiling to CSR format
     private final List<Node<?>> nodes = new ArrayList<>();
@@ -34,7 +33,7 @@ public final class GraphBuilder {
     private boolean built;
 
     private GraphBuilder(String graphName) {
-        this.graphName = graphName;
+        // graphName reserved for future use
     }
 
     /**
@@ -280,17 +279,6 @@ public final class GraphBuilder {
 
         // Compile
         return new StabilizationEngine(topo.build());
-    }
-
-    /**
-     * Builds and returns a GraphContext, which includes the engine and a name
-     * lookup map.
-     * Useful for applications that need to look up nodes by name at runtime (e.g.,
-     * UI, diagnostics).
-     */
-    public GraphContext buildWithContext() {
-        StabilizationEngine engine = build();
-        return new GraphContext(graphName, engine, nodesByName);
     }
 
     /**
