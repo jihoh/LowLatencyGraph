@@ -8,7 +8,13 @@ import com.trading.drg.util.LatencyTrackingListener;
 import com.trading.drg.util.NodeProfileListener;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
+import java.lang.management.ThreadMXBean;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.MemoryPoolMXBean;
+import java.lang.management.MemoryUsage;
+import java.lang.management.RuntimeMXBean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -23,6 +29,11 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final GraphDashboardServer server;
     private final String graphName;
     private final String graphVersion;
+    private final MemoryMXBean memBean;
+    private final ThreadMXBean threadBean;
+    private final java.util.List<GarbageCollectorMXBean> gcBeans;
+    private final java.util.List<MemoryPoolMXBean> poolBeans;
+    private final RuntimeMXBean runtimeBean;
     private final String initialMermaid;
     private final java.util.Map<String, String> descriptions;
     private final java.util.Map<String, String> sourceCodes;
@@ -47,6 +58,9 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private LatencyTrackingListener latencyListener;
     @lombok.Setter
     private NodeProfileListener profileListener;
+
+    @lombok.Setter
+    private java.util.function.DoubleSupplier backpressureSupplier;
 
     // ── Double-Buffered Snapshot (Zero allocation on hot path) ────
     private final int nodeCount;
@@ -76,6 +90,11 @@ public class WebsocketPublisherListener implements StabilizationListener {
         this.descriptions = descriptions;
         this.sourceCodes = sourceCodes;
         this.edgeLabels = edgeLabels;
+        this.memBean = ManagementFactory.getMemoryMXBean();
+        this.threadBean = ManagementFactory.getThreadMXBean();
+        this.gcBeans = ManagementFactory.getGarbageCollectorMXBeans();
+        this.poolBeans = ManagementFactory.getMemoryPoolMXBeans();
+        this.runtimeBean = ManagementFactory.getRuntimeMXBean();
         this.initialMermaid = new com.trading.drg.util.GraphExplain(engine, logicalTypes, originalOrder)
                 .toMermaid()
                 .replace("\"", "\\\"")
@@ -349,6 +368,76 @@ public class WebsocketPublisherListener implements StabilizationListener {
                     .append("\"totalSourceNodes\":").append(srcCount).append(",")
                     .append("\"eventsProcessed\":").append(totalEvents).append(",")
                     .append("\"epochEvents\":").append(epochEvents);
+
+            long heapUsed = memBean.getHeapMemoryUsage().getUsed();
+            long heapMax = memBean.getHeapMemoryUsage().getMax();
+            int threadCount = threadBean.getThreadCount();
+            long uptimeMs = runtimeBean.getUptime();
+
+            long youngGcCount = 0;
+            long youngGcTime = 0;
+            long oldGcCount = 0;
+            long oldGcTime = 0;
+
+            for (int i = 0; i < gcBeans.size(); i++) {
+                GarbageCollectorMXBean gc = gcBeans.get(i);
+                long c = gc.getCollectionCount();
+                long t = gc.getCollectionTime();
+                if (c > 0) {
+                    String name = gc.getName();
+                    if (name.contains("G1 Old") || name.contains("MarkSweep") || name.contains("PS Old")
+                            || name.contains("ConcurrentMarkSweep")) {
+                        oldGcCount += c;
+                        oldGcTime += t;
+                    } else {
+                        youngGcCount += c;
+                        youngGcTime += t;
+                    }
+                }
+            }
+
+            long edenUsed = 0, survivorUsed = 0, oldGenUsed = 0;
+            long edenMax = 0, survivorMax = 0, oldGenMax = 0;
+            for (int i = 0; i < poolBeans.size(); i++) {
+                MemoryPoolMXBean p = poolBeans.get(i);
+                MemoryUsage u = p.getUsage();
+                if (u == null)
+                    continue;
+                String name = p.getName();
+                if (name.contains("Eden")) {
+                    edenUsed = u.getUsed();
+                    edenMax = u.getMax();
+                } else if (name.contains("Survivor")) {
+                    survivorUsed = u.getUsed();
+                    survivorMax = u.getMax();
+                } else if (name.contains("Old") || name.contains("Tenured")) {
+                    oldGenUsed = u.getUsed();
+                    oldGenMax = u.getMax();
+                }
+            }
+
+            jsonBuilder.append(",\"jvm\":{")
+                    .append("\"heapUsed\":").append(heapUsed).append(",")
+                    .append("\"heapMax\":").append(heapMax).append(",")
+                    .append("\"edenUsed\":").append(edenUsed).append(",")
+                    .append("\"edenMax\":").append(edenMax).append(",")
+                    .append("\"survivorUsed\":").append(survivorUsed).append(",")
+                    .append("\"survivorMax\":").append(survivorMax).append(",")
+                    .append("\"oldGenUsed\":").append(oldGenUsed).append(",")
+                    .append("\"oldGenMax\":").append(oldGenMax).append(",")
+                    .append("\"uptime\":").append(uptimeMs).append(",")
+                    .append("\"threads\":").append(threadCount).append(",")
+                    .append("\"youngGcCount\":").append(youngGcCount).append(",")
+                    .append("\"youngGcTime\":").append(youngGcTime).append(",")
+                    .append("\"oldGcCount\":").append(oldGcCount).append(",")
+                    .append("\"oldGcTime\":").append(oldGcTime)
+                    .append("}");
+
+            if (backpressureSupplier != null) {
+                jsonBuilder.append(",\"disruptor\":{\"backpressure\":");
+                appendDouble(jsonBuilder, backpressureSupplier.getAsDouble());
+                jsonBuilder.append("}");
+            }
 
             if (latencyListener != null) {
                 jsonBuilder.append(",\"latency\":{\"latest\":");

@@ -30,10 +30,6 @@ public class CoreGraphComplexDemo {
 
         // 1. Initialize Graph Engine
         CoreGraph graph = new CoreGraph("src/main/resources/bond_pricer.json");
-        new com.trading.drg.web.DashboardWiring(graph)
-                .enableNodeProfiling()
-                .enableLatencyTracking()
-                .enableDashboardServer(PORT);
 
         // 2. Setup LMAX Disruptor
         ThreadFactory threadFactory = DaemonThreadFactory.INSTANCE;
@@ -53,7 +49,14 @@ public class CoreGraphComplexDemo {
         // Start Disruptor Native Executor
         RingBuffer<MarketDataEvent> ringBuffer = disruptor.start();
 
-        // 3. Simulate Market Feed (Producer Thread)
+        // 3. Setup Dashboard Server with Telemetry
+        new com.trading.drg.web.DashboardWiring(graph)
+                .enableNodeProfiling()
+                .enableLatencyTracking()
+                .bindDisruptorTelemetry(ringBuffer)
+                .enableDashboardServer(PORT);
+
+        // 4. Simulate Market Feed (Producer Thread)
         simulateMarketFeed(ringBuffer);
     }
 

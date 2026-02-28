@@ -174,8 +174,7 @@
                     <h3 id="header-stab-metrics" style="cursor: pointer; user-select: none;">Stabilization Metrics
                         <span>▼</span>
                     </h3>
-                    <div id="content-stab-metrics" class="metric-row"
-                        style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px 1rem; padding-bottom: 12px;">
+                    <div id="content-stab-metrics" class="metric-row metric-grid-3">
                         <div class="metric-small">
                             <span class="label">Epoch</span>
                             <span class="value" id="epoch-value">0</span>
@@ -199,6 +198,59 @@
                         <div class="metric-small">
                             <span class="label">Evaluated Nodes</span>
                             <span class="value" id="reactive-eff">0 / 0</span>
+                        </div>
+                    </div>
+
+                    <h3 id="header-jvm-metrics" style="cursor: pointer; user-select: none;">JVM Metrics <span>▼</span>
+                    </h3>
+                    <div id="content-jvm-metrics" class="metric-row metric-grid-2">
+                        <div class="metric-small">
+                            <span class="label">Heap Used (MB)</span>
+                            <span class="value" id="jvm-heap-used">0.0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Heap Size (MB)</span>
+                            <span class="value" id="jvm-heap-max">0.0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Eden Space (MB)</span>
+                            <span class="value" id="jvm-eden">0.0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Survivor Space (MB)</span>
+                            <span class="value" id="jvm-surv">0.0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Old Gen (MB)</span>
+                            <span class="value" id="jvm-old">0.0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Threads</span>
+                            <span class="value" id="jvm-threads">0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Young GC Count</span>
+                            <span class="value" id="jvm-young-gc-count">0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Young GC Time (ms)</span>
+                            <span class="value" id="jvm-young-gc-time">0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Old GC Count</span>
+                            <span class="value" id="jvm-old-gc-count" style="color: var(--text-highlight);">0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Old GC Time (ms)</span>
+                            <span class="value" id="jvm-old-gc-time" style="color: var(--text-highlight);">0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Disruptor Backpressure (%)</span>
+                            <span class="value" id="jvm-backpressure">0.0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Uptime</span>
+                            <span class="value" id="jvm-uptime">0s</span>
                         </div>
                     </div>
 

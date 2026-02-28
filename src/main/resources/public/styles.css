@@ -376,6 +376,20 @@ body {
     border: 1px solid var(--border-color);
 }
 
+.metric-row.metric-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 1rem;
+    padding-bottom: 12px;
+}
+
+.metric-row.metric-grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px 1rem;
+    padding-bottom: 12px;
+}
+
 .metric-small {
     flex: 1;
     display: flex;

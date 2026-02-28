@@ -25,6 +25,7 @@ public final class DashboardWiring {
 
     private LatencyTrackingListener latencyListener;
     private NodeProfileListener profileListener;
+    private java.util.function.DoubleSupplier backpressureSupplier;
     private GraphDashboardServer dashboardServer;
 
     public DashboardWiring(CoreGraph graph) {
@@ -49,6 +50,28 @@ public final class DashboardWiring {
         return this;
     }
 
+    /**
+     * Supplies dynamic backpressure load percentage (0.0 to 100.0) from a queuing
+     * mechanism
+     */
+    public DashboardWiring withBackpressureSupplier(java.util.function.DoubleSupplier supplier) {
+        this.backpressureSupplier = supplier;
+        return this;
+    }
+
+    /**
+     * Binds Disruptor ring buffer telemetry for measuring backpressure percentage
+     * automatically.
+     */
+    public DashboardWiring bindDisruptorTelemetry(com.lmax.disruptor.RingBuffer<?> ringBuffer) {
+        return withBackpressureSupplier(() -> {
+            long remaining = ringBuffer.remainingCapacity();
+            long total = ringBuffer.getBufferSize();
+            double used = (double) (total - remaining) / total;
+            return used * 100.0;
+        });
+    }
+
     /** Boots a Live Dashboard Server and wires it to the graph. */
     public DashboardWiring enableDashboardServer(int port) {
         if (this.dashboardServer == null) {
@@ -69,6 +92,9 @@ public final class DashboardWiring {
             }
             if (this.profileListener != null) {
                 wsListener.setProfileListener(this.profileListener);
+            }
+            if (this.backpressureSupplier != null) {
+                wsListener.setBackpressureSupplier(this.backpressureSupplier);
             }
 
             graph.setListener(wsListener);

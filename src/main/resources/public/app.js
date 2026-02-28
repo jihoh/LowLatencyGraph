@@ -686,6 +686,64 @@ function updateMetricsDOM(payload) {
                 }
             }
         }
+
+        if (payload.metrics.jvm) {
+            const elHeapUsed = document.getElementById('jvm-heap-used');
+            const elHeapMax = document.getElementById('jvm-heap-max');
+            const elThreads = document.getElementById('jvm-threads');
+            const elUptime = document.getElementById('jvm-uptime');
+
+            const elEden = document.getElementById('jvm-eden');
+            const elSurv = document.getElementById('jvm-surv');
+            const elOld = document.getElementById('jvm-old');
+
+            const elYoungGcCount = document.getElementById('jvm-young-gc-count');
+            const elYoungGcTime = document.getElementById('jvm-young-gc-time');
+            const elOldGcCount = document.getElementById('jvm-old-gc-count');
+            const elOldGcTime = document.getElementById('jvm-old-gc-time');
+            const elBackpressure = document.getElementById('jvm-backpressure');
+
+            let formatMB = (bytes) => (bytes >= 0) ? (bytes / 1048576).toFixed(1) : "-";
+
+            if (elHeapUsed) elHeapUsed.textContent = formatMB(payload.metrics.jvm.heapUsed);
+            if (elHeapMax) elHeapMax.textContent = formatMB(payload.metrics.jvm.heapMax);
+
+            if (elEden) elEden.textContent = formatMB(payload.metrics.jvm.edenUsed);
+            if (elSurv) elSurv.textContent = formatMB(payload.metrics.jvm.survivorUsed);
+            if (elOld) elOld.textContent = formatMB(payload.metrics.jvm.oldGenUsed);
+
+            if (elThreads) elThreads.textContent = payload.metrics.jvm.threads;
+            if (elUptime) {
+                let ms = payload.metrics.jvm.uptime || 0;
+                let s = Math.floor((ms / 1000) % 60);
+                let m = Math.floor((ms / (1000 * 60)) % 60);
+                let h = Math.floor((ms / (1000 * 60 * 60)) % 24);
+                let d = Math.floor(ms / (1000 * 60 * 60 * 24));
+
+                let timeStr = "";
+                if (d > 0) timeStr += `${d}d `;
+                if (h > 0 || d > 0) timeStr += `${h}h `;
+                if (m > 0 || h > 0 || d > 0) timeStr += `${m}m `;
+                timeStr += `${s}s`;
+                elUptime.textContent = timeStr.trim();
+            }
+
+            if (elYoungGcCount) elYoungGcCount.textContent = payload.metrics.jvm.youngGcCount;
+            if (elYoungGcTime) elYoungGcTime.textContent = payload.metrics.jvm.youngGcTime;
+
+            if (elOldGcCount) {
+                elOldGcCount.textContent = payload.metrics.jvm.oldGcCount;
+                if (payload.metrics.jvm.oldGcCount > 0) elOldGcCount.style.color = '#ef4444';
+            }
+            if (elOldGcTime) {
+                elOldGcTime.textContent = payload.metrics.jvm.oldGcTime;
+                if (payload.metrics.jvm.oldGcCount > 0) elOldGcTime.style.color = '#ef4444';
+            }
+
+            if (payload.disruptor && elBackpressure) {
+                elBackpressure.textContent = payload.disruptor.backpressure.toFixed(1);
+            }
+        }
     }
 
     // Re-hydrate internal state for the parsed node
