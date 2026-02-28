@@ -1,10 +1,9 @@
 package com.trading.drg.fn.finance;
 
 /**
- * Simple Moving Average (SMA) using a Ring Buffer.
- * 
- * Performance: O(1) update.
- * Keeps a running sum and a circular buffer of history.
+ * Simple Moving Average (SMA).
+ * <p>
+ * Formula: {@code y[t] = Sum(x[t-i]) / N}
  */
 public class Sma extends AbstractFn1 {
     private final double[] window;

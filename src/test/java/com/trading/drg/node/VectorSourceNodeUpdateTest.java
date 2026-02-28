@@ -20,7 +20,10 @@ public class VectorSourceNodeUpdateTest {
         source.update(zeros);
 
         assertTrue("First stabilization with 0.0 should return true (change detected)", source.stabilize());
-        assertArrayEquals(zeros, source.value(), 1e-9);
+        double[] actual = new double[source.size()];
+        for (int i = 0; i < source.size(); i++)
+            actual[i] = source.valueAt(i);
+        assertArrayEquals(zeros, actual, 1e-9);
     }
 
     @Test

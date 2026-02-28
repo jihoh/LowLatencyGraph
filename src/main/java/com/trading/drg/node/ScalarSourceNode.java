@@ -6,42 +6,22 @@ import com.trading.drg.api.SourceNode;
 import com.trading.drg.util.ScalarCutoffs;
 
 /**
- * A source node acting as an input for double values.
- *
- * Used for:
- * - Market Data (e.g., "Mkt:AAPL_Price")
- * - Model Parameters (e.g., "Param:RiskFreeRate")
- * - Scenario Overrides
- *
- * Dirty Flag Contract:
- * This node maintains a "dirty" flag concept indirectly via the Engine's dirty
- * array.
- * When update(value) is called, the caller must ALSO call
- * engine.markDirty(nodeId)
- * to ensure the new value is picked up during the next stabilization pass.
+ * A source node acting as an input for scalar double values.
  */
-public final class ScalarSourceNode implements SourceNode<Double>, ScalarValue {
+public final class ScalarSourceNode implements SourceNode, ScalarValue {
     private final String name;
     private final ScalarCutoff cutoff;
     private double currentValue;
     private double previousValue = Double.NaN;
 
-    /**
-     * Creates a named source node with a custom cutoff strategy.
-     * 
-     * @param name         Unique node name.
-     * @param initialValue Initial value (defaults to NaN if not provided).
-     * @param cutoff       Strategy to determine if updates are meaningful.
-     */
+    /** Creates a named source node with a custom cutoff strategy. */
     public ScalarSourceNode(String name, double initialValue, ScalarCutoff cutoff) {
         this.name = name;
         this.cutoff = cutoff;
         this.currentValue = initialValue;
     }
 
-    /**
-     * Creates a named source node with EXACT change detection.
-     */
+    /** Creates a named source node with exact change detection. */
     public ScalarSourceNode(String name, double initialValue) {
         this(name, initialValue, ScalarCutoffs.EXACT);
     }
@@ -51,15 +31,11 @@ public final class ScalarSourceNode implements SourceNode<Double>, ScalarValue {
         return name;
     }
 
-    @Override
     public void update(Double value) {
         updateDouble(value);
     }
 
-    /**
-     * Specialized update method for primitive doubles.
-     * Sets the dirty flag to ensure propagation during next stabilization.
-     */
+    /** Updates the primitive double value directly. */
     public void updateDouble(double value) {
         this.currentValue = value;
     }
@@ -78,16 +54,11 @@ public final class ScalarSourceNode implements SourceNode<Double>, ScalarValue {
     }
 
     @Override
-    public Double value() {
+    public double value() {
         return currentValue;
     }
 
-    @Override
-    public double doubleValue() {
-        return currentValue;
-    }
-
-    public double previousDoubleValue() {
+    public double previousValue() {
         return previousValue;
     }
 }

@@ -1,59 +1,31 @@
 package com.trading.drg.api;
 
 /**
- * Interface for nodes that expose an indexed array of double values (vectors).
- *
- * This is used for representing curves (e.g., Yield Curves, Volatility Surfaces
- * slices)
- * or any collection of numeric data that needs to be processed efficiently
- * (e.g., a
- * collection of shock scenarios).
- *
- * Performance Optimization:
- * Instead of forcing the node to return a 'double[]' array object (which might
- * require
- * defensive copying to ensure immutability), this interface enables a "View"
- * pattern.
- *
- * 1. Random Access: Downstream nodes can call valueAt(int) to read specific
- * elements
- * without materializing the entire vector.
- * 2. Zero-Copy: If the vector is backed by shared memory or a reusable buffer,
- * this
- * interface allows reading directly from that source without object allocation.
- *
- * This is essential for handling large vectors in a low-latency environment
- * where
- * allocation and copying would be prohibitive.
+ * Interface for nodes exposing an indexed array of double values (vectors).
+ * <p>
+ * Enables a zero-copy "View" pattern for low-latency random access
+ * without materializing or defensively copying full arrays.
  */
-public interface VectorValue extends Node<double[]> {
+public interface VectorValue extends Node {
 
     /**
-     * Returns the value at the specified index.
-     *
-     * This provides zero-allocation random access to the vector elements.
+     * Returns the primitive double value at the specified zero-based index.
      *
      * @param index 0-based index of the element to retrieve.
      * @return The primitive double value at that index.
-     * @throws IndexOutOfBoundsException if index is invalid (implementation
-     *                                   dependent).
      */
     double valueAt(int index);
 
     /**
      * Returns the size of the vector.
      *
-     * Useful for iterating over the vector elements.
-     *
      * @return The number of elements in the vector.
      */
     int size();
 
     /**
-     * Returns an optional array of string headers (labels) for the vector elements.
-     * Often used by UIs or formatting utilities to display context (e.g. ["1M",
-     * "3M"]).
-     * 
+     * Returns optional string headers (labels) for the vector elements.
+     *
      * @return Array of string labels, or null if no headers are defined.
      */
     default String[] headers() {

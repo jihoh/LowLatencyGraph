@@ -2,9 +2,8 @@ package com.trading.drg.fn.finance;
 
 /**
  * Rolling Maximum over a window.
- * 
- * Uses linear scan (O(N)) over ring buffer for zero-GC simplicity.
- * For N < 100, this is often faster than Deque due to cache locality.
+ * <p>
+ * Formula: {@code y[t] = max(x[t-N+1], ..., x[t])}
  */
 public class RollingMax extends AbstractFn1 {
     private final double[] window;
@@ -32,23 +31,6 @@ public class RollingMax extends AbstractFn1 {
         }
 
         double max = -Double.MAX_VALUE;
-        // Linear scan for correctness in O(N)
-        for (int i = 0; i < size; i++) {
-            // Note: we must scan all valid elements.
-            // The original logic scanned 'count' elements starting from 0.
-            // But wait, if we are using a ring buffer, the 'count' elements are not
-            // 0..count.
-            // They are scattered if wrapped?
-            // Actually, if count < size, we just filled 0..count.
-            // If count == size, the buffer is full, we must scan everything.
-            // So "i < count" logic in original code assumes 0..count-1 are the valid
-            // elements.
-            // Once full, count == size, so we scan 0..size-1.
-            // Is this correct? Yes, because we write to 'head' but we don't zero out old
-            // values?
-            // Well, we overwrite them.
-            // So scanning the whole array is correct once full.
-        }
 
         // Re-implementing existing logic but safely inside try-catch
         for (int i = 0; i < count; i++) {

@@ -2,14 +2,8 @@ package com.trading.drg.fn.finance;
 
 /**
  * Historical Volatility (Rolling Standard Deviation).
- * 
- * Uses Welford's algorithm or Sum of Squares to compute rolling variance in
- * O(1).
- * Here we use the naive sum-of-squares method for performance, suitable for
- * small windows (N < 1000).
- * For extreme precision or large N, Welford is better but slower.
- * 
- * Var = (Sum(x^2) / N) - (Sum(x) / N)^2
+ * <p>
+ * Formula: {@code Vol = sqrt((Sum(x^2) / N) - (Sum(x) / N)^2)}
  */
 
 public class HistVol extends AbstractFn1 {

@@ -1,49 +1,21 @@
 package com.trading.drg.engine;
 
-import com.trading.drg.api.*;
-
+import com.trading.drg.api.Node;
 import java.util.*;
 
 import lombok.extern.log4j.Log4j2;
 
 /**
- * Topology -- CSR-encoded static DAG (Directed Acyclic Graph).
- *
- * This class represents the immutable structure of the graph after it has been
- * built.
- * It is optimized for extremely fast traversal during the stabilization phase.
- *
- * Optimization Strategy: Compressed Sparse Row (CSR)
- * Instead of using an object-oriented graph where each Node object holds a
- * reference to a
- * List of its children (which suffers from pointer chasing and poor cache
- * locality),
- * we use a flattened structure-of-arrays approach.
- *
- * Data layout:
- * - topoOrder: An array of Node objects sorted topologically. Iterating this
- * array 0..N
- * guarantees we visit dependencies before dependents.
- * - childrenList: A single flattened int array containing the topological
- * indices of all
- * children for all nodes.
- * - childrenOffset: An index array. childrenOffset[i] points to the start of
- * node i's
- * children in the childrenList. The children for node i are stored from
- * childrenList[childrenOffset[i]] inclusive to
- * childrenList[childrenOffset[i+1]] exclusive.
- *
- * Benefits:
- * 1. CPU Cache: Iterating children involves reading contiguous memory (ints),
- * which is
- * extremely cache-friendly compared to chasing object pointers.
- * 2. Zero-Overhead: No Iterator objects are created during traversal.
- * 3. Compactness: High density of useful data per cache line.
+ * Immutable Directed Acyclic Graph (DAG) topography encoded using Compressed
+ * Sparse Row (CSR).
+ * <p>
+ * Optimized for zero-allocation, cache-friendly traversal during stabilization.
  */
 @Log4j2
+@lombok.AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
 public final class TopologicalOrder {
     // The nodes in topological execution order.
-    private final Node<?>[] topoOrder;
+    private final Node[] topoOrder;
 
     // CSR Index: childrenOffset[i] points to the start of node i's children in
     // childrenList.
@@ -62,22 +34,12 @@ public final class TopologicalOrder {
     // Bitset: packs 64 source flags per long, matching dirtyWords layout
     private final long[] sourceWords;
 
-    private TopologicalOrder(Node<?>[] topoOrder, int[] childrenOffset, int[] childrenList,
-            int[] parentCount, Map<String, Integer> nameToIndex, long[] sourceWords) {
-        this.topoOrder = topoOrder;
-        this.childrenOffset = childrenOffset;
-        this.childrenList = childrenList;
-        this.parentCount = parentCount;
-        this.nameToIndex = nameToIndex;
-        this.sourceWords = sourceWords;
-    }
-
     public int nodeCount() {
         return topoOrder.length;
     }
 
     /** Returns the node object at the given topological index. */
-    public Node<?> node(int ti) {
+    public Node node(int ti) {
         return topoOrder[ti];
     }
 
@@ -124,16 +86,16 @@ public final class TopologicalOrder {
     }
 
     /**
-     * Builder for constructing the TopologicalOrder.
-     * Handles cycle detection and topological sorting.
+     * Builder for constructing and validating a TopologicalOrder via Kahn's
+     * algorithm.
      */
     public static final class Builder {
-        private final List<Node<?>> nodes = new ArrayList<>();
+        private final List<Node> nodes = new ArrayList<>();
         private final Map<String, Integer> nameToIdx = new HashMap<>();
         private final Map<Integer, List<Integer>> forwardEdges = new HashMap<>();
         private final Set<Integer> sourceIndices = new HashSet<>();
 
-        public Builder addNode(Node<?> node) {
+        public Builder addNode(Node node) {
             if (nameToIdx.containsKey(node.name()))
                 throw new IllegalArgumentException("Duplicate node name: " + node.name());
             int idx = nodes.size();
@@ -163,9 +125,7 @@ public final class TopologicalOrder {
         }
 
         /**
-         * Compiles the graph.
-         * <p>
-         * Performs Kahn's algorithm for topological sorting and cycle detection.
+         * Compiles the graph, executing cycle detection and topological sorting.
          */
         public TopologicalOrder build() {
             int n = nodes.size();
@@ -199,7 +159,7 @@ public final class TopologicalOrder {
                 throw new IllegalStateException("Cycle detected! Processed " + topoIdx + " of " + n);
 
             // 4. Construct compact arrays
-            Node<?>[] orderedNodes = new Node<?>[n];
+            Node[] orderedNodes = new Node[n];
             long[] srcWords = new long[(n + 63) / 64];
             int[] parentCounts = new int[n];
             Map<String, Integer> newNameToIndex = new HashMap<>(n * 2);

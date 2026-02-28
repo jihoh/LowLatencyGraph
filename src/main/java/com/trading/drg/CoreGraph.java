@@ -11,18 +11,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import lombok.Getter;
 
 /**
- * A high-level wrapper around the DRG engine that simplifies JSON-based graph
- * instantiation and event publishing.
- * <p>
- * Responsibilities: parse JSON, compile graph, update sources, stabilize.
- * Dashboard wiring is handled separately by
- * {@link com.trading.drg.web.DashboardWiring}.
+ * High-level graph engine wrapper for JSON graph instantiation and event
+ * publishing.
  */
+@Getter
 public class CoreGraph {
     private final StabilizationEngine engine;
-    private final Map<String, Node<?>> nodes;
+    private final Map<String, Node> nodes;
 
     private final String name;
     private final String version;
@@ -34,18 +32,14 @@ public class CoreGraph {
     private final com.trading.drg.util.CompositeStabilizationListener compositeListener;
 
     // Cache source nodes for O(1) updates
-    private final Node<?>[] sourceNodes;
+    private final Node[] sourceNodes;
 
-    /**
-     * Creates a new CoreGraph from a JSON file path string.
-     */
+    /** Creates a new CoreGraph from a JSON file path string. */
     public CoreGraph(String jsonPath) {
         this(Path.of(jsonPath));
     }
 
-    /**
-     * Creates a new CoreGraph from a JSON file path.
-     */
+    /** Creates a new CoreGraph from a JSON file path. */
     public CoreGraph(Path jsonPath) {
         GraphDefinition graphDef;
         try {
@@ -70,7 +64,7 @@ public class CoreGraph {
 
         // Pre-cache source nodes for update()
         var topology = engine.topology();
-        this.sourceNodes = new Node<?>[topology.nodeCount()];
+        this.sourceNodes = new Node[topology.nodeCount()];
         for (int i = 0; i < topology.nodeCount(); i++) {
             if (topology.isSource(i)) {
                 sourceNodes[i] = topology.node(i);
@@ -84,113 +78,61 @@ public class CoreGraph {
 
     // ── Listeners ────────────────────────────────────────────────
 
-    /**
-     * Adds a listener to the composite (does not overwrite existing ones).
-     */
+    /** Adds a listener to the composite (does not overwrite existing ones). */
     public void setListener(StabilizationListener listener) {
         compositeListener.addForComposite(listener);
     }
 
-    // ── Accessors ────────────────────────────────────────────────
-
-    public StabilizationEngine getEngine() {
-        return engine;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getVersion() {
-        return version;
-    }
-
-    public Map<String, Node<?>> getNodes() {
-        return nodes;
-    }
-
-    public Map<String, String> getLogicalTypes() {
-        return logicalTypes;
-    }
-
-    public Map<String, String> getDescriptions() {
-        return descriptions;
-    }
-
-    public List<String> getOriginalOrder() {
-        return originalOrder;
-    }
-
-    public Map<String, Map<String, String>> getEdgeLabels() {
-        return edgeLabels;
-    }
-
     // ── Domain Operations ────────────────────────────────────────
 
-    /**
-     * Reads the current value of a Scalar node.
-     */
+    /** Reads the current value of a Scalar node. */
     public double getDouble(String name) {
-        Node<?> node = getNode(name);
+        Node node = getNode(name);
         if (node instanceof ScalarValue sv) {
-            return sv.doubleValue();
+            return sv.value();
         }
         throw new IllegalArgumentException("Node " + name + " is not a ScalarValue.");
     }
 
-    /**
-     * Retrieves a node by name.
-     */
+    /** Retrieves a node by name. */
     @SuppressWarnings("unchecked")
     public <T> T getNode(String name) {
         return (T) nodes.get(name);
     }
 
-    /**
-     * Resolves a node name to its topological index.
-     */
+    /** Resolves a node name to its topological index. */
     public int getNodeId(String name) {
         return engine.topology().topoIndex(name);
     }
 
-    /**
-     * Updates a Scalar source node by name. Does NOT trigger stabilization.
-     */
+    /** Updates a Scalar source node by name without triggering stabilization. */
     public void update(String nodeName, double value) {
         update(getNodeId(nodeName), value);
     }
 
-    /**
-     * Updates a Scalar source node by ID. Does NOT trigger stabilization.
-     */
+    /** Updates a Scalar source node by ID without triggering stabilization. */
     public void update(int nodeId, double value) {
         if (nodeId < 0 || nodeId >= sourceNodes.length)
             return;
-        Node<?> node = sourceNodes[nodeId];
+        Node node = sourceNodes[nodeId];
         if (node instanceof com.trading.drg.node.ScalarSourceNode sn) {
             sn.updateDouble(value);
             engine.markDirty(nodeId);
         }
     }
 
-    /**
-     * Updates a single element of a Vector source node by ID.
-     */
+    /** Updates a single element of a Vector source node by ID. */
     public void update(int nodeId, int index, double value) {
         if (nodeId < 0 || nodeId >= sourceNodes.length)
             return;
-        Node<?> node = sourceNodes[nodeId];
+        Node node = sourceNodes[nodeId];
         if (node instanceof com.trading.drg.node.VectorSourceNode vsn) {
             vsn.updateAt(index, value);
             engine.markDirty(nodeId);
         }
     }
 
-    /**
-     * Triggers a stabilization cycle.
-     *
-     * @return Number of nodes recomputed.
-     */
+    /** Triggers a stabilization cycle. @return Number of nodes recomputed. */
     public int stabilize() {
         return engine.stabilize();
     }

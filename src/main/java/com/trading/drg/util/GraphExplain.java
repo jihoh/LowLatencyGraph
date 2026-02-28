@@ -7,17 +7,8 @@ import com.trading.drg.node.ScalarNode;
 import com.trading.drg.node.ScalarSourceNode;
 
 /**
- * Diagnostic utility for inspecting graph state and topology.
- *
- * <p>
- * This class generates human-readable string representations of the graph
- * structure
- * and the current state of specific nodes.
- *
- * <p>
- * <b>Usage:</b> Intended for debugging sessions, logging errors, or
- * "toString()" style diagnostics.
- * Do <b>not</b> use on the hot path (allocates strings, iterates collections).
+ * Diagnostic utility for inspecting graph state and topology. Not for hot path
+ * use.
  */
 public final class GraphExplain {
     private final StabilizationEngine engine;
@@ -37,22 +28,32 @@ public final class GraphExplain {
         this.displayOrder = displayOrder;
     }
 
-    /**
-     * Dumps detailed state of a single node.
-     */
+    /** Dumps detailed state of a single node. */
     public String explainNode(String nodeName) {
         int idx = topology.topoIndex(nodeName);
-        Node<?> node = topology.node(idx);
+        Node node = topology.node(idx);
         StringBuilder sb = new StringBuilder(256);
         sb.append("Node: ").append(nodeName).append('\n')
                 .append("  Topo index: ").append(idx).append('\n')
                 .append("  Type: ").append(node.getClass().getSimpleName()).append('\n')
                 .append("  Is source: ").append(topology.isSource(idx)).append('\n')
-                .append("  Current value: ").append(node.value()).append('\n');
+                .append("  Current value: ");
+        if (node instanceof com.trading.drg.api.ScalarValue sv)
+            sb.append(sv.value());
+        else if (node instanceof com.trading.drg.node.BooleanNode bn)
+            sb.append(bn.booleanValue());
+        else if (node instanceof com.trading.drg.api.VectorValue vv) {
+            double[] arr = new double[vv.size()];
+            for (int i = 0; i < vv.size(); i++)
+                arr[i] = vv.valueAt(i);
+            sb.append(java.util.Arrays.toString(arr));
+        } else
+            sb.append("N/A");
+        sb.append('\n');
         if (node instanceof ScalarNode dn)
-            sb.append("  Previous: ").append(dn.previousDoubleValue()).append('\n');
+            sb.append("  Previous: ").append(dn.previousValue()).append('\n');
         else if (node instanceof ScalarSourceNode dsn)
-            sb.append("  Previous: ").append(dsn.previousDoubleValue()).append('\n');
+            sb.append("  Previous: ").append(dsn.previousValue()).append('\n');
         int cc = topology.childCount(idx);
         sb.append("  Children (").append(cc).append("): ");
         for (int i = 0; i < cc; i++) {
@@ -63,21 +64,17 @@ public final class GraphExplain {
         return sb.append('\n').toString();
     }
 
-    /**
-     * returns summary of the last stabilization pass.
-     */
+    /** Returns summary of the last stabilization pass. */
     public String explainLastStabilization() {
         return "Epoch: " + engine.epoch() + ", Recomputed: " + engine.lastStabilizedCount() + "/" + engine.nodeCount();
     }
 
-    /**
-     * Dumps the entire topology in dot-like text format.
-     */
+    /** Dumps the entire topology in dot-like text format. */
     public String dumpTopology() {
         StringBuilder sb = new StringBuilder(1024);
         sb.append("Graph (").append(topology.nodeCount()).append(" nodes):\n");
         for (int i = 0; i < topology.nodeCount(); i++) {
-            Node<?> node = topology.node(i);
+            Node node = topology.node(i);
             sb.append("  [").append(i).append("] ").append(node.name());
             if (topology.isSource(i))
                 sb.append(" (SRC)");
@@ -95,12 +92,7 @@ public final class GraphExplain {
         return sb.toString();
     }
 
-    /**
-     * Generates a Mermaid JS graph diagram.
-     * <p>
-     * Renders nodes and edges in a format suitable for embedding in Markdown.
-     * </p>
-     */
+    /** Generates a Mermaid JS graph diagram suitable for Markdown embedding. */
     public String toMermaid() {
         StringBuilder sb = new StringBuilder(4096);
         sb.append("graph TD;\n");
@@ -119,20 +111,20 @@ public final class GraphExplain {
             int i = topology.topoIndex(nodeName);
             if (i < 0)
                 continue;
-            Node<?> node = topology.node(i);
+            Node node = topology.node(i);
             String safeName = sanitize(node.name());
 
             // Format the value nicely
             double val = Double.NaN;
             double[] vectorVal = null;
             if (node instanceof com.trading.drg.api.ScalarValue sv) {
-                val = sv.doubleValue();
-            } else if (node.value() instanceof Number num) {
-                val = num.doubleValue();
+                val = sv.value();
+            } else if (node instanceof com.trading.drg.node.BooleanNode bn) {
+                val = bn.booleanValue() ? 1.0 : 0.0;
             } else if (node instanceof com.trading.drg.api.VectorValue vv) {
-                vectorVal = vv.value();
-            } else if (node.value() instanceof double[] arr) {
-                vectorVal = arr;
+                vectorVal = new double[vv.size()];
+                for (int v = 0; v < vv.size(); v++)
+                    vectorVal[v] = vv.valueAt(v);
             }
 
             String valueStr;
@@ -193,12 +185,12 @@ public final class GraphExplain {
             int i = topology.topoIndex(nodeName);
             if (i < 0)
                 continue;
-            Node<?> node = topology.node(i);
+            Node node = topology.node(i);
             String safeName = sanitize(node.name());
 
             int cc = topology.childCount(i);
             for (int j = 0; j < cc; j++) {
-                Node<?> child = topology.node(topology.child(i, j));
+                Node child = topology.node(topology.child(i, j));
                 String safeChild = sanitize(child.name());
 
                 sb.append("  ").append(safeName).append(" --> ").append(safeChild).append(";\n");

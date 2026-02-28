@@ -17,7 +17,7 @@ import java.util.concurrent.ThreadFactory;
  * Simulates an external market data feed streaming real-time QUOTE
  * events into a Disruptor RingBuffer. A dedicated consumer translates those
  * raw binary network events into explicit node updates and strictly triggers
- * DRG stabilization bursts exactly per batch.
+ * stabilization bursts exactly per batch.
  */
 public class CoreGraphComplexDemo {
 
@@ -28,9 +28,9 @@ public class CoreGraphComplexDemo {
     public static void main(String[] args) throws Exception {
         log.info("Starting Disruptor E2E Demo...");
 
-        // 1. Initialize DRG Engine
+        // 1. Initialize Graph Engine
         CoreGraph graph = new CoreGraph("src/main/resources/bond_pricer.json");
-        var dashboard = new com.trading.drg.web.DashboardWiring(graph)
+        new com.trading.drg.web.DashboardWiring(graph)
                 .enableNodeProfiling()
                 .enableLatencyTracking()
                 .enableDashboardServer(PORT);
@@ -130,11 +130,10 @@ public class CoreGraphComplexDemo {
         }
     }
 
+    @lombok.Getter
     public static class MarketDataEvent {
-
         private String venue;
         private String instrument;
-
         private double bid;
         private double bidQty;
         private double ask;
@@ -160,30 +159,6 @@ public class CoreGraphComplexDemo {
             this.bidQty = bidQty;
             this.ask = ask;
             this.askQty = askQty;
-        }
-
-        public String getVenue() {
-            return venue;
-        }
-
-        public String getInstrument() {
-            return instrument;
-        }
-
-        public double getBid() {
-            return bid;
-        }
-
-        public double getBidQty() {
-            return bidQty;
-        }
-
-        public double getAsk() {
-            return ask;
-        }
-
-        public double getAskQty() {
-            return askQty;
         }
     }
 }

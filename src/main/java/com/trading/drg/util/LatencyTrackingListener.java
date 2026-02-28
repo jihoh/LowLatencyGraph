@@ -3,22 +3,8 @@ package com.trading.drg.util;
 import com.trading.drg.api.StabilizationListener;
 
 /**
- * A listener that tracks performance metrics for graph stabilization.
- *
- * <p>
- * Captures:
- * <ul>
- * <li><b>Latency:</b> Min, Max, Average time per stabilization pass (in
- * nanoseconds).</li>
- * <li><b>Throughput:</b> Total number of stabilizations.</li>
- * <li><b>Workload:</b> Number of nodes recomputed per pass.</li>
- * </ul>
- *
- * <p>
- * This listener is designed to be low-overhead but should generally only be
- * enabled
- * for profiling or in non-production environments if nanosecond precision is
- * not critical.
+ * Tracks performance metrics (latency, throughput, workload) for graph
+ * stabilization.
  */
 public final class LatencyTrackingListener implements StabilizationListener {
     private static final org.apache.logging.log4j.Logger log = org.apache.logging.log4j.LogManager

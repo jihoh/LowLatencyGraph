@@ -2,6 +2,8 @@ package com.trading.drg.fn.finance;
 
 /**
  * Rolling Minimum over a window.
+ * <p>
+ * Formula: {@code y[t] = min(x[t-N+1], ..., x[t])}
  */
 public class RollingMin extends AbstractFn1 {
     private final double[] window;

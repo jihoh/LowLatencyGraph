@@ -1,9 +1,9 @@
 package com.trading.drg.fn.finance;
 
 /**
- * Calculates the raw non-commutative difference between two streams.
- * 
- * y = minuend - subtrahend
+ * Difference between two streams.
+ * <p>
+ * Formula: {@code y = a - b}
  */
 public class Spread extends AbstractFn2 {
 

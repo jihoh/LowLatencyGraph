@@ -1,11 +1,9 @@
 package com.trading.drg.fn.finance;
 
 /**
- * Z-Score (Standard Score).
- * 
- * z = (x - mean) / stdDev
- * 
- * Useful for normalizing signals.
+ * Z-Score (Standard Score) over a rolling window.
+ * <p>
+ * Formula: {@code z = (x - mean) / stdDev}
  */
 public class ZScore extends AbstractFn1 {
     // Composition: Uses HistVol logic internally but needs to access mean too.

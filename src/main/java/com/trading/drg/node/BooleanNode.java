@@ -3,29 +3,10 @@ package com.trading.drg.node;
 import com.trading.drg.api.Node;
 
 /**
- * Boolean signal node. Propagates only when value flips.
- *
- * This node is designed to act as a gate or trigger mechanism within the
- * dependency graph.
- * Unlike standard DoubleNode which might propagate updates for small changes
- * (depending
- * on tolerance), the BooleanNode enforces a strict "change of state" contract.
- *
- * Propagation Logic:
- * - The node only returns true from stabilize() when its boolean state changes
- * (e.g., false -> true or true -> false).
- * - This behavior is essential for implementing "event-driven" logic within the
- * graph,
- * such as triggering a barrier breach, signal activation, or regime switch.
- * - Downstream nodes will only be marked dirty if the boolean condition
- * actually toggles.
- *
- * Initialization:
- * The node handles its first stabilization logic to ensure that even if the
- * initial
- * state matches the default (false), it propagates if it is the first run.
+ * Boolean signal node that propagates only when its value flips.
+ * Designed to act as a trigger mechanism within the graph.
  */
-public final class BooleanNode implements Node<Boolean> {
+public final class BooleanNode implements Node {
     private final String name;
     private final BooleanCalcFn fn;
 
@@ -56,13 +37,8 @@ public final class BooleanNode implements Node<Boolean> {
     /**
      * Recomputes the node's value and determines if it has changed.
      *
-     * <p>
-     * This method executes the user-provided {@link BooleanCalcFn}.
-     * It then compares the new result with the previous result.
-     *
-     * @return {@code true} if the value has changed (flipped) or if this is the
-     *         first stabilization.
-     *         {@code false} otherwise.
+     * @return {@code true} if the value flipped or on first run, {@code false}
+     *         otherwise.
      */
     @Override
     public boolean stabilize() {
@@ -86,23 +62,12 @@ public final class BooleanNode implements Node<Boolean> {
         return currentValue != previousValue;
     }
 
-    @Override
-    public Boolean value() {
-        return currentValue;
-    }
-
-    /**
-     * Optimized primitive access to avoid unboxing overhead.
-     *
-     * @return the current primitive boolean value.
-     */
+    /** @return the current primitive boolean value. */
     public boolean booleanValue() {
         return currentValue;
     }
 
-    /**
-     * Functional interface for the calculation logic.
-     */
+    /** Functional interface for calculation logic. */
     @FunctionalInterface
     public interface BooleanCalcFn {
         boolean compute();

@@ -1,71 +1,73 @@
 package com.trading.drg.dsl;
 
-import com.trading.drg.api.*;
-import com.trading.drg.engine.*;
-
-import com.trading.drg.fn.*;
-import com.trading.drg.node.*;
+import com.trading.drg.api.Node;
+import com.trading.drg.api.ScalarCutoff;
+import com.trading.drg.api.ScalarValue;
+import com.trading.drg.api.VectorValue;
+import com.trading.drg.engine.StabilizationEngine;
+import com.trading.drg.engine.TopologicalOrder;
+import com.trading.drg.fn.DoublePredicate;
+import com.trading.drg.fn.Fn1;
+import com.trading.drg.fn.Fn2;
+import com.trading.drg.fn.Fn3;
+import com.trading.drg.fn.FnN;
+import com.trading.drg.fn.TemplateFactory;
+import com.trading.drg.fn.VectorFn;
+import com.trading.drg.node.BooleanNode;
+import com.trading.drg.node.ScalarCalcNode;
+import com.trading.drg.node.ScalarSourceNode;
+import com.trading.drg.node.VectorCalcNode;
+import com.trading.drg.node.VectorSourceNode;
 import com.trading.drg.util.ScalarCutoffs;
 import java.util.*;
 
 /**
- * Graph Builder -- primary quant-facing API.
- *
- * This class provides a fluent API for defining the structure (topology) of the
- * dependency graph.
- *
- * Usage Pattern:
- * 1. Create a builder: GraphBuilder g = GraphBuilder.create("my_graph");
- * 2. Define sources: var src = g.scalarSource("src", 100.0);
- * 3. Define calculations: var calc = g.compute("calc", (x) -> x * 2, src);
- * 4. Build: StabilizationEngine engine = g.build();
- * ...
+ * Fluent API for defining the dependency graph topology.
+ * <p>
+ * Used to construct nodes, define relationships, and compile the final engine.
  */
 public final class GraphBuilder {
 
     // Accumulate nodes and edges in lists before compiling to CSR format
-    private final List<Node<?>> nodes = new ArrayList<>();
-    private final Map<String, Node<?>> nodesByName = new HashMap<>();
+    private final List<Node> nodes = new ArrayList<>();
+    private final Map<String, Node> nodesByName = new HashMap<>();
     private final List<Edge> edges = new ArrayList<>();
     private final List<String> sourceNames = new ArrayList<>();
 
     // Flag to prevent modification after building
     private boolean built;
 
-    private GraphBuilder(String graphName) {
-        // graphName reserved for future use
+    private GraphBuilder() {
     }
 
     /**
      * Creates a new GraphBuilder instance.
      * ...
      */
-    public static GraphBuilder create(String graphName) {
-        return new GraphBuilder(graphName);
+    public static GraphBuilder create() {
+        return new GraphBuilder();
     }
 
     // ── Sources ──────────────────────────────────────────────────
 
     /**
-     * Creates a scalar double source node with EXACT cutoffs.
-     * Use this for market data inputs where every bit change matters.
+     * Creates a scalar source node with EXACT cutoffs.
      *
-     * @param name         Unique name of the node.
-     * @param initialValue Starting value.
-     * @return The created ScalarSourceNode.
+     * @param name         Unique node name.
+     * @param initialValue Initial value.
+     * @return The created source node.
      */
     public ScalarSourceNode scalarSource(String name, double initialValue) {
         return scalarSource(name, initialValue, ScalarCutoffs.EXACT);
     }
 
     /**
-     * Creates a scalar double source node with a custom cutoff strategy.
+     * Creates a scalar source node with a custom cutoff strategy.
      *
-     * @param name         Unique name of the node.
-     * @param initialValue Starting value.
-     * @param cutoff       Cutoff logic to determine if a value change should
-     *                     propagate.
-     * @return The created ScalarSourceNode.
+     * @param name         Unique node name.
+     * @param initialValue Initial value.
+     * @param cutoff       Cutoff strategy for propagation.
+     * @return The created source node.
      */
     public ScalarSourceNode scalarSource(String name, double initialValue, ScalarCutoff cutoff) {
         checkNotBuilt();
@@ -95,12 +97,12 @@ public final class GraphBuilder {
     // ── Computed doubles (1, 2, 3, N inputs) ────────────────────
 
     /**
-     * Defines a computation node with 1 input.
+     * Defines a computation node with 1 scalar input.
      *
-     * @param name Unique name.
-     * @param fn   Function: double -> double.
-     * @param in   Input node (must implement ScalarValue).
-     * @return The created computation node.
+     * @param name Unique node name.
+     * @param fn   1-arity function.
+     * @param in   Input scalar node.
+     * @return The created calc node.
      */
     public ScalarCalcNode compute(String name, Fn1 fn, ScalarValue in) {
         return compute(name, ScalarCutoffs.EXACT, fn, in);
@@ -112,7 +114,7 @@ public final class GraphBuilder {
     public ScalarCalcNode compute(String name, ScalarCutoff cutoff, Fn1 fn, ScalarValue in) {
         checkNotBuilt();
         // Create the node with a lambda that pulls from the input interface
-        var node = new ScalarCalcNode(name, cutoff, () -> fn.apply(in.doubleValue()))
+        var node = new ScalarCalcNode(name, cutoff, () -> fn.apply(in.value()))
                 .withStateExtractor(fn);
         register(node);
         // Explicitly record dependency
@@ -134,7 +136,7 @@ public final class GraphBuilder {
             ScalarValue in1, ScalarValue in2) {
         checkNotBuilt();
         var node = new ScalarCalcNode(name, cutoff,
-                () -> fn.apply(in1.doubleValue(), in2.doubleValue()))
+                () -> fn.apply(in1.value(), in2.value()))
                 .withStateExtractor(fn);
         register(node);
         addEdge(in1.name(), name);
@@ -151,7 +153,7 @@ public final class GraphBuilder {
             ScalarValue in1, ScalarValue in2, ScalarValue in3) {
         checkNotBuilt();
         var node = new ScalarCalcNode(name, cutoff,
-                () -> fn.apply(in1.doubleValue(), in2.doubleValue(), in3.doubleValue()))
+                () -> fn.apply(in1.value(), in2.value(), in3.value()))
                 .withStateExtractor(fn);
         register(node);
         addEdge(in1.name(), name);
@@ -177,7 +179,7 @@ public final class GraphBuilder {
         var node = new ScalarCalcNode(name, cutoff, () -> {
             // Gather inputs into scratch buffer
             for (int i = 0; i < inputs.length; i++)
-                scratch[i] = inputs[i].doubleValue();
+                scratch[i] = inputs[i].value();
             return fn.apply(scratch);
         }).withStateExtractor(fn);
         register(node);
@@ -190,11 +192,11 @@ public final class GraphBuilder {
     /**
      * computeVector: Creates a vector computation node.
      */
-    public VectorCalcNode computeVector(String name, int size, double tolerance, VectorFn fn, Node<?>... inputs) {
+    public VectorCalcNode computeVector(String name, int size, double tolerance, VectorFn fn, Node... inputs) {
         checkNotBuilt();
         var node = new VectorCalcNode(name, size, tolerance, fn, inputs);
         register(node);
-        for (Node<?> in : inputs)
+        for (Node in : inputs)
             addEdge(in.name(), name);
         return node;
     }
@@ -217,7 +219,7 @@ public final class GraphBuilder {
      */
     public BooleanNode condition(String name, ScalarValue input, DoublePredicate pred) {
         checkNotBuilt();
-        var node = new BooleanNode(name, () -> pred.test(input.doubleValue()));
+        var node = new BooleanNode(name, () -> pred.test(input.value()));
         register(node);
         addEdge(input.name(), name);
         return node;
@@ -231,7 +233,7 @@ public final class GraphBuilder {
             ScalarValue ifTrue, ScalarValue ifFalse) {
         checkNotBuilt();
         var node = new ScalarCalcNode(name, ScalarCutoffs.EXACT,
-                () -> cond.booleanValue() ? ifTrue.doubleValue() : ifFalse.doubleValue());
+                () -> cond.booleanValue() ? ifTrue.value() : ifFalse.value());
         register(node);
         addEdge(cond.name(), name);
         addEdge(ifTrue.name(), name);
@@ -249,13 +251,7 @@ public final class GraphBuilder {
 
     /**
      * Compiles the graph into an executable {@link StabilizationEngine}.
-     * This process involves:
-     * <ol>
-     * <li>Topological sort of all nodes.</li>
-     * <li>Cycle detection.</li>
-     * <li>Conversion of list-based graph to array-based (CSR) formats.</li>
-     * </ol>
-     * 
+     *
      * @return The executable engine.
      */
     public StabilizationEngine build() {
@@ -266,7 +262,7 @@ public final class GraphBuilder {
         var topo = TopologicalOrder.builder();
 
         // Add all registered nodes
-        for (Node<?> node : nodes)
+        for (Node node : nodes)
             topo.addNode(node);
 
         // Mark source nodes so the engine knows to clear their dirty flags
@@ -286,12 +282,12 @@ public final class GraphBuilder {
      * Useful for wiring up complex dependencies.
      */
     @SuppressWarnings("unchecked")
-    public <T extends Node<?>> T getNode(String name) {
+    public <T extends Node> T getNode(String name) {
         return (T) nodesByName.get(name);
     }
 
     // Internal helper to register a node and check for duplicates
-    private void register(Node<?> node) {
+    private void register(Node node) {
         if (nodesByName.containsKey(node.name()))
             throw new IllegalArgumentException("Duplicate node name: " + node.name());
         nodes.add(node);

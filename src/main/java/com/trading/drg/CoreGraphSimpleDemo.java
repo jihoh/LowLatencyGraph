@@ -58,7 +58,7 @@ public class CoreGraphSimpleDemo {
                 nanCountdown--;
                 if (nanCountdown == 0) {
                     // Recover the node with a sensible baseline so it doesn't stay NaN forever.
-                    double recoveryValue = nanNode.equals("USDJPY") ? 154.9 : (nanNode.equals("EURJPY") ? 182.8 : 1.18);
+                    double recoveryValue = nanNode.equals("USDJPY") ? 154.9 : nanNode.equals("EURJPY") ? 182.8 : 1.18;
                     graph.update(nanNode, recoveryValue);
                     log.info("Recovered " + nanNode + " from NaN fault.");
                     nanNode = null;
@@ -75,7 +75,7 @@ public class CoreGraphSimpleDemo {
             String targetNode = nodes[rng.nextInt(nodes.length)];
 
             // Loop until we find a node that is NOT currently the active NaN fault
-            while (nanNode != null && targetNode.equals(nanNode)) {
+            while (nanNode != null && nanNode.equals(targetNode)) {
                 targetNode = nodes[rng.nextInt(nodes.length)];
             }
 

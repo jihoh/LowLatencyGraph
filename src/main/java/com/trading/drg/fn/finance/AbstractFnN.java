@@ -7,8 +7,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 /**
- * Base class for all FnN implementations.
- * Handles try-catch wrapping and error rate limiting automatically.
+ * Base class for array-input functions. Handles error rate limiting.
+ * <p>
+ * Formula: {@code y = f(X)}
  */
 public abstract class AbstractFnN implements FnN, DynamicState {
     private final Logger log = LogManager.getLogger(this.getClass());

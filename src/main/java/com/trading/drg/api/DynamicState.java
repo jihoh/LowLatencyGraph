@@ -9,8 +9,10 @@ import java.lang.reflect.Modifier;
  */
 public interface DynamicState {
     /**
-     * Serializes internal state using reflection to automatically append standard
-     * JSON key-value pairs separated by commas without surrounding braces.
+     * Serializes non-static, non-transient fields to JSON key-value pairs.
+     * Appends directly to the provided StringBuilder without surrounding braces.
+     *
+     * @param sb The StringBuilder to append serialized state to.
      */
     default void serializeDynamicState(StringBuilder sb) {
         boolean first = true;
@@ -48,6 +50,7 @@ public interface DynamicState {
                 first = false;
             } catch (IllegalAccessException e) {
                 // Ignore fields that cannot be accessed
+                continue;
             }
         }
     }

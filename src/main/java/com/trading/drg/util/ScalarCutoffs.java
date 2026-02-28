@@ -2,13 +2,7 @@ package com.trading.drg.util;
 
 import com.trading.drg.api.ScalarCutoff;
 
-/**
- * Standard implementations of ScalarCutoff.
- *
- * This utility class provides common strategies for determining if a node's
- * value
- * has changed enough to warrant propagation.
- */
+/** Standard implementations of {@link ScalarCutoff} for change detection. */
 public final class ScalarCutoffs {
     private ScalarCutoffs() {
         // Utility class
@@ -17,22 +11,15 @@ public final class ScalarCutoffs {
     /** Always propagates change (returns true). */
     public static final ScalarCutoff ALWAYS = (p, c) -> true;
 
-    /**
-     * Never propagates change (returns false).
-     * Useful for sinks or side-effect-only nodes.
-     */
+    /** Never propagates change. Useful for sink/side-effect nodes. */
     public static final ScalarCutoff NEVER = (p, c) -> false;
 
     /**
-     * Propagates if bits are different (handles NaN canonicalization naturally).
-     * Ideal for exact equality checks.
+     * Propagates if bits differ (exact equality check, handles NaN canonically).
      */
     public static final ScalarCutoff EXACT = (p, c) -> Double.doubleToRawLongBits(p) != Double.doubleToRawLongBits(c);
 
-    /**
-     * Propagates if absolute difference exceeds tolerance.
-     * Logic: |current - previous| > tolerance
-     */
+    /** Propagates if absolute difference exceeds tolerance. */
     public static ScalarCutoff absoluteTolerance(double tol) {
         return (p, c) -> {
             if (Double.isNaN(p) != Double.isNaN(c))
@@ -41,10 +28,7 @@ public final class ScalarCutoffs {
         };
     }
 
-    /**
-     * Propagates if relative difference exceeds tolerance.
-     * Logic: |current - previous| / max(|current|, |previous|) > tolerance
-     */
+    /** Propagates if relative difference exceeds tolerance. */
     public static ScalarCutoff relativeTolerance(double tol) {
         return (p, c) -> {
             if (Double.isNaN(p) != Double.isNaN(c))

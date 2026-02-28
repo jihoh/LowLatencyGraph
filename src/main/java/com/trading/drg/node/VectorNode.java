@@ -4,20 +4,7 @@ import com.trading.drg.api.VectorValue;
 
 /**
  * Abstract base class for nodes that produce a fixed-size array of doubles.
- *
- * Ideal for representing:
- * - Yield Curves (e.g., discount factors at 1M, 3M, 6M...).
- * - Volatility Surface Slices.
- * - Bucketized Risks (e.g., Delta by tenor).
- *
- * Zero-Allocation Policy:
- * Unlike standard Java code which might return a new double[] on every call,
- * VectorNode maintains two pre-allocated arrays: currentValues and
- * previousValues.
- *
- * 1. Logic writes directly into these arrays, avoiding GC pressure.
- * 2. Downstream nodes can read directly from these arrays via valueAt(i).
- * 3. Stabilization uses System.arraycopy for fast state management.
+ * Maintains pre-allocated arrays to guarantee a zero-allocation update policy.
  */
 public abstract class VectorNode implements VectorValue {
     private final String name;
@@ -44,11 +31,7 @@ public abstract class VectorNode implements VectorValue {
         return size;
     }
 
-    /**
-     * Subclasses implement this to populate the output array.
-     * 
-     * @param output The array to write results into.
-     */
+    /** Computes the vector values directly into the output array. */
     protected abstract void compute(double[] output);
 
     @Override
@@ -73,11 +56,6 @@ public abstract class VectorNode implements VectorValue {
                 return true;
         }
         return false;
-    }
-
-    @Override
-    public final double[] value() {
-        return currentValues;
     }
 
     @Override

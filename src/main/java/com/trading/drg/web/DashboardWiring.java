@@ -12,12 +12,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 
+import lombok.Getter;
+
 /**
  * Wires a {@link CoreGraph} to the live dashboard infrastructure.
- * <p>
- * Handles: latency tracking, node profiling, dashboard server,
- * WebSocket publishing, and snapshot serialization.
+ * Handles telemetry, web server, WebSocket broadcasting, and snapshot
+ * generation.
  */
+@Getter
 public final class DashboardWiring {
     private final CoreGraph graph;
 
@@ -29,9 +31,7 @@ public final class DashboardWiring {
         this.graph = graph;
     }
 
-    /**
-     * Enables latency tracking.
-     */
+    /** Enables latency tracking. */
     public DashboardWiring enableLatencyTracking() {
         if (this.latencyListener == null) {
             this.latencyListener = new LatencyTrackingListener();
@@ -40,9 +40,7 @@ public final class DashboardWiring {
         return this;
     }
 
-    /**
-     * Enables detailed per-node profiling.
-     */
+    /** Enables detailed per-node profiling. */
     public DashboardWiring enableNodeProfiling() {
         if (this.profileListener == null) {
             this.profileListener = new NodeProfileListener();
@@ -51,17 +49,13 @@ public final class DashboardWiring {
         return this;
     }
 
-    /**
-     * Boots a Live Dashboard Server and wires it to the graph.
-     *
-     * @param port the port to bind to (e.g., 8080)
-     */
+    /** Boots a Live Dashboard Server and wires it to the graph. */
     public DashboardWiring enableDashboardServer(int port) {
         if (this.dashboardServer == null) {
             this.dashboardServer = new GraphDashboardServer();
             this.dashboardServer.setSnapshotSupplier(this::buildSnapshotJson);
 
-            // Lazily extract source codes only when dashboard is needed
+            // Lazily extract source codes when dashboard is needed
             var sourceCodes = buildSourceCodes();
 
             var wsListener = new WebsocketPublisherListener(
@@ -83,10 +77,7 @@ public final class DashboardWiring {
         return this;
     }
 
-    /**
-     * Lazily builds source code map from logicalTypes + NodeType.getNodeClass().
-     * Only called when dashboard is enabled — never during graph compilation.
-     */
+    /** Lazily builds source code map from logicalTypes and NodeType classes. */
     private Map<String, String> buildSourceCodes() {
         var logicalTypes = graph.getLogicalTypes();
         var result = new java.util.HashMap<String, String>(logicalTypes.size());
@@ -98,29 +89,16 @@ public final class DashboardWiring {
                 }
             } catch (IllegalArgumentException e) {
                 // Skip unknown types
+                continue;
             }
         }
         return result;
     }
 
-    public LatencyTrackingListener getLatencyListener() {
-        return this.latencyListener;
-    }
-
-    public NodeProfileListener getProfileListener() {
-        return this.profileListener;
-    }
-
-    public GraphDashboardServer getDashboardServer() {
-        return this.dashboardServer;
-    }
-
-    /**
-     * Serializes the current graph state into a JSON snapshot.
-     */
+    /** Serializes the current graph state into a JSON snapshot. */
     public String buildSnapshotJson() {
         StabilizationEngine engine = graph.getEngine();
-        Map<String, Node<?>> nodes = graph.getNodes();
+        Map<String, Node> nodes = graph.getNodes();
 
         GraphDefinition snapshot = new GraphDefinition();
         var info = new GraphDefinition.GraphInfo();
@@ -133,7 +111,7 @@ public final class DashboardWiring {
         ObjectMapper mapper = new ObjectMapper();
 
         for (String nodeName : graph.getOriginalOrder()) {
-            Node<?> node = nodes.get(nodeName);
+            Node node = nodes.get(nodeName);
             if (node == null)
                 continue;
 
@@ -144,9 +122,9 @@ public final class DashboardWiring {
             // Reconstruct Inputs map from Edge Labels
             Map<String, Map<String, String>> edgeLabels = graph.getEdgeLabels();
             if (edgeLabels.containsKey(nodeName)) {
-                java.util.Map<String, String> original = edgeLabels.get(nodeName);
-                java.util.Map<String, String> inverted = new java.util.HashMap<>();
-                for (java.util.Map.Entry<String, String> entry : original.entrySet()) {
+                Map<String, String> original = edgeLabels.get(nodeName);
+                Map<String, String> inverted = new java.util.HashMap<>();
+                for (Map.Entry<String, String> entry : original.entrySet()) {
                     inverted.put(entry.getValue(), entry.getKey());
                 }
                 def.setInputs(inverted);
@@ -169,18 +147,20 @@ public final class DashboardWiring {
                 }
             }
 
-            Object val = node.value();
-            if (val == null) {
-                props.put("value", null);
-            } else if (val instanceof double[] arr) {
-                Double[] safeArr = new Double[arr.length];
-                for (int i = 0; i < arr.length; i++)
-                    safeArr[i] = Double.isNaN(arr[i]) ? null : arr[i];
+            if (node instanceof com.trading.drg.api.VectorValue vv) {
+                Double[] safeArr = new Double[vv.size()];
+                for (int i = 0; i < vv.size(); i++) {
+                    double v = vv.valueAt(i);
+                    safeArr[i] = Double.isNaN(v) ? null : v;
+                }
                 props.put("value", safeArr);
-            } else if (val instanceof Double d) {
-                props.put("value", d.isNaN() ? null : d);
+            } else if (node instanceof com.trading.drg.api.ScalarValue sv) {
+                double d = sv.value();
+                props.put("value", Double.isNaN(d) ? null : d);
+            } else if (node instanceof com.trading.drg.node.BooleanNode bn) {
+                props.put("value", bn.booleanValue());
             } else {
-                props.put("value", val);
+                props.put("value", null);
             }
 
             if (node instanceof com.trading.drg.api.VectorValue vv && vv.headers() != null) {

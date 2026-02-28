@@ -7,8 +7,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 /**
- * Base class for all Fn2 implementations.
- * Handles try-catch wrapping and error rate limiting automatically.
+ * Base class for dual-input functions. Handles error rate limiting.
+ * <p>
+ * Formula: {@code y = f(x_1, x_2)}
  */
 public abstract class AbstractFn2 implements Fn2, DynamicState {
     private final Logger log = LogManager.getLogger(this.getClass());

@@ -4,10 +4,6 @@ import com.trading.drg.api.Node;
 
 /**
  * Functional interface for vector computations.
- *
- * Calculates an array of doubles based on a set of input nodes.
- * The output array is pre-allocated by the framework and passed in, allowing
- * for zero-allocation results.
  */
 @FunctionalInterface
 public interface VectorFn {
@@ -18,5 +14,5 @@ public interface VectorFn {
      *               these to expected types.
      * @param output The pre-allocated output buffer to write results into.
      */
-    void compute(Node<?>[] inputs, double[] output);
+    void compute(Node[] inputs, double[] output);
 }

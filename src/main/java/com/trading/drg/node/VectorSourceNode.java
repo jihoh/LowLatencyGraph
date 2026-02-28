@@ -5,20 +5,10 @@ import com.trading.drg.api.VectorValue;
 
 /**
  * A source node for array-based data.
- *
- * Allows feeding entire curves or vectors into the graph efficiently.
- *
- * Usage:
- * - Full Update: update(double[]) replaces the entire vector.
- * - Partial Update: updateAt(index, value) updates a single element.
- *
- * Change Detection:
- * If ANY element in the vector changes significantly (exceeding tolerance), the
- * ENTIRE node is marked as changed. This means all downstream dependents will
- * be
- * recomputed.
+ * If any element in the vector exceeds the tolerance threshold, the entire node
+ * is marked changed.
  */
-public final class VectorSourceNode implements SourceNode<double[]>, VectorValue {
+public final class VectorSourceNode implements SourceNode, VectorValue {
     private final String name;
     private final double tolerance;
     private final int size;
@@ -37,9 +27,7 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorValue
         // by flag
     }
 
-    /**
-     * Creates a vector source with default tolerance (1e-15).
-     */
+    /** Creates a vector source with default tolerance (1e-15). */
     public VectorSourceNode(String name, int size) {
         this(name, size, 1e-15);
     }
@@ -68,7 +56,6 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorValue
         return size;
     }
 
-    @Override
     public void update(double[] values) {
         if (values.length != size) {
             throw new IllegalArgumentException(
@@ -80,10 +67,7 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorValue
         this.currentValues = values;
     }
 
-    /**
-     * Update a single element of the vector.
-     * Useful for spot shocks to a curve point.
-     */
+    /** Updates a single element of the vector at the specified index. */
     public void updateAt(int index, double value) {
         if (index < 0 || index >= size) {
             throw new IndexOutOfBoundsException(
@@ -119,11 +103,6 @@ public final class VectorSourceNode implements SourceNode<double[]>, VectorValue
             System.arraycopy(currentValues, 0, previousValues, 0, size);
         }
         return changed;
-    }
-
-    @Override
-    public double[] value() {
-        return currentValues;
     }
 
     @Override

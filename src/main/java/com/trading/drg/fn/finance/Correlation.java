@@ -1,12 +1,9 @@
 package com.trading.drg.fn.finance;
 
 /**
- * Rolling Correlation of X and Y.
- * 
- * Corr = Cov(X, Y) / (StdDev(X) * StdDev(Y))
- * 
- * Implements Fn2 so it can be used in g.compute(name, new Correlation(20), x,
- * y).
+ * Rolling Correlation between X and Y.
+ * <p>
+ * Formula: {@code Corr = Cov(X, Y) / (StdDev(X) * StdDev(Y))}
  */
 public class Correlation extends AbstractFn2 {
     private final double[] xWindow;
@@ -40,12 +37,6 @@ public class Correlation extends AbstractFn2 {
             sumXY -= oldX * oldY;
             sumX2 -= oldX * oldX;
             sumY2 -= oldY * oldY;
-        } else {
-            // Logic error in previous snippet: count++ should happen if NOT full.
-            // But let's be cleaner.
-            // If full, remove old. If not full, count increases.
-            // But removal happens at 'head' which is the oldest.
-            // If full, we overwrite 'head'.
         }
 
         // Add new

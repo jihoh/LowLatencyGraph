@@ -7,8 +7,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 /**
- * Base class for all Fn3 implementations.
- * Handles try-catch wrapping and error rate limiting automatically.
+ * Base class for triple-input functions. Handles error rate limiting.
+ * <p>
+ * Formula: {@code y = f(x_1, x_2, x_3)}
  */
 public abstract class AbstractFn3 implements Fn3, DynamicState {
     private final Logger log = LogManager.getLogger(this.getClass());

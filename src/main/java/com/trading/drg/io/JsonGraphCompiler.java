@@ -1,25 +1,16 @@
 package com.trading.drg.io;
 
-import com.trading.drg.api.*;
-import com.trading.drg.engine.*;
-
+import com.trading.drg.api.Node;
+import com.trading.drg.api.ScalarCutoff;
+import com.trading.drg.api.SourceNode;
+import com.trading.drg.engine.StabilizationEngine;
+import com.trading.drg.engine.TopologicalOrder;
 import java.util.*;
 
 import com.trading.drg.util.ScalarCutoffs;
 
 /**
  * Compiles a JSON {@link GraphDefinition} into a live, executable graph.
- *
- * <p>
- * This compiler operates in two passes:
- * <ol>
- * <li><b>Instantiation:</b> Creates all nodes based on registered factories
- * (types).</li>
- * <li><b>Wiring:</b> Connects dependencies based on the topology.</li>
- * </ol>
- *
- * <p>
- * Supports plugins via {@link #registerFactory(String, NodeFactory)}.
  */
 public final class JsonGraphCompiler {
     private final NodeRegistry registry = new NodeRegistry();
@@ -59,7 +50,7 @@ public final class JsonGraphCompiler {
         // 1. Sort dependencies topologically
         nodeDefs = topologicalSort(nodeDefs);
 
-        Map<String, Node<?>> nodesByName = new HashMap<>(nodeDefs.size() * 2);
+        Map<String, Node> nodesByName = new HashMap<>(nodeDefs.size() * 2);
         Map<String, String> logicalTypes = new HashMap<>(nodeDefs.size() * 2);
         Map<String, String> descriptions = new HashMap<>(nodeDefs.size() * 2);
         Map<String, Map<String, String>> edgeLabels = new HashMap<>(nodeDefs.size() * 2);
@@ -84,11 +75,11 @@ public final class JsonGraphCompiler {
             }
 
             // Resolve dependencies array
-            Node<?>[] deps;
+            Node[] deps;
 
             if (nd.getInputs() != null && !nd.getInputs().isEmpty()) {
                 if (meta.namedInputs() != null) {
-                    deps = new Node<?>[meta.namedInputs().length];
+                    deps = new Node[meta.namedInputs().length];
                     for (int i = 0; i < deps.length; i++) {
                         String inputKey = meta.namedInputs()[i];
                         String depName = nd.getInputs().get(inputKey);
@@ -100,7 +91,7 @@ public final class JsonGraphCompiler {
 
                         edgeLabels.computeIfAbsent(nd.getName(), k -> new HashMap<>()).put(depName, inputKey);
 
-                        Node<?> upstream = nodesByName.get(depName);
+                        Node upstream = nodesByName.get(depName);
                         if (upstream == null)
                             throw new IllegalArgumentException(
                                     "Dependency " + depName + " not found for node " + nd.getName());
@@ -109,14 +100,14 @@ public final class JsonGraphCompiler {
                     }
                 } else {
                     // Unbounded varargs node (e.g. AVERAGE)
-                    deps = new Node<?>[nd.getInputs().size()];
+                    deps = new Node[nd.getInputs().size()];
                     int i = 0;
                     List<String> sortedKeys = new ArrayList<>(nd.getInputs().keySet());
                     Collections.sort(sortedKeys);
                     for (String inputKey : sortedKeys) {
                         String depName = nd.getInputs().get(inputKey);
                         edgeLabels.computeIfAbsent(nd.getName(), k -> new HashMap<>()).put(depName, inputKey);
-                        Node<?> upstream = nodesByName.get(depName);
+                        Node upstream = nodesByName.get(depName);
                         if (upstream == null)
                             throw new IllegalArgumentException(
                                     "Dependency " + depName + " not found for node " + nd.getName());
@@ -124,10 +115,10 @@ public final class JsonGraphCompiler {
                     }
                 }
             } else {
-                deps = new Node<?>[0];
+                deps = new Node[0];
             }
 
-            Node<?> node = meta.factory().create(nd.getName(),
+            Node node = meta.factory().create(nd.getName(),
                     nd.getProperties() != null ? nd.getProperties() : Collections.emptyMap(),
                     deps);
             nodesByName.put(nd.getName(), node);
@@ -228,14 +219,13 @@ public final class JsonGraphCompiler {
         return v instanceof Number n ? n.intValue() : Integer.parseInt(v.toString());
     }
 
+    /** Factory for creating node instances from JSON definitions. */
     @FunctionalInterface
     public interface NodeFactory {
-        Node<?> create(String name, Map<String, Object> properties, Node<?>[] dependencies);
+        Node create(String name, Map<String, Object> properties, Node[] dependencies);
     }
 
-    /**
-     * The result of compilation: a graph engine ready to run.
-     */
+    /** Expands template nodes into their constituent sub-graph nodes. */
     private List<GraphDefinition.NodeDef> expandTemplates(List<GraphDefinition.NodeDef> nodes,
             Map<String, GraphDefinition.TemplateDef> templates) {
         List<GraphDefinition.NodeDef> expanded = new ArrayList<>();
@@ -364,13 +354,13 @@ public final class JsonGraphCompiler {
     public static final class CompiledGraph {
         private final String name, version;
         private final StabilizationEngine engine;
-        private final Map<String, Node<?>> nodesByName;
+        private final Map<String, Node> nodesByName;
         private final Map<String, String> logicalTypes;
         private final Map<String, String> descriptions;
         private final List<String> originalOrder;
         private final Map<String, Map<String, String>> edgeLabels;
 
-        CompiledGraph(String name, String version, StabilizationEngine engine, Map<String, Node<?>> nodesByName,
+        CompiledGraph(String name, String version, StabilizationEngine engine, Map<String, Node> nodesByName,
                 Map<String, String> logicalTypes, Map<String, String> descriptions,
                 List<String> originalOrder,
                 Map<String, Map<String, String>> edgeLabels) {
@@ -396,7 +386,7 @@ public final class JsonGraphCompiler {
             return engine;
         }
 
-        public Map<String, Node<?>> nodesByName() {
+        public Map<String, Node> nodesByName() {
             return nodesByName;
         }
 

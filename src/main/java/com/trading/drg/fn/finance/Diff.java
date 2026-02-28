@@ -2,10 +2,9 @@ package com.trading.drg.fn.finance;
 
 /**
  * First Difference.
- * 
- * y[t] = x[t] - x[t-1]
+ * <p>
+ * Formula: {@code y[t] = x[t] - x[t-1]}
  */
-
 public class Diff extends AbstractFn1 {
     private double prev;
     private boolean initialized = false;

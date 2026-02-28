@@ -10,55 +10,33 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
- * A lightweight web server that hosts the real-time graph dashboard
- * and manages WebSocket connections for pushing state updates.
+ * Lightweight web server for the real-time graph dashboard and WebSocket state
+ * pushing.
  */
 public class GraphDashboardServer {
     private static final Logger log = LogManager.getLogger(GraphDashboardServer.class);
 
-    // We use a ConcurrentHashMap to track active WebSocket client sessions.
-    // The boolean value is just a placeholder, we only care about the keys
-    // (WsContext).
+    // Track active WebSocket client sessions (Set wrapper)
     private final Set<WsContext> sessions = ConcurrentHashMap.newKeySet();
     private Javalin app;
 
-    // Cached heavy structural JSON sent strictly upon connection
+    // Cached heavy structural JSON sent upon connection
+    @lombok.Setter
     private volatile String initialGraphConfig = null;
 
     // Supplier to build the snapshot JSON on demand
+    @lombok.Setter
     private Supplier<String> snapshotSupplier = null;
 
-    /**
-     * Injects the heavy static Graph Configuration payload (Topology and Routing)
-     * which only needs to be sent once per client connection.
-     */
-    public void setInitialGraphConfig(String jsonPayload) {
-        this.initialGraphConfig = jsonPayload;
-    }
-
-    /**
-     * Sets the supplier that generates the exact runtime state of the graph
-     * when the /api/snapshot endpoint is called.
-     */
-    public void setSnapshotSupplier(Supplier<String> supplier) {
-        this.snapshotSupplier = supplier;
-    }
-
-    /**
-     * Starts the dashboard server on the specified port.
-     * Starts serving static files from src/main/resources/public.
-     *
-     * @param port The port to listen on (e.g., 7070).
-     */
+    /** Starts the dashboard server on the specified port. */
     public void start(int port) {
         log.info("Starting Graph Dashboard Server on port {}", port);
 
         app = Javalin.create(config -> {
-            // Serve frontend files (HTML/JS/CSS) from the classpath 'public' directory
+            // Serve frontend files from classpath 'public'
             config.staticFiles.add("/public");
 
-            // Allow massive JSON payloads to pass through WebSocket initialized graph
-            // configs.
+            // Allow massive JSON payloads
             config.jetty.modifyWebSocketServletFactory(factory -> {
                 factory.setMaxTextMessageSize(10_000_000L);
             });
@@ -79,8 +57,7 @@ public class GraphDashboardServer {
                 log.info("WebSocket Client Connected: {}", ctx.sessionId());
                 sessions.add(ctx);
 
-                // Immediately flush the heavy structural payload dynamically.
-                // The frontend relies on this specific 'init' structured response.
+                // Immediately flush structural payload
                 if (initialGraphConfig != null && ctx.session.isOpen()) {
                     ctx.send(initialGraphConfig);
                 }
@@ -96,15 +73,10 @@ public class GraphDashboardServer {
         });
     }
 
-    /**
-     * Broadcasts a JSON string payload to all currently connected WebSocket
-     * clients.
-     *
-     * @param jsonPayload The JSON string to broadcast.
-     */
+    /** Broadcasts a JSON string payload to all connected clients. */
     public void broadcast(String jsonPayload) {
         if (sessions.isEmpty()) {
-            return; // Fast path: avoid iteration if nobody is listening
+            return; // Fast path
         }
 
         for (WsContext ctx : sessions) {
@@ -114,9 +86,7 @@ public class GraphDashboardServer {
         }
     }
 
-    /**
-     * Stops the dashboard server.
-     */
+    /** Stops the dashboard server. */
     public void stop() {
         if (app != null) {
             app.stop();

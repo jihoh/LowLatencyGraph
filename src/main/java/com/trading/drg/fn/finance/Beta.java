@@ -1,11 +1,9 @@
 package com.trading.drg.fn.finance;
 
 /**
- * Rolling Beta of Y with respect to X.
- * 
- * Beta = Cov(X, Y) / Var(Y)
- * Where X is the Benchmark, Y is the Asset.
- * apply(x, y) -> x is benchmark.
+ * Rolling Beta of Asset (Y) with respect to Benchmark (X).
+ * <p>
+ * Formula: {@code Beta = Cov(X, Y) / Var(X)}
  */
 public class Beta extends AbstractFn2 {
     private final double[] bufferX;

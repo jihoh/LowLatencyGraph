@@ -1,5 +1,11 @@
 package com.trading.drg.fn.finance;
 
+/**
+ * Weighted average of inputs. Assumes inputs format:
+ * {@code [val1, wt1, val2, wt2, ...]}.
+ * <p>
+ * Formula: {@code y = Sum(w_i * x_i) / Sum(w_i)}
+ */
 public class WeightedAverage extends AbstractFnN {
 
     @Override

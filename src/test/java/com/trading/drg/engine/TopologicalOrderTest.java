@@ -11,7 +11,7 @@ import static org.junit.Assert.*;
 public class TopologicalOrderTest {
 
     // Helper to create a simple compute node
-    private Node<Double> createComputeNode(String name) {
+    private Node createComputeNode(String name) {
         return new ScalarCalcNode(name, ScalarCutoffs.ALWAYS, () -> 2.0);
     }
 
@@ -23,7 +23,7 @@ public class TopologicalOrderTest {
 
     @Test
     public void testSingleNode() {
-        Node<Double> a = new ScalarSourceNode("A", 1.0);
+        Node a = new ScalarSourceNode("A", 1.0);
         TopologicalOrder order = TopologicalOrder.builder()
                 .addNode(a)
                 .markSource("A")
@@ -40,9 +40,9 @@ public class TopologicalOrderTest {
     @Test
     public void testLinearGraph() {
         // A -> B -> C
-        Node<Double> a = new ScalarSourceNode("A", 1.0);
-        Node<Double> b = createComputeNode("B");
-        Node<Double> c = createComputeNode("C");
+        Node a = new ScalarSourceNode("A", 1.0);
+        Node b = createComputeNode("B");
+        Node c = createComputeNode("C");
 
         TopologicalOrder order = TopologicalOrder.builder()
                 .addNode(a).addNode(b).addNode(c)
@@ -89,10 +89,10 @@ public class TopologicalOrderTest {
         // B C
         // \ /
         // D
-        Node<Double> a = new ScalarSourceNode("A", 1.0);
-        Node<Double> b = createComputeNode("B");
-        Node<Double> c = createComputeNode("C");
-        Node<Double> d = createComputeNode("D");
+        Node a = new ScalarSourceNode("A", 1.0);
+        Node b = createComputeNode("B");
+        Node c = createComputeNode("C");
+        Node d = createComputeNode("D");
 
         TopologicalOrder order = TopologicalOrder.builder()
                 .addNode(a).addNode(b).addNode(c).addNode(d)
@@ -138,10 +138,10 @@ public class TopologicalOrderTest {
     public void testDisjointGraphs() {
         // A -> B
         // C -> D
-        Node<Double> a = new ScalarSourceNode("A", 1.0);
-        Node<Double> b = createComputeNode("B");
-        Node<Double> c = new ScalarSourceNode("C", 2.0);
-        Node<Double> d = createComputeNode("D");
+        Node a = new ScalarSourceNode("A", 1.0);
+        Node b = createComputeNode("B");
+        Node c = new ScalarSourceNode("C", 2.0);
+        Node d = createComputeNode("D");
 
         TopologicalOrder order = TopologicalOrder.builder()
                 .addNode(a).addNode(b).addNode(c).addNode(d)
@@ -176,9 +176,9 @@ public class TopologicalOrderTest {
     @Test(expected = IllegalStateException.class)
     public void testCycleDetection() {
         // A -> B -> C -> A
-        Node<Double> a = new ScalarSourceNode("A", 1.0);
-        Node<Double> b = createComputeNode("B");
-        Node<Double> c = createComputeNode("C");
+        Node a = new ScalarSourceNode("A", 1.0);
+        Node b = createComputeNode("B");
+        Node c = createComputeNode("C");
 
         TopologicalOrder.builder()
                 .addNode(a).addNode(b).addNode(c)
@@ -188,10 +188,10 @@ public class TopologicalOrderTest {
                 .build();
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test(expected = IllegalArgumentException.class)
     public void testSelfLoopDetection() {
         // A -> A
-        Node<Double> a = new ScalarSourceNode("A", 1.0);
+        Node a = new ScalarSourceNode("A", 1.0);
 
         TopologicalOrder.builder()
                 .addNode(a)
@@ -201,8 +201,8 @@ public class TopologicalOrderTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void testDuplicateNodeException() {
-        Node<Double> a1 = new ScalarSourceNode("A", 1.0);
-        Node<Double> a2 = new ScalarSourceNode("A", 2.0);
+        Node a1 = new ScalarSourceNode("A", 1.0);
+        Node a2 = new ScalarSourceNode("A", 2.0);
 
         TopologicalOrder.builder()
                 .addNode(a1)
@@ -211,7 +211,7 @@ public class TopologicalOrderTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void testUnknownEdgeSourceException() {
-        Node<Double> b = createComputeNode("B");
+        Node b = createComputeNode("B");
 
         TopologicalOrder.builder()
                 .addNode(b)
@@ -220,7 +220,7 @@ public class TopologicalOrderTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void testUnknownEdgeTargetException() {
-        Node<Double> a = new ScalarSourceNode("A", 1.0);
+        Node a = new ScalarSourceNode("A", 1.0);
 
         TopologicalOrder.builder()
                 .addNode(a)
@@ -234,7 +234,7 @@ public class TopologicalOrderTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void testInvalidTopoIndexLookup() {
-        Node<Double> a = new ScalarSourceNode("A", 1.0);
+        Node a = new ScalarSourceNode("A", 1.0);
         TopologicalOrder order = TopologicalOrder.builder().addNode(a).build();
         order.topoIndex("UNKNOWN");
     }

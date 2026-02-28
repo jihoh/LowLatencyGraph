@@ -2,8 +2,8 @@ package com.trading.drg.fn.finance;
 
 /**
  * Logarithmic Return.
- * 
- * y[t] = ln(x[t] / x[t-1])
+ * <p>
+ * Formula: {@code y[t] = ln(x[t] / x[t-1])}
  */
 
 public class LogReturn extends AbstractFn1 {

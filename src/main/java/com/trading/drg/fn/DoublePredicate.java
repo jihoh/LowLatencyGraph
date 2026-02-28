@@ -1,8 +1,7 @@
 package com.trading.drg.fn;
 
 /**
- * Functional interface for testing a double value.
- * Used for conditional nodes and logic gates.
+ * Functional interface for testing a double value. Used for conditional nodes.
  */
 @FunctionalInterface
 public interface DoublePredicate {

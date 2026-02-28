@@ -1,11 +1,9 @@
 package com.trading.drg.fn.finance;
 
 /**
- * Calculates the arbitrage spread between a Direct rate and a Synthetic rate.
- *
- * Spread = Direct - (Leg1 * Leg2)
- *
- * Example: Spread = EUR/JPY - (EUR/USD * USD/JPY)
+ * Arbitrage spread between a Direct rate and a Synthetic rate.
+ * <p>
+ * Formula: {@code Spread = Direct - (Leg1 * Leg2)}
  */
 public class TriangularArbSpread extends AbstractFn3 {
 

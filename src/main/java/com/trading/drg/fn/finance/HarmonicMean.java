@@ -1,10 +1,9 @@
 package com.trading.drg.fn.finance;
 
 /**
- * Calculates the Harmonic Mean of N inputs.
- * Useful for averaging rates or ratios (e.g., P/E ratios).
- * 
- * y = N / Sum(1 / x_i)
+ * Harmonic Mean of N inputs. Useful for averaging rates or ratios.
+ * <p>
+ * Formula: {@code y = N / Sum(1 / x_i)}
  */
 public class HarmonicMean extends AbstractFnN {
 

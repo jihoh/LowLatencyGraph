@@ -4,19 +4,8 @@ import com.trading.drg.api.DynamicState;
 import com.trading.drg.api.ScalarCutoff;
 
 /**
- * A general-purpose double node that delegates computation to a functional
+ * A general-purpose scalar node that delegates computation to a functional
  * interface.
- *
- * This is the "lambda node" of the graph. It allows users to define node logic
- * inline
- * without creating a new class for every mathematical operation.
- *
- * Example:
- * new ScalarCalcNode("Sum", ScalarCutoffs.EXACT, () -> inputA.doubleValue() +
- * inputB.doubleValue());
- *
- * Performance:
- * The JVM can often inline the lambda execution, making this very efficient.
  */
 public final class ScalarCalcNode extends ScalarNode implements DynamicState {
     private final CalcFn fn;
@@ -28,7 +17,7 @@ public final class ScalarCalcNode extends ScalarNode implements DynamicState {
     }
 
     public ScalarCalcNode withStateExtractor(Object obj) {
-        if (obj instanceof com.trading.drg.api.DynamicState ds) {
+        if (obj instanceof DynamicState ds) {
             this.stateExtractor = ds;
         }
         return this;

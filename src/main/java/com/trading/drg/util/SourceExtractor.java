@@ -5,22 +5,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * Utility for extracting the source code of specific methods from .java files.
- * Used for exporting core mathematical logic to the web UI.
+ * Extracts source code of specific implementation classes for web UI export.
  */
 public class SourceExtractor {
 
-    /**
-     * Extracts the class source from the specified class's source file,
-     * excluding package and import statements.
-     * Searches globally in the expected src/main/java directory.
-     * 
-     * @param className the fully qualified class name (e.g.
-     *                  "com.trading.drg.fn.finance.Ewma")
-     * @return the raw string block representing the class source, or a fallback
-     *         message
-     *         if not found/error.
-     */
+    /** Extracts class source excluding package and imports. */
     public static String extractClassSource(String className) {
         if (className == null || className.isEmpty()) {
             return "No underlying implementation class defined.";

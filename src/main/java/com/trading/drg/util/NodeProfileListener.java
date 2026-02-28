@@ -3,10 +3,7 @@ package com.trading.drg.util;
 import com.trading.drg.api.StabilizationListener;
 import java.util.Arrays;
 
-/**
- * A listener that aggregates performance statistics per node.
- * Useful for identifying bottlenecks and tuning ScalarCutoffs.
- */
+/** Aggregates performance statistics per node to identify bottlenecks. */
 public class NodeProfileListener implements StabilizationListener {
 
     public static class NodeStats {
@@ -32,15 +29,14 @@ public class NodeProfileListener implements StabilizationListener {
         }
 
         public double avgMicros() {
-            return count == 0 ? 0 : (totalDurationNanos / (double) count) / 1000.0;
+            return count == 0 ? 0 : totalDurationNanos / (double) count / 1000.0;
         }
     }
 
-    // Flat array mapping topoIndex -> Stats
-    // Completely eliminates Map hashing overhead from the hot path.
+    // Flat array mapping topoIndex -> NodeStats. Eliminates Map hashing overhead.
     private NodeStats[] statsArray = new NodeStats[0];
 
-    // Read by external telemetry threads. Returns a safe snapshot reference.
+    /** @return Read-only snapshot of stats array for telemetry. */
     public NodeStats[] getStatsArray() {
         return statsArray;
     }
@@ -74,9 +70,7 @@ public class NodeProfileListener implements StabilizationListener {
         // No-op
     }
 
-    /**
-     * Resets all collected statistics.
-     */
+    /** Resets all collected statistics. */
     public void reset() {
         for (int i = 0; i < statsArray.length; i++) {
             if (statsArray[i] != null) {
@@ -91,8 +85,7 @@ public class NodeProfileListener implements StabilizationListener {
 
     /**
      * Returns a formatted table of node statistics.
-     * Synchronized to permit safe reading from an external monitoring thread
-     * while the engine thread writes.
+     * Synchronized for safe reading from telemetry thread.
      */
     public synchronized String dump() {
         StringBuilder sb = new StringBuilder();

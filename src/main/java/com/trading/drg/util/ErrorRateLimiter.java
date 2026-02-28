@@ -3,13 +3,14 @@ package com.trading.drg.util;
 import org.apache.logging.log4j.Logger;
 
 /**
- * A utility class to limit the rate of error logging.
- * Useful in high-frequency loops to prevent log flooding during persistent
- * failure conditions.
+ * Limits error logging rate in high-frequency loops to prevent log flooding.
  */
 public class ErrorRateLimiter {
+    /** Bound logger instance. */
     private final Logger logger;
+    /** Minimum interval between logs in nanos. */
     private final long minIntervalNanos;
+    /** Timestamp of last log. */
     private long lastLogTime = 0;
 
     public ErrorRateLimiter(Logger logger, long minIntervalMillis) {

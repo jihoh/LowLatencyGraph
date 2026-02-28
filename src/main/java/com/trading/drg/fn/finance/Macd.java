@@ -1,12 +1,9 @@
 package com.trading.drg.fn.finance;
 
 /**
- * Moving Average Convergence Divergence (MACD).
- * 
- * Returns the "MACD Line" (Fast EWMA - Slow EWMA).
- * 
- * To get the "Signal Line", feed this output into another EWMA.
- * To get the "Histogram", subtract the Signal Line from this output.
+ * Moving Average Convergence Divergence (MACD). Returns the MACD Line.
+ * <p>
+ * Formula: {@code MACD = EWMA_fast(x) - EWMA_slow(x)}
  */
 public class Macd extends AbstractFn1 {
     private final Ewma fast;

@@ -4,14 +4,10 @@ import com.trading.drg.dsl.GraphBuilder;
 
 /**
  * Interface for reusable graph sub-structures (templates).
- *
- * <p>
- * Allows encapsulating common patterns (e.g., "Create a Black-Scholes Pricer")
- * into reusable factories.
+ * Encapsulates common patterns into reusable factories.
  *
  * @param <C> Configuration object type.
- * @param <T> Result type (e.g., the output node, or a container of output
- *            nodes).
+ * @param <T> Result type.
  */
 @FunctionalInterface
 public interface TemplateFactory<C, T> {

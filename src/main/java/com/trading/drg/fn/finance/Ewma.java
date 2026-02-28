@@ -2,9 +2,8 @@ package com.trading.drg.fn.finance;
 
 /**
  * Exponential Moving Average (EWMA).
- * 
- * Formula:
- * y[t] = alpha * x[t] + (1 - alpha) * y[t-1]
+ * <p>
+ * Formula: {@code y[t] = alpha * x[t] + (1 - alpha) * y[t-1]}
  */
 public class Ewma extends AbstractFn1 {
     private final double alpha;

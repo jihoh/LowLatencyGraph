@@ -1,11 +1,29 @@
 package com.trading.drg.io;
 
-import com.trading.drg.fn.finance.*;
-import com.trading.drg.node.*;
+import com.trading.drg.fn.finance.Average;
+import com.trading.drg.fn.finance.Beta;
+import com.trading.drg.fn.finance.Correlation;
+import com.trading.drg.fn.finance.Diff;
+import com.trading.drg.fn.finance.Ewma;
+import com.trading.drg.fn.finance.HarmonicMean;
+import com.trading.drg.fn.finance.HistVol;
+import com.trading.drg.fn.finance.LogReturn;
+import com.trading.drg.fn.finance.Macd;
+import com.trading.drg.fn.finance.RollingMax;
+import com.trading.drg.fn.finance.RollingMin;
+import com.trading.drg.fn.finance.Rsi;
+import com.trading.drg.fn.finance.Sma;
+import com.trading.drg.fn.finance.Spread;
+import com.trading.drg.fn.finance.TriangularArbSpread;
+import com.trading.drg.fn.finance.WeightedAverage;
+import com.trading.drg.fn.finance.ZScore;
+import com.trading.drg.node.ScalarCalcNode;
+import com.trading.drg.node.ScalarSourceNode;
+import com.trading.drg.node.VectorCalcNode;
+import com.trading.drg.node.VectorSourceNode;
 
 /**
  * Enum of all built-in node types.
- * Factory lambdas are registered separately in {@link NodeRegistry}.
  */
 public enum NodeType {
     EWMA(Ewma.class),
@@ -42,7 +60,7 @@ public enum NodeType {
     }
 
     public static NodeType fromString(String text) {
-        for (NodeType b : NodeType.values()) {
+        for (NodeType b : values()) {
             if (b.name().equalsIgnoreCase(text)) {
                 return b;
             }

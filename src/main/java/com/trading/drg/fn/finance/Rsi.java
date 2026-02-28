@@ -1,11 +1,10 @@
 package com.trading.drg.fn.finance;
 
 /**
- * Relative Strength Index (RSI).
- * 
- * Uses Wilder's Smoothing for Avg Gain/Loss.
- * RSI = 100 - (100 / (1 + RS))
- * RS = AvgGain / AvgLoss
+ * Relative Strength Index (RSI). Uses Wilder's Smoothing.
+ * <p>
+ * Formula: {@code RSI = 100 - (100 / (1 + RS))}, where
+ * {@code RS = AvgGain / AvgLoss}
  */
 public class Rsi extends AbstractFn1 {
     private final double alpha; // 1/N for Wilder's

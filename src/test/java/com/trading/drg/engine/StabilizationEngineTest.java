@@ -1,6 +1,5 @@
 package com.trading.drg.engine;
 
-import com.trading.drg.api.Node;
 import com.trading.drg.api.StabilizationListener;
 import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.node.ScalarNode;
@@ -35,13 +34,13 @@ public class StabilizationEngineTest {
         // C = A + B
         ScalarNode c = new ScalarCalcNode("C", ScalarCutoffs.ALWAYS, () -> {
             executionLog.add("C");
-            return sourceA.doubleValue() + sourceB.doubleValue();
+            return sourceA.value() + sourceB.value();
         });
 
         // D = C * 2
         ScalarNode d = new ScalarCalcNode("D", ScalarCutoffs.ALWAYS, () -> {
             executionLog.add("D");
-            return c.doubleValue() * 2;
+            return c.value() * 2;
         });
 
         // Topology:
@@ -125,7 +124,7 @@ public class StabilizationEngineTest {
         // E = D_Stop + 1
         ScalarNode e = new ScalarCalcNode("E", ScalarCutoffs.ALWAYS, () -> {
             executionLog.add("E");
-            return dCutoff.doubleValue() + 1;
+            return dCutoff.value() + 1;
         });
 
         TopologicalOrder customTopo = TopologicalOrder.builder()
@@ -157,7 +156,7 @@ public class StabilizationEngineTest {
         });
 
         ScalarNode downstream = new ScalarCalcNode("Downstream", ScalarCutoffs.ALWAYS, () -> {
-            return explosive.doubleValue() + 10.0;
+            return explosive.value() + 10.0;
         });
 
         TopologicalOrder badTopo = TopologicalOrder.builder()
@@ -176,10 +175,10 @@ public class StabilizationEngineTest {
         badEngine.stabilize();
 
         // The explosive node should evaluate to NaN because it caught its own error
-        assertTrue("Explosive node should output NaN on error", Double.isNaN(explosive.doubleValue()));
+        assertTrue("Explosive node should output NaN on error", Double.isNaN(explosive.value()));
 
         // Downstream should also evaluate to NaN because the calculation involved NaN
-        assertTrue("Downstream node should propagate NaN", Double.isNaN(downstream.doubleValue()));
+        assertTrue("Downstream node should propagate NaN", Double.isNaN(downstream.value()));
     }
 
     @Test

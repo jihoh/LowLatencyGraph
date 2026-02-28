@@ -12,13 +12,9 @@ import org.apache.logging.log4j.Logger;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * A listener that observes the graph engine and broadcasts the
- * entire graph state (node values) along with optional telemetry
- * metrics via WebSockets at the end of every stabilization cycle.
- * <p>
- * Performance: JSON construction and WebSocket I/O are offloaded to
- * a dedicated daemon thread. The engine thread only copies raw primitive
- * values into pre-allocated double-buffered arrays (zero allocation).
+ * Broadcasts graph state and telemetry via WebSockets after stabilization.
+ * Utilizes a zero-allocation double-buffering scheme offloaded to a daemon
+ * thread.
  */
 public class WebsocketPublisherListener implements StabilizationListener {
     private static final Logger log = LogManager.getLogger(WebsocketPublisherListener.class);
@@ -28,18 +24,17 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final String graphName;
     private final String graphVersion;
     private final String initialMermaid;
-    private final java.util.Map<String, String> logicalTypes;
     private final java.util.Map<String, String> descriptions;
     private final java.util.Map<String, String> sourceCodes;
     private final java.util.Map<String, java.util.Map<String, String>> edgeLabels;
     private final com.trading.drg.util.ErrorRateLimiter errLimiter = new com.trading.drg.util.ErrorRateLimiter(log,
             1000);
 
-    // Pre-computed JSON key prefixes indexed by topoIndex, e.g. "\"UST_10Y\":"
+    // Pre-computed JSON key prefixes indexed by topoIndex
     private final String[] jsonKeys;
-    // Pre-computed header key prefixes, e.g. ",\"UST_10Y_headers\":"
+    // Pre-computed header key prefixes
     private final String[] jsonHeaderKeys;
-    // Node type flags: 0=scalar, 1=vector — instanceof only at construction
+    // Node type flags (0=scalar, 1=vector)
     private final byte[] nodeKinds;
     private static final byte KIND_SCALAR = 0;
     private static final byte KIND_VECTOR = 1;
@@ -48,11 +43,12 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final long[] nanCounters;
 
     // Optional metrics listeners
+    @lombok.Setter
     private LatencyTrackingListener latencyListener;
+    @lombok.Setter
     private NodeProfileListener profileListener;
 
-    // ── Double-Buffered Snapshot (ZERO allocation on hot path) ────
-    // Two pre-allocated buffers: engine writes to one, I/O thread reads the other.
+    // ── Double-Buffered Snapshot (Zero allocation on hot path) ────
     private final int nodeCount;
     private final double[][] bufScalars = new double[2][];
     private final double[][][] bufVectors = new double[2][][];
@@ -65,8 +61,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final double[] bufLastLatency = new double[2];
     private final double[] bufAvgLatency = new double[2];
 
-    // Engine thread writes to buffers[writeSlot], then publishes via readySlot
-    // readySlot: -1 = nothing ready, 0 or 1 = slot ready for I/O thread
+    // Engine writes to buffers[writeSlot], then publishes via readySlot
     private final AtomicInteger readySlot = new AtomicInteger(-1);
 
     public WebsocketPublisherListener(StabilizationEngine engine, GraphDashboardServer server, String graphName,
@@ -78,7 +73,6 @@ public class WebsocketPublisherListener implements StabilizationListener {
         this.server = server;
         this.graphName = graphName;
         this.graphVersion = graphVersion;
-        this.logicalTypes = logicalTypes;
         this.descriptions = descriptions;
         this.sourceCodes = sourceCodes;
         this.edgeLabels = edgeLabels;
@@ -111,6 +105,12 @@ public class WebsocketPublisherListener implements StabilizationListener {
             bufScalars[b] = new double[nodeCount];
             bufVectors[b] = new double[nodeCount][];
             bufHeaders[b] = new String[nodeCount][];
+            for (int i = 0; i < nodeCount; i++) {
+                if (nodeKinds[i] == KIND_VECTOR) {
+                    int sz = ((com.trading.drg.api.VectorValue) topology.node(i)).size();
+                    bufVectors[b][i] = new double[sz];
+                }
+            }
         }
 
         // Start the dedicated I/O thread
@@ -210,28 +210,15 @@ public class WebsocketPublisherListener implements StabilizationListener {
                 .replace("\t", "\\t");
     }
 
-    public void setLatencyListener(LatencyTrackingListener latencyListener) {
-        this.latencyListener = latencyListener;
-    }
-
-    public void setProfileListener(NodeProfileListener profileListener) {
-        this.profileListener = profileListener;
-    }
-
     @Override
     public void onStabilizationStart(long epoch) {
         // No action needed
     }
 
-    /**
-     * Engine-thread hot path. ZERO allocation.
-     * Copies raw primitive values into a pre-allocated buffer slot
-     * and publishes the slot index atomically.
-     */
+    /** Hot path: Copies values to buffer and publishes atomically (Zero alloc). */
     @Override
     public void onStabilizationEnd(long epoch, int nodesStabilized) {
-        // Pick the write slot: always the one NOT currently being read
-        // Simple toggle: if readySlot is 0, write to 1; if 1 or -1, write to 0
+        // Pick the write slot: toggle between 0 and 1
         int ws = (readySlot.get() == 0) ? 1 : 0;
 
         TopologicalOrder topology = engine.topology();
@@ -245,19 +232,22 @@ public class WebsocketPublisherListener implements StabilizationListener {
             if (topology.isSource(i))
                 srcCount++;
 
-            Node<?> node = topology.node(i);
+            Node node = topology.node(i);
             if (nodeKinds[i] == KIND_VECTOR) {
                 var vv = (com.trading.drg.api.VectorValue) node;
-                vectors[i] = vv.value(); // reference copy — zero alloc
+                double[] dest = vectors[i];
+                for (int v = 0; v < dest.length; v++) {
+                    dest[v] = vv.valueAt(v);
+                }
                 headers[i] = vv.headers();
                 scalars[i] = Double.NaN;
             } else {
                 vectors[i] = null;
                 headers[i] = null;
                 if (node instanceof com.trading.drg.api.ScalarValue sv) {
-                    scalars[i] = sv.doubleValue();
-                } else if (node.value() instanceof Number num) {
-                    scalars[i] = num.doubleValue();
+                    scalars[i] = sv.value();
+                } else if (node instanceof com.trading.drg.node.BooleanNode bn) {
+                    scalars[i] = bn.booleanValue() ? 1.0 : 0.0;
                 } else {
                     scalars[i] = Double.NaN;
                 }
@@ -280,10 +270,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
         readySlot.set(ws);
     }
 
-    /**
-     * Dedicated I/O thread. Polls for ready snapshots and builds JSON + broadcasts.
-     * Completely decoupled from the engine stabilization thread.
-     */
+    /** Dedicated I/O thread polling ready snapshots to build JSON and broadcast. */
     private void ioLoop() {
         StringBuilder jsonBuilder = new StringBuilder(2048);
 
@@ -420,9 +407,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
         }
     }
 
-    /**
-     * Appends a double to StringBuilder without autoboxing.
-     */
+    /** Appends a double to StringBuilder without autoboxing. */
     private static void appendDouble(StringBuilder sb, double val) {
         if (!Double.isFinite(val)) {
             sb.append("\"").append(val).append("\"");

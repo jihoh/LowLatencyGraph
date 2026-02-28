@@ -4,8 +4,8 @@ import com.trading.drg.api.StabilizationListener;
 import java.util.Arrays;
 
 /**
- * Aggregates multiple {@link StabilizationListener} instances.
- * Uses a volatile snapshot array for zero-allocation iteration on the hot path.
+ * Aggregates multiple {@link StabilizationListener} instances with
+ * zero-allocation iteration.
  */
 public class CompositeStabilizationListener implements StabilizationListener {
     private StabilizationListener[] listeners = new StabilizationListener[0];
