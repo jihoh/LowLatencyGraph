@@ -62,6 +62,9 @@ public class WebsocketPublisherListener implements StabilizationListener {
     @lombok.Setter
     private java.util.function.DoubleSupplier backpressureSupplier;
 
+    @lombok.Setter
+    private com.trading.drg.util.AllocationProfiler allocationProfiler;
+
     // ── Double-Buffered Snapshot (Zero allocation on hot path) ────
     private final int nodeCount;
     private final double[][] bufScalars = new double[2][];
@@ -430,8 +433,12 @@ public class WebsocketPublisherListener implements StabilizationListener {
                     .append("\"youngGcCount\":").append(youngGcCount).append(",")
                     .append("\"youngGcTime\":").append(youngGcTime).append(",")
                     .append("\"oldGcCount\":").append(oldGcCount).append(",")
-                    .append("\"oldGcTime\":").append(oldGcTime)
-                    .append("}");
+                    .append("\"oldGcTime\":").append(oldGcTime);
+
+            if (allocationProfiler != null) {
+                jsonBuilder.append(",\"allocatedBytes\":").append(allocationProfiler.getLastAllocatedBytes());
+            }
+            jsonBuilder.append("}");
 
             if (backpressureSupplier != null) {
                 jsonBuilder.append(",\"disruptor\":{\"backpressure\":");

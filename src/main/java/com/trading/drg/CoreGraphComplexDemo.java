@@ -54,6 +54,7 @@ public class CoreGraphComplexDemo {
                 .enableNodeProfiling()
                 .enableLatencyTracking()
                 .bindDisruptorTelemetry(ringBuffer)
+                .withAllocationProfiler(handler.getProfiler())
                 .enableDashboardServer(PORT);
 
         // 4. Simulate Market Feed (Producer Thread)
@@ -109,22 +110,35 @@ public class CoreGraphComplexDemo {
         private final CoreGraph graph;
         private final com.trading.drg.api.GraphAutoRouter router;
 
+        @lombok.Getter
+        private final com.trading.drg.util.AllocationProfiler profiler;
+
         public MarketDataEventHandler(CoreGraph graph) {
             this.graph = graph;
             this.router = new com.trading.drg.api.GraphAutoRouter(graph)
                     .registerClass(MarketDataEvent.class);
+            this.profiler = new com.trading.drg.util.AllocationProfiler();
         }
 
         @Override
         public void onEvent(MarketDataEvent event, long sequence, boolean endOfBatch) throws Exception {
+            // Snapshot current Thread Allocated Bytes
+            profiler.start();
+
             // Zero-allocation, Zero GC topological update based purely on Trie routing
             router.route(event);
 
             // The beauty of the Disruptor is endOfBatch.
-            // It guarantees we only stabilize the graph ONCE per burst,
-            // maximizing throughput and preventing jitter.
+            // It guarantees we only stabilize the graph ONCE per burst, maximizing
+            // throughput and preventing jitter.
             if (endOfBatch && graph != null) {
                 graph.stabilize();
+            }
+
+            long bytesAllocated = profiler.stop();
+            // Ignore the JVM JIT warmup phase
+            if (bytesAllocated > 0 && sequence > 10000) {
+                System.err.println("WARNING: Hot-path allocated " + bytesAllocated + " bytes at sequence " + sequence);
             }
         }
     }

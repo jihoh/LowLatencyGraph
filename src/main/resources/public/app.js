@@ -702,6 +702,7 @@ function updateMetricsDOM(payload) {
             const elOldGcCount = document.getElementById('jvm-old-gc-count');
             const elOldGcTime = document.getElementById('jvm-old-gc-time');
             const elBackpressure = document.getElementById('jvm-backpressure');
+            const elAllocatedBytes = document.getElementById('jvm-allocated-bytes');
 
             let formatMB = (bytes) => (bytes >= 0) ? (bytes / 1048576).toFixed(1) : "-";
 
@@ -742,6 +743,14 @@ function updateMetricsDOM(payload) {
 
             if (payload.disruptor && elBackpressure) {
                 elBackpressure.textContent = payload.disruptor.backpressure.toFixed(1);
+            }
+            if (payload.metrics.jvm.allocatedBytes !== undefined && elAllocatedBytes) {
+                elAllocatedBytes.textContent = payload.metrics.jvm.allocatedBytes;
+                if (payload.metrics.jvm.allocatedBytes > 0) {
+                    elAllocatedBytes.style.color = '#ef4444';
+                } else {
+                    elAllocatedBytes.style.color = 'var(--text-color)';
+                }
             }
         }
     }

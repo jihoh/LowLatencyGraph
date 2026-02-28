@@ -26,6 +26,7 @@ public final class DashboardWiring {
     private LatencyTrackingListener latencyListener;
     private NodeProfileListener profileListener;
     private java.util.function.DoubleSupplier backpressureSupplier;
+    private com.trading.drg.util.AllocationProfiler allocationProfiler;
     private GraphDashboardServer dashboardServer;
 
     public DashboardWiring(CoreGraph graph) {
@@ -56,6 +57,14 @@ public final class DashboardWiring {
      */
     public DashboardWiring withBackpressureSupplier(java.util.function.DoubleSupplier supplier) {
         this.backpressureSupplier = supplier;
+        return this;
+    }
+
+    /**
+     * Binds an AllocationProfiler to stream zero-GC confirmation bytes.
+     */
+    public DashboardWiring withAllocationProfiler(com.trading.drg.util.AllocationProfiler profiler) {
+        this.allocationProfiler = profiler;
         return this;
     }
 
@@ -95,6 +104,9 @@ public final class DashboardWiring {
             }
             if (this.backpressureSupplier != null) {
                 wsListener.setBackpressureSupplier(this.backpressureSupplier);
+            }
+            if (this.allocationProfiler != null) {
+                wsListener.setAllocationProfiler(this.allocationProfiler);
             }
 
             graph.setListener(wsListener);
