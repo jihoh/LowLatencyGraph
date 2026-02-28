@@ -5,27 +5,20 @@ import com.trading.drg.api.StabilizationListener;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.io.GraphDefinition;
 import com.trading.drg.io.JsonGraphCompiler;
-import com.fasterxml.jackson.databind.ObjectMapper;
-// Removed Wiring imports
 import com.trading.drg.api.ScalarValue;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 /**
  * A high-level wrapper around the DRG engine that simplifies JSON-based graph
- * instantiation
- * and event publishing.
+ * instantiation and event publishing.
  * <p>
- * This class handles:
- * <ul>
- * <li>Parsing JSON graph definitions</li>
- * <li>Compiling the graph using {@link JsonGraphCompiler} with built-in
- * factories</li>
- * <li>Setting up the {@link StabilizationEngine}</li>
- * <li>Configuring the LMAX Disruptor for single-threaded event processing</li>
- * <li>Providing simplified {@link #publish(String, double)} methods</li>
- * </ul>
+ * Responsibilities: parse JSON, compile graph, update sources, stabilize.
+ * Dashboard wiring is handled separately by
+ * {@link com.trading.drg.web.DashboardWiring}.
  */
 public class CoreGraph {
     private final StabilizationEngine engine;
@@ -36,23 +29,16 @@ public class CoreGraph {
     private final Map<String, String> logicalTypes;
     private final Map<String, String> descriptions;
     private final Map<String, String> sourceCodes;
-    private final java.util.List<String> originalOrder;
+    private final List<String> originalOrder;
     private final Map<String, Map<String, String>> edgeLabels;
 
     private final com.trading.drg.util.CompositeStabilizationListener compositeListener;
-
-    // Optional trackers
-    private com.trading.drg.util.LatencyTrackingListener latencyListener;
-    private com.trading.drg.util.NodeProfileListener profileListener;
-    private com.trading.drg.web.GraphDashboardServer dashboardServer;
 
     // Cache source nodes for O(1) updates
     private final Node<?>[] sourceNodes;
 
     /**
      * Creates a new CoreGraph from a JSON file path string.
-     *
-     * @param jsonPath relative or absolute path to the JSON graph definition.
      */
     public CoreGraph(String jsonPath) {
         this(Path.of(jsonPath));
@@ -60,11 +46,8 @@ public class CoreGraph {
 
     /**
      * Creates a new CoreGraph from a JSON file path.
-     *
-     * @param jsonPath Path to the JSON graph definition.
      */
     public CoreGraph(Path jsonPath) {
-        // 1. Parse & Compile
         GraphDefinition graphDef;
         try {
             ObjectMapper mapper = new ObjectMapper();
@@ -96,29 +79,22 @@ public class CoreGraph {
             }
         }
 
-        // Register default listener via Composite
+        // Register composite listener
         this.compositeListener = new com.trading.drg.util.CompositeStabilizationListener();
         this.engine.setListener(this.compositeListener);
-
     }
 
+    // ── Listeners ────────────────────────────────────────────────
+
     /**
-     * Registers a listener to monitor stabilization events.
-     * Note: This adds to the composite listener rather than overwriting existing
-     * listeners
-     * (such as latency or profiling trackers).
-     *
-     * @param listener The listener to register.
+     * Adds a listener to the composite (does not overwrite existing ones).
      */
     public void setListener(StabilizationListener listener) {
         compositeListener.addForComposite(listener);
     }
 
-    /**
-     * Returns the underlying engine.
-     *
-     * @return The StabilizationEngine.
-     */
+    // ── Accessors ────────────────────────────────────────────────
+
     public StabilizationEngine getEngine() {
         return engine;
     }
@@ -131,76 +107,34 @@ public class CoreGraph {
         return version;
     }
 
-    /**
-     * Enables latency tracking.
-     * If already enabled, it does nothing.
-     */
-    public CoreGraph enableLatencyTracking() {
-        if (this.latencyListener == null) {
-            this.latencyListener = new com.trading.drg.util.LatencyTrackingListener();
-            compositeListener.addForComposite(this.latencyListener);
-        }
-        return this;
+    public Map<String, Node<?>> getNodes() {
+        return nodes;
     }
 
-    /**
-     * Enables detailed per-node profiling.
-     */
-    public CoreGraph enableNodeProfiling() {
-        if (this.profileListener == null) {
-            this.profileListener = new com.trading.drg.util.NodeProfileListener();
-            compositeListener.addForComposite(this.profileListener);
-        }
-        return this;
+    public Map<String, String> getLogicalTypes() {
+        return logicalTypes;
     }
 
-    /**
-     * Boots a Live Dashboard Server and wires it to the graph.
-     *
-     * @param port the port to bind to (e.g., 8080)
-     */
-    public CoreGraph enableDashboardServer(int port) {
-        if (this.dashboardServer == null) {
-            this.dashboardServer = new com.trading.drg.web.GraphDashboardServer();
-            this.dashboardServer.setSnapshotSupplier(this::buildSnapshotJson);
-
-            var wsListener = new com.trading.drg.web.WebsocketPublisherListener(
-                    this.engine, this.dashboardServer, this.name, this.version, this.logicalTypes, this.descriptions,
-                    this.originalOrder,
-                    this.edgeLabels,
-                    this.sourceCodes);
-
-            if (this.latencyListener != null) {
-                wsListener.setLatencyListener(this.latencyListener);
-            }
-            if (this.profileListener != null) {
-                wsListener.setProfileListener(this.profileListener);
-            }
-
-            setListener(wsListener);
-
-            // Open the socket only AFTER the server has the required initial configuration
-            // payloads cached.
-            this.dashboardServer.start(port);
-        }
-        return this;
+    public Map<String, String> getDescriptions() {
+        return descriptions;
     }
 
-    public com.trading.drg.util.LatencyTrackingListener getLatencyListener() {
-        return this.latencyListener;
+    public Map<String, String> getSourceCodes() {
+        return sourceCodes;
     }
 
-    public com.trading.drg.util.NodeProfileListener getProfileListener() {
-        return this.profileListener;
+    public List<String> getOriginalOrder() {
+        return originalOrder;
     }
 
-    public com.trading.drg.web.GraphDashboardServer getDashboardServer() {
-        return this.dashboardServer;
+    public Map<String, Map<String, String>> getEdgeLabels() {
+        return edgeLabels;
     }
+
+    // ── Domain Operations ────────────────────────────────────────
 
     /**
-     * Helper to read the current value of a Scalar node directly from the graph.
-     * Guaranteed safe in single-threaded usage.
+     * Reads the current value of a Scalar node.
      */
     public double getDouble(String name) {
         Node<?> node = getNode(name);
@@ -212,10 +146,6 @@ public class CoreGraph {
 
     /**
      * Retrieves a node by name.
-     *
-     * @param name The name of the node in the JSON definition.
-     * @param <T>  The expected type of the node.
-     * @return The node, or null if not found.
      */
     @SuppressWarnings("unchecked")
     public <T> T getNode(String name) {
@@ -223,36 +153,25 @@ public class CoreGraph {
     }
 
     /**
-     * Helper to get nodeId by name.
+     * Resolves a node name to its topological index.
      */
     public int getNodeId(String name) {
         return engine.topology().topoIndex(name);
     }
 
     /**
-     * Directly updates a Scalar Input Node.
-     * This method does NOT trigger stabilization. Call {@link #stabilize()} after a
-     * batch of updates.
-     *
-     * @param nodeName The name of the source node.
-     * @param value    The new value.
+     * Updates a Scalar source node by name. Does NOT trigger stabilization.
      */
     public void update(String nodeName, double value) {
         update(getNodeId(nodeName), value);
     }
 
     /**
-     * Directly updates a Scalar Input Node by ID.
-     * This method does NOT trigger stabilization. Call {@link #stabilize()} after a
-     * batch of updates.
-     *
-     * @param nodeId The topological index of the source node.
-     * @param value  The new value.
+     * Updates a Scalar source node by ID. Does NOT trigger stabilization.
      */
     public void update(int nodeId, double value) {
         if (nodeId < 0 || nodeId >= sourceNodes.length)
             return;
-
         Node<?> node = sourceNodes[nodeId];
         if (node instanceof com.trading.drg.node.ScalarSourceNode sn) {
             sn.updateDouble(value);
@@ -260,10 +179,12 @@ public class CoreGraph {
         }
     }
 
+    /**
+     * Updates a single element of a Vector source node by ID.
+     */
     public void update(int nodeId, int index, double value) {
         if (nodeId < 0 || nodeId >= sourceNodes.length)
             return;
-
         Node<?> node = sourceNodes[nodeId];
         if (node instanceof com.trading.drg.node.VectorSourceNode vsn) {
             vsn.updateAt(index, value);
@@ -272,106 +193,11 @@ public class CoreGraph {
     }
 
     /**
-     * Triggers a stabilization cycle on the engine.
+     * Triggers a stabilization cycle.
      *
      * @return Number of nodes recomputed.
      */
     public int stabilize() {
         return engine.stabilize();
     }
-
-    /**
-     * Serializes the current graph topology along with the internal dynamic state
-     * of every node
-     * into an expanded JSON string representing the exact runtime state.
-     */
-    public String buildSnapshotJson() {
-        GraphDefinition snapshot = new GraphDefinition();
-        var info = new GraphDefinition.GraphInfo();
-        info.setName(this.name + " (Snapshot)");
-        info.setVersion(this.version);
-        info.setEpoch(engine.epoch());
-        snapshot.setGraph(info);
-
-        java.util.List<GraphDefinition.NodeDef> expandedNodes = new java.util.ArrayList<>();
-        ObjectMapper mapper = new ObjectMapper();
-
-        for (String nodeName : originalOrder) {
-            Node<?> node = nodes.get(nodeName);
-            if (node == null)
-                continue;
-
-            GraphDefinition.NodeDef def = new GraphDefinition.NodeDef();
-            def.setName(nodeName);
-            def.setType(logicalTypes.get(nodeName));
-
-            // Reconstruct Inputs map from Edge Labels (Inverted: InputKey -> NodeName)
-            if (edgeLabels.containsKey(nodeName)) {
-                java.util.Map<String, String> original = edgeLabels.get(nodeName);
-                java.util.Map<String, String> inverted = new java.util.HashMap<>();
-                for (java.util.Map.Entry<String, String> entry : original.entrySet()) {
-                    inverted.put(entry.getValue(), entry.getKey());
-                }
-                def.setInputs(inverted);
-            }
-
-            // Extract dynamic state and value natively via Map
-            Map<String, Object> props = new java.util.HashMap<>();
-            if (node instanceof com.trading.drg.api.DynamicState ds) {
-                // To keep backwards compatibility with the existing DynamicState interface
-                // which writes to a StringBuilder, we will parse just the state block.
-                // Or better, since this is just the snapshot, we don't *really* need the
-                // internal
-                // DynamicState of pure mathematical nodes for the visual representation,
-                // but we will keep extracting it if present.
-                StringBuilder stateSb = new StringBuilder("{");
-                ds.serializeDynamicState(stateSb);
-                stateSb.append("}");
-                if (stateSb.length() > 2) {
-                    try {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> parsedState = mapper.readValue(stateSb.toString(), Map.class);
-                        props.putAll(parsedState);
-                    } catch (Exception e) {
-                        props.put("stateError", e.getMessage());
-                    }
-                }
-            }
-
-            Object val = node.value();
-            if (val == null) {
-                props.put("value", null);
-            } else if (val instanceof double[] arr) {
-                // Ensure NaNs serialize cleanly for JSON
-                Double[] safeArr = new Double[arr.length];
-                for (int i = 0; i < arr.length; i++)
-                    safeArr[i] = Double.isNaN(arr[i]) ? null : arr[i];
-                props.put("value", safeArr);
-            } else if (val instanceof Double d) {
-                props.put("value", d.isNaN() ? null : d);
-            } else {
-                props.put("value", val);
-            }
-
-            if (node instanceof com.trading.drg.api.VectorValue vv && vv.headers() != null) {
-                props.put("headers", vv.headers());
-            }
-
-            if (!props.isEmpty()) {
-                def.setProperties(props);
-            }
-
-            expandedNodes.add(def);
-        }
-
-        info.setNodes(expandedNodes);
-
-        try {
-            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(snapshot);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            return "{\"error\":\"Failed to serialize snapshot: " + e.getMessage() + "\"}";
-        }
-    }
-
-    // End of CoreGraph
 }

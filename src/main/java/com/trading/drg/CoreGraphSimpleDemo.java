@@ -15,7 +15,8 @@ public class CoreGraphSimpleDemo {
         log.info("Starting CoreGraph Demo...");
 
         // Initialize the graph
-        var graph = new CoreGraph("src/main/resources/fx_arb.json")
+        var graph = new CoreGraph("src/main/resources/fx_arb.json");
+        var dashboard = new com.trading.drg.web.DashboardWiring(graph)
                 .enableNodeProfiling()
                 .enableLatencyTracking()
                 .enableDashboardServer(8081);
@@ -26,12 +27,12 @@ public class CoreGraphSimpleDemo {
         // Get Latency Stats
         log.info("Demo complete.");
         System.out.println("\n--- Global Latency Stats ---");
-        System.out.println(graph.getLatencyListener().dump());
+        System.out.println(dashboard.getLatencyListener().dump());
         System.out.println("\n--- Node Performance Profile ---");
-        System.out.println(graph.getProfileListener().dump());
+        System.out.println(dashboard.getProfileListener().dump());
 
         // Stop the dashboard server after demo
-        graph.getDashboardServer().stop();
+        dashboard.getDashboardServer().stop();
     }
 
     private static void simulateMarketFeed(CoreGraph graph) throws InterruptedException {

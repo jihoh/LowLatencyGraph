@@ -29,10 +29,11 @@ public class CoreGraphComplexDemo {
         log.info("Starting Disruptor E2E Demo...");
 
         // 1. Initialize DRG Engine
-        CoreGraph graph = new CoreGraph("src/main/resources/bond_pricer.json")
+        CoreGraph graph = new CoreGraph("src/main/resources/bond_pricer.json");
+        var dashboard = new com.trading.drg.web.DashboardWiring(graph)
                 .enableNodeProfiling()
-                .enableLatencyTracking();
-        graph.enableDashboardServer(PORT);
+                .enableLatencyTracking()
+                .enableDashboardServer(PORT);
 
         // 2. Setup LMAX Disruptor
         ThreadFactory threadFactory = DaemonThreadFactory.INSTANCE;
