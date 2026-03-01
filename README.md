@@ -82,8 +82,8 @@ This architecture achieves $O(Wait-Free)$ thread transfer, guaranteeing that the
 Every time `stabilize()` is called, the engine increments an internal `epoch` counter.
 *   This creates a distinct **Logical Time** step.
 *   All nodes computed in Epoch `N` see a consistent snapshot of inputs from Epoch `N-1` or `N`.
-*   This guarantees **Atomic Consistency**: You typically never see "half a curve update" or "half an arb". If an input changes, all dependent nodes are updated before any output is visible.
-
+*   This guarantees **Atomic Consistency**: You typically never see "half a curve update" or "half an arb". If an input changes, all dependent nodes are updated before any output is visible
+.
 ### 2.4 Memory Layout (CSR Topology)
 To keep the CPU cache hot during the critical `stabilize()` loop, CoreGraph avoids an object-oriented tree structure.
 Instead of Nodes holding `List<Node>` pointers to their children, the engine builds a **Compressed Sparse Row (CSR)** topology:
