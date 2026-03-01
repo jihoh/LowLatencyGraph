@@ -101,7 +101,7 @@ public class StabilizationEngineTest {
         executionLog.clear();
 
         // Update A
-        sourceA.updateDouble(2.0);
+        sourceA.update(2.0);
         engine.markDirty("A");
 
         int stabilized = engine.stabilize();
@@ -141,7 +141,7 @@ public class StabilizationEngineTest {
         executionLog.clear();
 
         // Update A -> triggers D_Stop. D_Stop NEVER propagates -> E is skipped.
-        sourceA.updateDouble(2.0);
+        sourceA.update(2.0);
         customEngine.markDirty("A");
         int stab = customEngine.stabilize();
 
@@ -200,7 +200,7 @@ public class StabilizationEngineTest {
         assertEquals(100, hugeEngine.stabilize());
 
         // Mark node 75 dirty (crosses the 64-bit word boundary into word[1])
-        nodes.get(75).updateDouble(1.0);
+        nodes.get(75).update(1.0);
         hugeEngine.markDirty("S75");
 
         assertEquals(1, hugeEngine.stabilize());

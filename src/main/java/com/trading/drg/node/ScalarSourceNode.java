@@ -31,12 +31,8 @@ public final class ScalarSourceNode implements SourceNode, ScalarValue {
         return name;
     }
 
-    public void update(Double value) {
-        updateDouble(value);
-    }
-
     /** Updates the primitive double value directly. */
-    public void updateDouble(double value) {
+    public void update(double value) {
         this.currentValue = value;
     }
 

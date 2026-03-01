@@ -117,7 +117,7 @@ public class CoreGraph {
             return;
         Node node = sourceNodes[nodeId];
         if (node instanceof com.trading.drg.node.ScalarSourceNode sn) {
-            sn.updateDouble(value);
+            sn.update(value);
             engine.markDirty(nodeId);
         }
     }

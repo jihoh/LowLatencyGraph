@@ -86,7 +86,7 @@ Before building a graph, it's important to understand the available nodes you ca
 
 ### Source Nodes (The Inputs)
 Source nodes have no parents. Their values are updated externally (e.g. by a market data feed) and their changes propagate downstream.
-*   **`ScalarSourceNode`**: Holds a single primitive `double` value (e.g. a stock price).
+*   **`ScalarSourceNode`**: Holds a single primitive `double` value (e.g. a price).
 *   **`VectorSourceNode`**: Holds a fixed-size contiguous array of primitive `double` values (e.g. a Yield Curve).
 
 ### Compute Nodes (The Logic)
@@ -122,8 +122,8 @@ ScalarCalcNode avgSpread = builder.compute("Avg_Spread", new Ewma(0.1), spread);
 StabilizationEngine engine = builder.build();
 
 // 6. Inject live data (update source nodes by name)
-leg1.updateDouble(4.20);
-leg2.updateDouble(4.88);
+leg1.update(4.20);
+leg2.update(4.88);
 
 // 7. Flush the system (recomputes only dirty nodes)
 engine.stabilize();
