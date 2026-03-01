@@ -1,7 +1,7 @@
 {
     "graph": {
-        "name": "Vector Operations Demo",
-        "version": "1.0.0",
+        "name": "VECTOR DEMO",
+        "version": "1.0",
         "nodes": [
             {
                 "name": "MarketYieldCurve",
