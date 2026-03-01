@@ -66,7 +66,19 @@ The system is designed as a **Passive** graph engine. The application thread dri
 | `GraphBuilder` | **Compiler**. Defines the topology. | Compiles the graph description into **CSR (Compressed Sparse Row)** format - flattened integer arrays for maximum cache locality. |
 | `JsonGraphCompiler` | **Loader**. JSON -> Graph. | Allows defining topology in data, decoupling strategy configuration from code compilation. |
 
-### 2.3 The "Epoch" Concept
+### 2.3 The Asynchronous Double-Buffer (Lock-Free I/O)
+
+To export millions of calculated scalars to WebSocket dashboards or remote UI telemetry without allocating `String`s or fighting OS locks, CoreGraph implements a **Double-Buffering** architecture.
+
+Most architectures build JSON by allocating `new SnapshotEvent()` POJOs and serializing them with Jackson, triggering massive Garbage Collection. CoreGraph explicitly avoids this:
+
+1. **The Math Thread (Write):** Two flat `double[][]` arrays are pre-allocated at startup. When `stabilize()` finishes natively, the hot thread grabs the "inactive" slot, blindly copy-pasting its raw node values into the array. It then triggers an `AtomicInteger` lock-free flip. There are **zero object creations** and **zero synchronized locks**.
+2. **The I/O Thread (Read):** A background WebSocket thread monitors the `AtomicInteger`. When flipped, it reads the active `double[]`.
+3. **Zero-Allocation JSON:** The I/O thread uses a single pre-allocated `StringBuilder`, resetting its length to 0 on every tick: `jsonBuilder.setLength(0)`. It constructs the JSON payload by directly concatenating statically interned string constants (e.g. `{"values":`) and mathematically formatting the primitive `double`s natively into the reusable `char[]` buffer.
+
+This architecture achieves $O(Wait-Free)$ thread transfer, guaranteeing that the mathematical hot-path never waits for the network card.
+
+### 2.4 The "Epoch" Concept
 Every time `stabilize()` is called, the engine increments an internal `epoch` counter.
 *   This creates a distinct **Logical Time** step.
 *   All nodes computed in Epoch `N` see a consistent snapshot of inputs from Epoch `N-1` or `N`.

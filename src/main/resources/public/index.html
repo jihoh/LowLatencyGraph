@@ -96,10 +96,10 @@
             </div>
 
             <!-- Bottom Dock -->
-            <div id="bottom-dock" class="dock-container bottom-dock">
+            <div id="bottom-dock" class="dock-container bottom-dock minimized hidden">
                 <div id="bottom-dock-resizer" class="edge-resizer top-edge"></div>
                 <!-- Floating Interactive Charting Panel -->
-                <div id="chart-panel" class="chart-panel docked">
+                <div id="chart-panel" class="chart-panel docked minimized hidden">
                     <div class="chart-header">
                         <h3 id="chart-title"></h3>
                         <div class="header-controls" style="display:flex; align-items:center;">
@@ -338,6 +338,32 @@
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    </div>
+
+                    <h3 id="header-settings" style="margin-top: 24px; cursor: pointer; user-select: none;">Settings
+                        <span>▶</span>
+                    </h3>
+                    <div id="content-settings" style="margin-top: 8px; display: none;">
+                        <div class="alert-controls" style="display: flex; flex-direction: column; gap: 12px;">
+                            <label
+                                style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-primary); cursor: pointer;">
+                                <input type="checkbox" id="setting-enable-scrubbing">
+                                Enable Historical Scrubbing
+                            </label>
+
+                            <div
+                                style="display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem;">
+                                <span style="color: var(--text-secondary);">History Depth (Ticks)</span>
+                                <input type="number" id="setting-history-size" class="alert-input" value="3000" min="2"
+                                    max="10000" style="width: 80px; text-align: right;">
+                            </div>
+
+                            <p
+                                style="font-size: 0.7rem; color: var(--text-highlight); margin-top: 4px; line-height: 1.4;">
+                                Warning: Large history sizes consume significant browser memory. Disabling scrubbing
+                                instantly frees memory and maximizes performance.
+                            </p>
                         </div>
                     </div>
                 </div>

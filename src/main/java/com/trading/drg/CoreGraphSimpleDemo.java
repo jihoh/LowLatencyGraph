@@ -1,5 +1,11 @@
 package com.trading.drg;
 
+import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.YieldingWaitStrategy;
+import com.lmax.disruptor.dsl.Disruptor;
+import com.lmax.disruptor.dsl.ProducerType;
+import com.lmax.disruptor.util.DaemonThreadFactory;
+import com.trading.drg.api.GraphAutoRouter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -12,100 +18,159 @@ public class CoreGraphSimpleDemo {
     private static final Logger log = LogManager.getLogger(CoreGraphSimpleDemo.class);
 
     public static void main(String[] args) throws Exception {
-        log.info("Starting CoreGraph Demo...");
+        log.info("Starting CoreGraph Simple Demo...");
 
-        // Initialize the graph
+        // 1. Initialize the graph
         var graph = new CoreGraph("src/main/resources/fx_arb.json");
+
+        // 2. Initialize Disruptor
+        int bufferSize = 1024;
+        Disruptor<FxTickEvent> disruptor = new Disruptor<>(
+                FxTickEvent::new,
+                bufferSize,
+                DaemonThreadFactory.INSTANCE,
+                ProducerType.SINGLE,
+                new YieldingWaitStrategy());
+
+        // 3. Bind Handler
+        FxTickEventHandler handler = new FxTickEventHandler(graph);
+        disruptor.handleEventsWith(handler);
+        RingBuffer<FxTickEvent> ringBuffer = disruptor.start();
+
+        // 4. Wiring
         var dashboard = new com.trading.drg.web.DashboardWiring(graph)
                 .enableNodeProfiling()
                 .enableLatencyTracking()
+                .bindDisruptorTelemetry(ringBuffer)
+                .withAllocationProfiler(handler.getProfiler())
                 .enableDashboardServer(8081);
 
         // Run the simulation
-        simulateMarketFeed(graph);
-
-        // Get Latency Stats
-        log.info("Demo complete.");
-        System.out.println("\n--- Global Latency Stats ---");
-        System.out.println(dashboard.getLatencyListener().dump());
-        System.out.println("\n--- Node Performance Profile ---");
-        System.out.println(dashboard.getProfileListener().dump());
+        simulateMarketFeed(ringBuffer);
 
         // Stop the dashboard server after demo
         dashboard.getDashboardServer().stop();
+        System.exit(0);
     }
 
-    private static void simulateMarketFeed(CoreGraph graph) throws InterruptedException {
-        // Advanced Simulation Loop
+    public static class FxTickEvent {
+        @GraphAutoRouter.RoutingValue
+        public double EURUSD = Double.NaN;
+        @GraphAutoRouter.RoutingValue
+        public double USDJPY = Double.NaN;
+        @GraphAutoRouter.RoutingValue
+        public double EURJPY = Double.NaN;
+
+        public void set(double eurUsd, double usdJpy, double eurJpy) {
+            this.EURUSD = eurUsd;
+            this.USDJPY = usdJpy;
+            this.EURJPY = eurJpy;
+        }
+    }
+
+    public static class FxTickEventHandler implements com.lmax.disruptor.EventHandler<FxTickEvent> {
+        private final CoreGraph graph;
+        private final GraphAutoRouter router;
+
+        @lombok.Getter
+        private final com.trading.drg.util.AllocationProfiler profiler;
+
+        public FxTickEventHandler(CoreGraph graph) {
+            this.graph = graph;
+            this.router = new GraphAutoRouter(graph).registerClass(FxTickEvent.class);
+            this.profiler = new com.trading.drg.util.AllocationProfiler();
+
+            // Warmup
+            FxTickEvent dummy = new FxTickEvent();
+            dummy.set(0, 0, 0);
+            router.route(dummy);
+        }
+
+        @Override
+        public void onEvent(FxTickEvent event, long sequence, boolean endOfBatch) throws Exception {
+            profiler.start();
+
+            // Zero-GC routing using the class fields purely
+            router.route(event);
+
+            if (endOfBatch && graph != null) {
+                graph.stabilize();
+            }
+
+            profiler.stop();
+        }
+    }
+
+    private static void simulateMarketFeed(RingBuffer<FxTickEvent> ringBuffer) {
         Random rng = new Random(42);
         int updates = 100_000;
 
-        String[] nodes = { "EURUSD", "USDJPY", "EURJPY" };
-        graph.update("EURUSD", 1.18);
-        graph.update("USDJPY", 154.9);
-        graph.update("EURJPY", 182.8);
-        graph.stabilize();
+        double currentEurUsd = 1.18;
+        double currentUsdJpy = 154.9;
+        double currentEurJpy = 182.8;
+
+        // Push baseline immediately
+        long initSeq = ringBuffer.next();
+        try {
+            ringBuffer.get(initSeq).set(currentEurUsd, currentUsdJpy, currentEurJpy);
+        } finally {
+            ringBuffer.publish(initSeq);
+        }
 
         int nanCountdown = 0;
-        String nanNode = null;
+        int nanTargetIndex = -1; // 0=EURUSD, 1=USDJPY, 2=EURJPY
 
         log.info("Publishing updates (1 tick/sec, with 5s NaN faults)...");
         for (int i = 0; i < updates; i++) {
-            // Priority 1: Manage NaN Fault Injection Phase
+
             if (nanCountdown > 0) {
-                // Keep the faulted node at NaN for the duration of the countdown
-                graph.update(nanNode, Double.NaN);
+                if (nanTargetIndex == 0)
+                    currentEurUsd = Double.NaN;
+                else if (nanTargetIndex == 1)
+                    currentUsdJpy = Double.NaN;
+                else
+                    currentEurJpy = Double.NaN;
+
                 nanCountdown--;
                 if (nanCountdown == 0) {
-                    // Recover the node with a sensible baseline so it doesn't stay NaN forever.
-                    double recoveryValue = nanNode.equals("USDJPY") ? 154.9 : nanNode.equals("EURJPY") ? 182.8 : 1.18;
-                    graph.update(nanNode, recoveryValue);
-                    log.info("Recovered " + nanNode + " from NaN fault.");
-                    nanNode = null;
+                    currentEurUsd = 1.18;
+                    currentUsdJpy = 154.9;
+                    currentEurJpy = 182.8;
+                    log.info("Recovered from NaN fault.");
                 }
             } else if (i > 0 && i % 500 == 0) {
-                // Trigger a new 100-second NaN fault every 500 ticks
-                nanNode = nodes[rng.nextInt(nodes.length)];
+                nanTargetIndex = rng.nextInt(3);
                 nanCountdown = 100;
-                graph.update(nanNode, Double.NaN);
-                log.info("Injected NaN fault into " + nanNode + " for 100 seconds.");
-            }
+                log.info("Injected NaN fault into index " + nanTargetIndex + " for 100 seconds.");
+            } else {
+                int targetNode = rng.nextInt(3);
+                while (nanCountdown > 0 && nanTargetIndex == targetNode) {
+                    targetNode = rng.nextInt(3);
+                }
 
-            // Normal Random Walk for exactly ONE OTHER random node
-            String targetNode = nodes[rng.nextInt(nodes.length)];
-
-            // Loop until we find a node that is NOT currently the active NaN fault
-            while (nanNode != null && nanNode.equals(targetNode)) {
-                targetNode = nodes[rng.nextInt(nodes.length)];
-            }
-
-            double shock = (rng.nextDouble() - 0.5) * 0.05; // Slightly larger shock for 1s ticks
-            double currentValue = graph.getDouble(targetNode);
-
-            // Remove the Double.isNaN() cold start block entirely.
-
-            if (targetNode.contains("JPY")) {
-                shock *= 100;
-            }
-            graph.update(targetNode, currentValue + shock);
-
-            // Always stabilize to propagate whatever state (good or NaN) exists
-            graph.stabilize();
-
-            if (i % 5 == 0) {
-                double spread = graph.getDouble("Arb.Spread");
-                if (!Double.isNaN(spread) && Math.abs(spread) > 0.05) {
-                    log.info(String.format(
-                            "[Arb Opportunity] Spread: %.4f | EWMA: %.4f | EURUSD: %.4f | USDJPY: %.2f | EURJPY: %.2f",
-                            spread,
-                            graph.getDouble("Arb.Spread.Ewma"),
-                            graph.getDouble("EURUSD"),
-                            graph.getDouble("USDJPY"),
-                            graph.getDouble("EURJPY")));
+                double shock = (rng.nextDouble() - 0.5) * 0.05;
+                if (targetNode == 0) {
+                    currentEurUsd += shock;
+                } else if (targetNode == 1) {
+                    currentUsdJpy += (shock * 100);
+                } else {
+                    currentEurJpy += (shock * 100);
                 }
             }
 
-            Thread.sleep(100);
+            // Publish cleanly to the RingBuffer without allocating
+            long sequence = ringBuffer.next();
+            try {
+                ringBuffer.get(sequence).set(currentEurUsd, currentUsdJpy, currentEurJpy);
+            } finally {
+                ringBuffer.publish(sequence);
+            }
+
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                break;
+            }
         }
     }
 }

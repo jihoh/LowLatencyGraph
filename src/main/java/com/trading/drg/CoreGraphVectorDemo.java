@@ -1,7 +1,11 @@
 package com.trading.drg;
 
+import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.YieldingWaitStrategy;
+import com.lmax.disruptor.dsl.Disruptor;
+import com.lmax.disruptor.dsl.ProducerType;
+import com.lmax.disruptor.util.DaemonThreadFactory;
 import org.apache.logging.log4j.LogManager;
-
 import org.apache.logging.log4j.Logger;
 
 import java.util.Random;
@@ -16,37 +20,91 @@ public class CoreGraphVectorDemo {
         log.info("Starting CoreGraph Vector Demo...");
 
         var graph = new CoreGraph("src/main/resources/vector_demo.json");
+
+        // 2. Initialize Disruptor
+        int bufferSize = 1024;
+        Disruptor<VectorUpdateEvent> disruptor = new Disruptor<>(
+                VectorUpdateEvent::new,
+                bufferSize,
+                DaemonThreadFactory.INSTANCE,
+                ProducerType.SINGLE,
+                new YieldingWaitStrategy());
+
+        // 3. Bind Handler
+        VectorUpdateHandler handler = new VectorUpdateHandler(graph);
+        disruptor.handleEventsWith(handler);
+        RingBuffer<VectorUpdateEvent> ringBuffer = disruptor.start();
+
+        // 4. Wiring
         var dashboard = new com.trading.drg.web.DashboardWiring(graph)
                 .enableNodeProfiling()
                 .enableLatencyTracking()
-                .enableDashboardServer(8089);
+                .bindDisruptorTelemetry(ringBuffer)
+                .withAllocationProfiler(handler.getProfiler())
+                .enableDashboardServer(8082);
 
         // Run the simulation
-        simulateVectorFeed(graph);
-
-        // Get Latency Stats
-        log.info("Demo complete.");
-        System.out.println("\n--- Global Latency Stats ---");
-        System.out.println(dashboard.getLatencyListener().dump());
-        System.out.println("\n--- Node Performance Profile ---");
-        System.out.println(dashboard.getProfileListener().dump());
+        simulateVectorFeed(ringBuffer, graph.getNodeId("MarketYieldCurve"));
 
         // Stop the dashboard server after demo
         dashboard.getDashboardServer().stop();
+        System.exit(0);
     }
 
-    private static void simulateVectorFeed(CoreGraph graph) throws InterruptedException {
+    public static class VectorUpdateEvent {
+        public int nodeId;
+        public int index;
+        public double value;
+
+        public void set(int nodeId, int index, double value) {
+            this.nodeId = nodeId;
+            this.index = index;
+            this.value = value;
+        }
+    }
+
+    public static class VectorUpdateHandler implements com.lmax.disruptor.EventHandler<VectorUpdateEvent> {
+        private final CoreGraph graph;
+
+        @lombok.Getter
+        private final com.trading.drg.util.AllocationProfiler profiler;
+
+        public VectorUpdateHandler(CoreGraph graph) {
+            this.graph = graph;
+            this.profiler = new com.trading.drg.util.AllocationProfiler();
+        }
+
+        @Override
+        public void onEvent(VectorUpdateEvent event, long sequence, boolean endOfBatch) {
+            profiler.start();
+
+            // Zero-GC Array Indexing update
+            graph.update(event.nodeId, event.index, event.value);
+
+            if (endOfBatch && graph != null) {
+                graph.stabilize();
+            }
+
+            profiler.stop();
+        }
+    }
+
+    private static void simulateVectorFeed(RingBuffer<VectorUpdateEvent> ringBuffer, int curveNodeId) {
         Random rng = new Random(42);
         int updates = 20_000;
 
         // Initialize the base yield curve vector: [1M, 3M, 6M, 1Y, 2Y]
         double[] baseCurve = { 4.50, 4.55, 4.60, 4.65, 4.70 };
 
-        // Push initial state using index-based updates
+        // Push initial state to the ring buffer
         for (int i = 0; i < baseCurve.length; i++) {
-            graph.update(graph.getNodeId("MarketYieldCurve"), i, baseCurve[i]);
+            long sequence = ringBuffer.next();
+            try {
+                ringBuffer.get(sequence).set(curveNodeId, i, baseCurve[i]);
+            } finally {
+                ringBuffer.publish(sequence);
+            }
         }
-        graph.stabilize();
 
         log.info("Publishing vector updates (mock yield curve shifts)...");
         for (int i = 0; i < updates; i++) {
@@ -58,23 +116,20 @@ public class CoreGraphVectorDemo {
                 // small bps shock
                 double shock = (rng.nextDouble() - 0.5) * 0.10;
                 baseCurve[tenorIndex] += shock;
-                graph.update(graph.getNodeId("MarketYieldCurve"), tenorIndex, baseCurve[tenorIndex]);
+
+                long sequence = ringBuffer.next();
+                try {
+                    ringBuffer.get(sequence).set(curveNodeId, tenorIndex, baseCurve[tenorIndex]);
+                } finally {
+                    ringBuffer.publish(sequence);
+                }
             }
 
-            // Always stabilize to propagate whatever state exists
-            graph.stabilize();
-
-            if (i % 20 == 0) {
-                double yield1M = graph.getDouble("MarketYieldCurve.1M");
-                double yield2Y = graph.getDouble("MarketYieldCurve.2Y");
-                double spread = graph.getDouble("Spread2Y1M");
-
-                log.info(String.format(
-                        "Curve Update | 1M: %.4f | 2Y: %.4f | Steepness (2Y-1M): %.4f",
-                        yield1M, yield2Y, spread));
+            try {
+                Thread.sleep(100); // Pause for dashboard visualization
+            } catch (InterruptedException e) {
+                break;
             }
-
-            Thread.sleep(250); // Pause for dashboard visualization
         }
     }
 }

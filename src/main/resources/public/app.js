@@ -124,13 +124,14 @@ const messageTimes = new RingBuffer(100);
 
 // Settings Configs
 let globalHistoryDepth = 3000;
+let isHistoryEnabled = false;
 
 // Lightweight Charts Globals
 const nodeHistory = new Map(); // Maps NodeID -> Array of {time: timestamp, value: number}
 const nodeNaNHistory = new Map(); // Tracks discrete NaN timestamps for red highlighting
 const epochToRealTime = new Map(); // Maps integer epochs -> actual JS millisecond timestamps
 let oldestEpochTracker = -1; // O(1) tracking for cleaning up old epochs
-const snapshots = new RingBuffer(globalHistoryDepth); // Master timeline payload cache
+const snapshots = new RingBuffer(2); // Master timeline payload cache, defaults to 2 because scrubbing is disabled
 
 
 // Alert Engine State
@@ -929,6 +930,11 @@ function connect() {
                         } catch (e) {
                             console.warn("Could not restore chart selections", e);
                         }
+
+                        // Auto-collapse chart panel when empty on load
+                        if (activeChartSeries.size === 0) {
+                            closeChart();
+                        }
                     }
 
                     // Store descriptions and edge labels globally
@@ -982,12 +988,14 @@ function connect() {
             }
 
             // Cache historical state uniformly ensuring precise timeline matches using an amortized double buffer
-            snapshots.push(payload);
+            if (isHistoryEnabled) {
+                snapshots.push(payload);
+            }
 
             if (!isScrubbing) {
-                if (domTimeScrubber) {
-                    domTimeScrubber.max = snapshots.size - 1;
-                    domTimeScrubber.value = snapshots.size - 1;
+                if (domTimeScrubber && isHistoryEnabled) {
+                    domTimeScrubber.max = snapshots.size === 0 ? 0 : snapshots.size - 1;
+                    domTimeScrubber.value = snapshots.size === 0 ? 0 : snapshots.size - 1;
                 }
                 if (domTimelineEpoch) domTimelineEpoch.textContent = 'Epoch: ' + payload.epoch;
             }
@@ -1099,14 +1107,35 @@ function connect() {
 
                     const point = { time: payload.epoch, value: plotVal };
 
-                    historyArr.push(point);
+                    if (isHistoryEnabled) {
+                        historyArr.push(point);
+                    } else {
+                        // Keep a size of 1 for NaN bridging manually
+                        historyArr.head = 1;
+                        historyArr.buffer[0] = point;
+                        historyArr.size = 1;
+                    }
 
                     // Track continuous NaN statuses for the chart's red overlay background
                     if (isNaNVal) {
                         const nanPoint = { time: payload.epoch, value: 1 };
-                        nanArr.push(nanPoint);
+                        if (isHistoryEnabled) {
+                            nanArr.push(nanPoint);
+                        } else {
+                            // Keep a size of 1 for NaN bridging manually
+                            nanArr.head = 1;
+                            nanArr.buffer[0] = nanPoint;
+                            nanArr.size = 1;
+                        }
                     } else {
-                        nanArr.push({ time: payload.epoch, value: NaN });
+                        if (isHistoryEnabled) {
+                            nanArr.push({ time: payload.epoch, value: NaN });
+                        } else {
+                            // Keep a size of 1 for NaN bridging manually
+                            nanArr.head = 1;
+                            nanArr.buffer[0] = { time: payload.epoch, value: NaN };
+                            nanArr.size = 1;
+                        }
                     }
 
                     // Explicitly push the live tick
@@ -1806,6 +1835,10 @@ function openChart(nodeId) {
     const chartPanel = document.getElementById('chart-panel');
     const bottomDock = document.getElementById('bottom-dock');
     const toggleBtn = document.getElementById('toggle-chart');
+
+    if (chartPanel) chartPanel.classList.remove('hidden');
+    if (bottomDock) bottomDock.classList.remove('hidden');
+
     if (chartPanel && chartPanel.classList.contains('minimized')) {
         chartPanel.classList.remove('minimized');
         if (bottomDock) bottomDock.classList.remove('minimized');
@@ -1925,8 +1958,14 @@ function openChart(nodeId) {
 function closeChart() {
     const chartPanel = document.getElementById('chart-panel');
     const bottomDock = document.getElementById('bottom-dock');
-    if (chartPanel) chartPanel.classList.add('minimized');
-    if (bottomDock) bottomDock.classList.add('minimized');
+    if (chartPanel) {
+        chartPanel.classList.add('minimized');
+        chartPanel.classList.add('hidden');
+    }
+    if (bottomDock) {
+        bottomDock.classList.add('minimized');
+        bottomDock.classList.add('hidden');
+    }
 
     // Wipe all chart series and free the lazy memory
     for (const [id, cs] of activeChartSeries.entries()) {
@@ -2268,6 +2307,7 @@ window.addEventListener('DOMContentLoaded', () => {
     setupDockResizers();
     initProfileSorting();
     initGraphSearch();
+    initSettings();
 
     // Boot WebSocket strictly after DOM stabilizes
     connect();
@@ -2343,4 +2383,101 @@ function initGraphSearch() {
             }
         });
     }
+}
+
+function initSettings() {
+    const enableCheckbox = document.getElementById('setting-enable-scrubbing');
+    const historySizeInput = document.getElementById('setting-history-size');
+
+    function applyHistorySettings() {
+        isHistoryEnabled = enableCheckbox.checked;
+        const requestedSize = parseInt(historySizeInput.value, 10);
+
+        if (!isNaN(requestedSize) && requestedSize >= 2) {
+            globalHistoryDepth = requestedSize;
+        }
+
+        // Adjust master snapshots RingBuffer
+        const targetCapacity = isHistoryEnabled ? globalHistoryDepth : 2;
+        if (snapshots.capacity !== targetCapacity) {
+            const oldData = snapshots.toArray();
+            snapshots.capacity = targetCapacity;
+            snapshots.buffer = new Array(targetCapacity);
+            snapshots.head = 0;
+            snapshots.tail = 0;
+            snapshots.size = 0;
+
+            // Retain recent history if shrinking or growing
+            const keepCount = Math.min(oldData.length, targetCapacity);
+            const startIndex = oldData.length - keepCount;
+            for (let i = 0; i < keepCount; i++) {
+                snapshots.push(oldData[startIndex + i]);
+            }
+        }
+
+        // Adjust history arrays tracking active charts (nodeHistory and nodeNaNHistory)
+        nodeHistory.forEach((arr, nodeId) => {
+            if (arr.capacity !== targetCapacity) {
+                const oldArray = arr.toArray();
+                arr.capacity = targetCapacity;
+                arr.buffer = new Array(targetCapacity);
+                arr.head = 0;
+                arr.tail = 0;
+                arr.size = 0;
+                const keep = Math.min(oldArray.length, targetCapacity);
+                const startIdx = oldArray.length - keep;
+                for (let i = 0; i < keep; i++) {
+                    arr.push(oldArray[startIdx + i]);
+                }
+            }
+        });
+
+        nodeNaNHistory.forEach((arr, nodeId) => {
+            if (arr.capacity !== targetCapacity) {
+                const oldArray = arr.toArray();
+                arr.capacity = targetCapacity;
+                arr.buffer = new Array(targetCapacity);
+                arr.head = 0;
+                arr.tail = 0;
+                arr.size = 0;
+                const keep = Math.min(oldArray.length, targetCapacity);
+                const startIdx = oldArray.length - keep;
+                for (let i = 0; i < keep; i++) {
+                    arr.push(oldArray[startIdx + i]);
+                }
+            }
+        });
+
+        // Toggle UI elements
+        if (domTimeScrubber) {
+            if (!isHistoryEnabled) {
+                domTimeScrubber.disabled = true;
+                domTimeScrubber.title = "Scrubbing history is disabled in settings for maximum performance";
+                if (isScrubbing) {
+                    isScrubbing = false; // Kick out of scrubbing mode to resume live streaming
+                }
+            } else {
+                domTimeScrubber.disabled = false;
+                domTimeScrubber.title = "";
+            }
+        }
+    }
+
+    if (enableCheckbox) {
+        enableCheckbox.addEventListener('change', applyHistorySettings);
+    }
+    if (historySizeInput) {
+        historySizeInput.addEventListener('change', (e) => {
+            // Only apply if the input is valid and they commit the change (e.g., press Enter or blur)
+            const val = parseInt(e.target.value, 10);
+            if (val >= 2 && val <= 100000) {
+                applyHistorySettings();
+            } else {
+                e.target.value = globalHistoryDepth; // Revert to known good if invalid
+            }
+        });
+    }
+
+    // Apply the initial HTML state directly to the JavaScript history engine
+    applyHistorySettings();
 }

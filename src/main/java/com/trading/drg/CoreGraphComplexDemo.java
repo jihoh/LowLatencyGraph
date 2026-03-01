@@ -1,7 +1,7 @@
 package com.trading.drg;
 
-import com.lmax.disruptor.BlockingWaitStrategy;
 import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.YieldingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
@@ -40,7 +40,7 @@ public class CoreGraphComplexDemo {
                 bufferSize,
                 threadFactory,
                 ProducerType.SINGLE,
-                new BlockingWaitStrategy());
+                new YieldingWaitStrategy());
 
         // Bind our logic handler to the ring buffer
         MarketDataEventHandler handler = new MarketDataEventHandler(graph);
@@ -150,13 +150,13 @@ public class CoreGraphComplexDemo {
         @com.trading.drg.api.GraphAutoRouter.RoutingKey(order = 2)
         private String venue;
 
-        @com.trading.drg.api.GraphAutoRouter.RoutingValue("bid")
+        @com.trading.drg.api.GraphAutoRouter.RoutingValue
         private double bid;
-        @com.trading.drg.api.GraphAutoRouter.RoutingValue("bidQty")
+        @com.trading.drg.api.GraphAutoRouter.RoutingValue
         private double bidQty;
-        @com.trading.drg.api.GraphAutoRouter.RoutingValue("ask")
+        @com.trading.drg.api.GraphAutoRouter.RoutingValue
         private double ask;
-        @com.trading.drg.api.GraphAutoRouter.RoutingValue("askQty")
+        @com.trading.drg.api.GraphAutoRouter.RoutingValue
         private double askQty;
 
         public MarketDataEvent() {
