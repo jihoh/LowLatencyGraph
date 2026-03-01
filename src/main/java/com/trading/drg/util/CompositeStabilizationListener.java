@@ -11,33 +11,33 @@ public class CompositeStabilizationListener implements StabilizationListener {
     private StabilizationListener[] listeners = new StabilizationListener[0];
 
     public void addForComposite(StabilizationListener listener) {
-        var old = listeners;
-        var next = Arrays.copyOf(old, old.length + 1);
+        StabilizationListener[] old = listeners;
+        StabilizationListener[] next = Arrays.copyOf(old, old.length + 1);
         next[old.length] = listener;
         listeners = next;
     }
 
     @Override
     public void onStabilizationStart(long epoch) {
-        for (var l : listeners)
+        for (StabilizationListener l : listeners)
             l.onStabilizationStart(epoch);
     }
 
     @Override
     public void onNodeStabilized(long epoch, int topoIndex, String nodeName, boolean changed, long durationNanos) {
-        for (var l : listeners)
+        for (StabilizationListener l : listeners)
             l.onNodeStabilized(epoch, topoIndex, nodeName, changed, durationNanos);
     }
 
     @Override
     public void onNodeError(long epoch, int topoIndex, String nodeName, Throwable error) {
-        for (var l : listeners)
+        for (StabilizationListener l : listeners)
             l.onNodeError(epoch, topoIndex, nodeName, error);
     }
 
     @Override
     public void onStabilizationEnd(long epoch, int nodesStabilized) {
-        for (var l : listeners)
+        for (StabilizationListener l : listeners)
             l.onStabilizationEnd(epoch, nodesStabilized);
     }
 }

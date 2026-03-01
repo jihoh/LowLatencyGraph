@@ -1,8 +1,11 @@
 package com.trading.drg.web;
 
+import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.trading.drg.api.Node;
+import com.trading.drg.api.ScalarValue;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.api.StabilizationListener;
+import com.trading.drg.api.VectorValue;
 import com.trading.drg.engine.TopologicalOrder;
 import com.trading.drg.util.LatencyTrackingListener;
 import com.trading.drg.util.NodeProfileListener;
@@ -235,7 +238,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
 
             Node node = topology.node(i);
             if (nodeKinds[i] == JsonSnapshotSerializer.KIND_VECTOR) {
-                var vv = (com.trading.drg.api.VectorValue) node;
+                VectorValue vv = (VectorValue) node;
                 double[] dest = vectors[i];
                 for (int v = 0; v < dest.length; v++) {
                     dest[v] = vv.valueAt(v);
@@ -245,9 +248,9 @@ public class WebsocketPublisherListener implements StabilizationListener {
             } else {
                 vectors[i] = null;
                 headers[i] = null;
-                if (node instanceof com.trading.drg.api.ScalarValue sv) {
+                if (node instanceof ScalarValue sv) {
                     scalars[i] = sv.value();
-                } else if (node instanceof com.trading.drg.node.BooleanNode bn) {
+                } else if (node instanceof BooleanNode bn) {
                     scalars[i] = bn.booleanValue() ? 1.0 : 0.0;
                 } else {
                     scalars[i] = Double.NaN;

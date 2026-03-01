@@ -3,6 +3,7 @@ package com.trading.drg;
 import com.trading.drg.api.Node;
 import com.trading.drg.api.StabilizationListener;
 import com.trading.drg.engine.StabilizationEngine;
+import com.trading.drg.engine.TopologicalOrder;
 import com.trading.drg.io.GraphDefinition;
 import com.trading.drg.io.JsonGraphCompiler;
 import com.trading.drg.api.ScalarValue;
@@ -48,10 +49,10 @@ public class CoreGraph {
         } catch (java.io.IOException e) {
             throw new RuntimeException("Failed to load graph definition from " + jsonPath, e);
         }
-        var compiler = new JsonGraphCompiler();
-        var compiled = compiler.compile(graphDef);
+        JsonGraphCompiler compiler = new JsonGraphCompiler();
+        JsonGraphCompiler.CompiledGraph compiled = compiler.compile(graphDef);
 
-        var info = graphDef.getGraph();
+        GraphDefinition.GraphInfo info = graphDef.getGraph();
         this.name = info != null ? info.getName() : "Unknown";
         this.version = compiled.version();
 
@@ -63,7 +64,7 @@ public class CoreGraph {
         this.edgeLabels = compiled.edgeLabels();
 
         // Pre-cache source nodes for update()
-        var topology = engine.topology();
+        TopologicalOrder topology = engine.topology();
         this.sourceNodes = new Node[topology.nodeCount()];
         for (int i = 0; i < topology.nodeCount(); i++) {
             if (topology.isSource(i)) {

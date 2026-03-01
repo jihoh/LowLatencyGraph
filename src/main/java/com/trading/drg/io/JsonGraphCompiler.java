@@ -6,6 +6,7 @@ import com.trading.drg.api.SourceNode;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.engine.TopologicalOrder;
 import java.util.*;
+import java.util.Iterator;
 
 import com.trading.drg.util.ScalarCutoffs;
 
@@ -30,17 +31,17 @@ public final class JsonGraphCompiler {
      * @return A container holding the engine and name lookup map.
      */
     public CompiledGraph compile(GraphDefinition def) {
-        var graphInfo = def.getGraph();
+        GraphDefinition.GraphInfo graphInfo = def.getGraph();
 
         // 0. Pre-process templates
         Map<String, GraphDefinition.TemplateDef> templateMap = new HashMap<>();
         if (graphInfo.getTemplates() != null) {
-            for (var t : graphInfo.getTemplates()) {
+            for (GraphDefinition.TemplateDef t : graphInfo.getTemplates()) {
                 templateMap.put(t.getName(), t);
             }
         }
 
-        var nodeDefs = expandTemplates(graphInfo.getNodes(), templateMap);
+        List<GraphDefinition.NodeDef> nodeDefs = expandTemplates(graphInfo.getNodes(), templateMap);
 
         // Capture original JSON sequence
         List<String> originalOrder = nodeDefs.stream()
@@ -51,10 +52,10 @@ public final class JsonGraphCompiler {
         Map<String, String> logicalTypes = new HashMap<>(nodeDefs.size() * 2);
         Map<String, String> descriptions = new HashMap<>(nodeDefs.size() * 2);
         Map<String, Map<String, String>> edgeLabels = new HashMap<>(nodeDefs.size() * 2);
-        var topo = TopologicalOrder.builder();
+        TopologicalOrder.Builder topo = TopologicalOrder.builder();
 
         // 2. Instantiate and Build Topology
-        for (var nd : nodeDefs) {
+        for (GraphDefinition.NodeDef nd : nodeDefs) {
             NodeType type = NodeType.fromString(nd.getType());
             logicalTypes.put(nd.getName(), type.name());
 
@@ -80,9 +81,9 @@ public final class JsonGraphCompiler {
             }
             prevPendingSize = pending.size();
 
-            var iter = pending.iterator();
+            Iterator<GraphDefinition.NodeDef> iter = pending.iterator();
             while (iter.hasNext()) {
-                var nd = iter.next();
+                GraphDefinition.NodeDef nd = iter.next();
 
                 // Skip if any dependency hasn't been created yet
                 if (nd.getInputs() != null && !nd.getInputs().isEmpty()) {
@@ -208,7 +209,7 @@ public final class JsonGraphCompiler {
         Queue<GraphDefinition.NodeDef> queue = new ArrayDeque<>(nodes);
 
         while (!queue.isEmpty()) {
-            var node = queue.poll();
+            GraphDefinition.NodeDef node = queue.poll();
             if (NodeType.TEMPLATE.name().equalsIgnoreCase(node.getType())) {
                 // Expand
                 Map<String, Object> state = node.getProperties() != null ? node.getProperties() : Map.of();
@@ -216,14 +217,14 @@ public final class JsonGraphCompiler {
                 if (templateName == null)
                     throw new IllegalArgumentException("Template node missing 'template' property: " + node.getName());
 
-                var template = templates.get(templateName);
+                GraphDefinition.TemplateDef template = templates.get(templateName);
                 if (template == null)
                     throw new IllegalArgumentException("Unknown template: " + templateName);
 
                 Map<String, Object> params = state;
 
-                for (var tNode : template.getNodes()) {
-                    var newNode = deepCopy(tNode);
+                for (GraphDefinition.NodeDef tNode : template.getNodes()) {
+                    GraphDefinition.NodeDef newNode = deepCopy(tNode);
                     // Substitute variables
                     newNode.setName(substitute(newNode.getName(), params));
                     if (newNode.getInputs() != null) {
@@ -234,7 +235,7 @@ public final class JsonGraphCompiler {
                     }
                     if (newNode.getProperties() != null) {
                         Map<String, Object> resolvedProps = new HashMap<>();
-                        for (var entry : newNode.getProperties().entrySet()) {
+                        for (Map.Entry<String, Object> entry : newNode.getProperties().entrySet()) {
                             Object val = entry.getValue();
                             if (val instanceof String s && s.contains("{{")) {
                                 resolvedProps.put(entry.getKey(), resolveTemplateString(s, params));
@@ -289,7 +290,7 @@ public final class JsonGraphCompiler {
     private String substitute(String s, Map<String, Object> params) {
         if (s == null || !s.contains("{{"))
             return s;
-        for (var entry : params.entrySet()) {
+        for (Map.Entry<String, Object> entry : params.entrySet()) {
             String key = "{{" + entry.getKey() + "}}";
             if (s.contains(key)) {
                 s = s.replace(key, String.valueOf(entry.getValue()));
@@ -301,7 +302,7 @@ public final class JsonGraphCompiler {
     private String resolveTemplateString(String s, Map<String, Object> params) {
         if (s == null || !s.contains("{{"))
             return s;
-        for (var entry : params.entrySet()) {
+        for (Map.Entry<String, Object> entry : params.entrySet()) {
             String key = "{{" + entry.getKey() + "}}";
             if (s.contains(key)) {
                 s = s.replace(key, String.valueOf(entry.getValue()));
@@ -311,7 +312,7 @@ public final class JsonGraphCompiler {
     }
 
     private GraphDefinition.NodeDef deepCopy(GraphDefinition.NodeDef original) {
-        var copy = new GraphDefinition.NodeDef();
+        GraphDefinition.NodeDef copy = new GraphDefinition.NodeDef();
         copy.setName(original.getName());
         copy.setType(original.getType());
         copy.setDescription(original.getDescription());

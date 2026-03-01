@@ -71,7 +71,7 @@ public final class GraphBuilder {
      */
     public ScalarSourceNode scalarSource(String name, double initialValue, ScalarCutoff cutoff) {
         checkNotBuilt();
-        var node = new ScalarSourceNode(name, initialValue, cutoff);
+        ScalarSourceNode node = new ScalarSourceNode(name, initialValue, cutoff);
         register(node);
         sourceNames.add(name);
         return node;
@@ -86,7 +86,7 @@ public final class GraphBuilder {
      */
     public VectorSourceNode vectorSource(String name, int size) {
         checkNotBuilt();
-        var node = new VectorSourceNode(name, size);
+        VectorSourceNode node = new VectorSourceNode(name, size);
         register(node);
         sourceNames.add(name);
         return node;
@@ -114,7 +114,7 @@ public final class GraphBuilder {
     public ScalarCalcNode compute(String name, ScalarCutoff cutoff, Fn1 fn, ScalarValue in) {
         checkNotBuilt();
         // Create the node with a lambda that pulls from the input interface
-        var node = new ScalarCalcNode(name, cutoff, () -> fn.apply(in.value()));
+        ScalarCalcNode node = new ScalarCalcNode(name, cutoff, () -> fn.apply(in.value()));
         register(node);
         // Explicitly record dependency
         addEdge(in.name(), name);
@@ -134,7 +134,7 @@ public final class GraphBuilder {
     public ScalarCalcNode compute(String name, ScalarCutoff cutoff, Fn2 fn,
             ScalarValue in1, ScalarValue in2) {
         checkNotBuilt();
-        var node = new ScalarCalcNode(name, cutoff,
+        ScalarCalcNode node = new ScalarCalcNode(name, cutoff,
                 () -> fn.apply(in1.value(), in2.value()));
         register(node);
         addEdge(in1.name(), name);
@@ -150,7 +150,7 @@ public final class GraphBuilder {
     public ScalarCalcNode compute(String name, ScalarCutoff cutoff, Fn3 fn,
             ScalarValue in1, ScalarValue in2, ScalarValue in3) {
         checkNotBuilt();
-        var node = new ScalarCalcNode(name, cutoff,
+        ScalarCalcNode node = new ScalarCalcNode(name, cutoff,
                 () -> fn.apply(in1.value(), in2.value(), in3.value()));
         register(node);
         addEdge(in1.name(), name);
@@ -173,7 +173,7 @@ public final class GraphBuilder {
         // Allocate scratch buffer once at build time.
         // NOTE: This scratch buffer is captured by the lambda.
         final double[] scratch = new double[inputs.length];
-        var node = new ScalarCalcNode(name, cutoff, () -> {
+        ScalarCalcNode node = new ScalarCalcNode(name, cutoff, () -> {
             // Gather inputs into scratch buffer
             for (int i = 0; i < inputs.length; i++)
                 scratch[i] = inputs[i].value();
@@ -191,7 +191,7 @@ public final class GraphBuilder {
      */
     public VectorCalcNode computeVector(String name, int size, double tolerance, VectorFn fn, Node... inputs) {
         checkNotBuilt();
-        var node = new VectorCalcNode(name, size, tolerance, fn, inputs);
+        VectorCalcNode node = new VectorCalcNode(name, size, tolerance, fn, inputs);
         register(node);
         for (Node in : inputs)
             addEdge(in.name(), name);
@@ -203,7 +203,7 @@ public final class GraphBuilder {
      */
     public ScalarCalcNode vectorElement(String name, VectorValue vec, int index) {
         checkNotBuilt();
-        var node = new ScalarCalcNode(name, ScalarCutoffs.EXACT, () -> vec.valueAt(index));
+        ScalarCalcNode node = new ScalarCalcNode(name, ScalarCutoffs.EXACT, () -> vec.valueAt(index));
         register(node);
         addEdge(vec.name(), name);
         return node;
@@ -216,7 +216,7 @@ public final class GraphBuilder {
      */
     public BooleanNode condition(String name, ScalarValue input, DoublePredicate pred) {
         checkNotBuilt();
-        var node = new BooleanNode(name, () -> pred.test(input.value()));
+        BooleanNode node = new BooleanNode(name, () -> pred.test(input.value()));
         register(node);
         addEdge(input.name(), name);
         return node;
@@ -229,7 +229,7 @@ public final class GraphBuilder {
     public ScalarCalcNode select(String name, BooleanNode cond,
             ScalarValue ifTrue, ScalarValue ifFalse) {
         checkNotBuilt();
-        var node = new ScalarCalcNode(name, ScalarCutoffs.EXACT,
+        ScalarCalcNode node = new ScalarCalcNode(name, ScalarCutoffs.EXACT,
                 () -> cond.booleanValue() ? ifTrue.value() : ifFalse.value());
         register(node);
         addEdge(cond.name(), name);
@@ -256,7 +256,7 @@ public final class GraphBuilder {
         built = true;
 
         // Use the TopologicalOrder builder to handle sorting and compaction
-        var topo = TopologicalOrder.builder();
+        TopologicalOrder.Builder topo = TopologicalOrder.builder();
 
         // Add all registered nodes
         for (Node node : nodes)

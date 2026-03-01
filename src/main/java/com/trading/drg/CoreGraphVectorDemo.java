@@ -5,6 +5,8 @@ import com.lmax.disruptor.YieldingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
+import com.trading.drg.web.DashboardWiring;
+
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 
@@ -19,7 +21,7 @@ public class CoreGraphVectorDemo {
     public static void main(String[] args) throws Exception {
         log.info("Starting CoreGraph Vector Demo...");
 
-        var graph = new CoreGraph("src/main/resources/vector_demo.json");
+        CoreGraph graph = new CoreGraph("src/main/resources/vector_demo.json");
 
         // 2. Initialize Disruptor
         int bufferSize = 1024;
@@ -36,7 +38,7 @@ public class CoreGraphVectorDemo {
         RingBuffer<VectorUpdateEvent> ringBuffer = disruptor.start();
 
         // 4. Wiring
-        var dashboard = new com.trading.drg.web.DashboardWiring(graph)
+        DashboardWiring dashboard = new DashboardWiring(graph)
                 .enableNodeProfiling()
                 .enableLatencyTracking()
                 .bindDisruptorTelemetry(ringBuffer)

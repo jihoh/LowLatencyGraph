@@ -10,6 +10,7 @@ import com.trading.drg.util.NodeProfileListener;
 import com.trading.drg.util.SourceExtractor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import lombok.Getter;
@@ -88,9 +89,9 @@ public final class DashboardWiring {
             this.dashboardServer.setSnapshotSupplier(this::buildSnapshotJson);
 
             // Lazily extract source codes when dashboard is needed
-            var sourceCodes = buildSourceCodes();
+            Map<String, String> sourceCodes = buildSourceCodes();
 
-            var wsListener = new WebsocketPublisherListener(
+            WebsocketPublisherListener wsListener = new WebsocketPublisherListener(
                     graph.getEngine(), this.dashboardServer, graph.getName(), graph.getVersion(),
                     graph.getLogicalTypes(), graph.getDescriptions(),
                     graph.getOriginalOrder(), graph.getEdgeLabels(),
@@ -117,9 +118,9 @@ public final class DashboardWiring {
 
     /** Lazily builds source code map from logicalTypes and NodeType classes. */
     private Map<String, String> buildSourceCodes() {
-        var logicalTypes = graph.getLogicalTypes();
-        var result = new java.util.HashMap<String, String>(logicalTypes.size());
-        for (var entry : logicalTypes.entrySet()) {
+        Map<String, String> logicalTypes = graph.getLogicalTypes();
+        HashMap<String, String> result = new HashMap<>(logicalTypes.size());
+        for (Map.Entry<String, String> entry : logicalTypes.entrySet()) {
             try {
                 NodeType type = NodeType.fromString(entry.getValue());
                 if (type.getNodeClass() != null) {
@@ -139,7 +140,7 @@ public final class DashboardWiring {
         Map<String, Node> nodes = graph.getNodes();
 
         GraphDefinition snapshot = new GraphDefinition();
-        var info = new GraphDefinition.GraphInfo();
+        GraphDefinition.GraphInfo info = new GraphDefinition.GraphInfo();
         info.setName(graph.getName() + " (Snapshot)");
         info.setVersion(graph.getVersion());
         info.setEpoch(engine.epoch());

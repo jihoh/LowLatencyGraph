@@ -27,14 +27,13 @@ The system is designed as a **Passive** graph engine. The application thread dri
  [Application Thread]
          │
          │ (1) Update Source Nodes
-         │     node.updateDouble(value);
-         │     engine.markDirty(nodeId);
+         │     graph.update("nodeName", value);
          │
          │ (2) Call Stabilize
          ▼
  [StabilizationEngine]
          │
-         │ (3) Walk Topological Order (int[] array scan)
+         │ (3) Walk Topological Order (BitSet sparse scan)
          │ (4) If (Node is Dirty):
          │         Recompute();
          │         Detect Change;
@@ -75,8 +74,8 @@ When a burst of events hits the input buffer, the engine quickly aggregates the 
 ### Stabilization
 **Stabilization** is the engine's pulse. At the end of every event batch, the engine calls `stabilize()`. 
 1. The engine checks the bitset to see exactly which Source Nodes were dirtied in the current batch.
-2. It propagates a dirty bitwave recursively down the tree in O(K) time (where K is the number of impacted down-stream nodes).
-3. It creates a brand-new **Epoch** and fires the `calculate()` methods of only the modified nodes in perfect topological order.
+2. It propagates a dirty bitwave recursively down the tree in O(K) time (where K is the number of impacted downstream nodes).
+3. It creates a brand-new **Epoch** and fires the `stabilize()` methods of only the modified nodes in perfect topological order.
 4. Nodes that haven't changed (or whose changes fell below their `"cutoff"` threshold) natively short-circuit, sparing CPU cycles.
 
 ---
@@ -86,18 +85,15 @@ When a burst of events hits the input buffer, the engine quickly aggregates the 
 Before building a graph, it's important to understand the available nodes you can place into it.
 
 ### Source Nodes (The Inputs)
-Source nodes have no parents. Their values are updated externally (e.g. by a market data feed) and their changes propagate downstream via the Disruptor.
+Source nodes have no parents. Their values are updated externally (e.g. by a market data feed) and their changes propagate downstream.
 *   **`ScalarSourceNode`**: Holds a single primitive `double` value (e.g. a stock price).
 *   **`VectorSourceNode`**: Holds a fixed-size contiguous array of primitive `double` values (e.g. a Yield Curve).
-*   **`BooleanSourceNode`**: Holds a single primitive `boolean` flag.
 
 ### Compute Nodes (The Logic)
 Compute nodes take one or more parents as inputs, execute a mathematical function upon them, and emit a result.
 *   **`ScalarCalcNode`**: Takes any number of scalar inputs and computes a new `double`.
-    *   *Includes functions like:*, `Average`, `ZScore`, `Spread`, `Rsi`, `Macd`, `Correlation`.
-*   **`VectorComputeNode`**: Takes one or more vector inputs, performs parallel operations on them, and emits a new vector.
-*   **`BooleanCalcNode`**: Takes inputs and returns a `boolean` (e.g. `Value > Threshold`).
-*   **`AlertNode`**: Takes a `boolean` input; when it transitions to `true`, it fires a user-defined event callback without generating garbage.
+*   **`VectorCalcNode`**: Takes one or more vector inputs, performs parallel operations on them, and emits a new vector.
+*   **`BooleanNode`**: Takes an input and returns a `boolean` (e.g. `Value > Threshold`).
 
 ---
 
@@ -108,54 +104,63 @@ The `GraphBuilder` is a fluent Java DSL ideal for generating topologies programm
 ### Example: Building a Basic Spread Calculator
 
 ```java
-import com.trading.drg.dsl.GraphBuilder;
-import com.trading.drg.fn.finance.Spread;
 
 // 1. Initialize the builder
-GraphBuilder builder = new GraphBuilder("Yield Curve Spread");
+GraphBuilder builder = GraphBuilder.create();
 
 // 2. Define your external input sources
-var leg1 = builder.scalarSource("US_10Y_Yield", 4.15);
-var leg2 = builder.scalarSource("US_02Y_Yield", 4.85);
+ScalarSourceNode leg1 = builder.scalarSource("US_10Y_Yield", 4.15);
+ScalarSourceNode leg2 = builder.scalarSource("US_02Y_Yield", 4.85);
 
 // 3. Define computation logic referencing those sources
-var spread = builder.scalarCalc("2Y_10Y_Spread", new Spread(), leg2, leg1);
+ScalarCalcNode spread = builder.compute("2Y_10Y_Spread", new Spread(), leg2, leg1);
 
 // 4. (Optional) Chain further computations
-var avgSpread = builder.scalarCalc("Avg_Spread", new com.trading.drg.fn.finance.Ewma(10), spread);
+ScalarCalcNode avgSpread = builder.compute("Avg_Spread", new Ewma(0.1), spread);
 
-// 5. Compile the topology and boot the engine
-CoreGraph engine = builder.build();
-engine.start();
+// 5. Compile the topology into an executable engine
+StabilizationEngine engine = builder.build();
 
-// 6. Inject Live Data!
-// Setting new values automatically cascades dirtiness to dependent nodes immediately.
-leg1.update(4.20);
-leg2.update(4.88);
+// 6. Inject live data (update source nodes by name)
+leg1.updateDouble(4.20);
+leg2.updateDouble(4.88);
 
-// 7. Flush the system (pushes the dirty nodes through the evaluate lifecycle)
+// 7. Flush the system (recomputes only dirty nodes)
 engine.stabilize();
 
-// 8. Read results
+// 8. Read results (zero-allocation primitive read)
 System.out.println("Spread: " + spread.value()); // Returns 0.68
 ```
 
 ### Example: Using Vectors
 
 ```java
-import com.trading.drg.dsl.GraphBuilder;
-import com.trading.drg.api.VectorValue;
 
-GraphBuilder builder = new GraphBuilder("Curve Demo");
+GraphBuilder builder = GraphBuilder.create();
 
 // Create a 3-point Yield Curve [1Y, 5Y, 10Y]
-var yieldCurve = builder.vectorSource("Curve", 3); 
+VectorSourceNode yieldCurve = builder.vectorSource("Curve", 3); 
 
 // Populate headers for the GUI dashboard
-yieldCurve.sourceHeaders(new String[]{"1Y", "5Y", "10Y"});
+yieldCurve.withHeaders(new String[]{"1Y", "5Y", "10Y"});
 
 // Update values atomically
 yieldCurve.update(new double[]{ 4.1, 3.8, 3.9 });
+```
+
+### Example: Boolean Conditions
+
+```java
+
+GraphBuilder builder = GraphBuilder.create();
+ScalarSourceNode pnlFeed = builder.scalarSource("PnL", 0.0);
+ScalarCalcNode zScore = builder.compute("CurrentZ", new ZScore(20), pnlFeed);
+
+// Creates a boolean node that flips when Z-Score > 3.0
+BooleanNode isExtreme = builder.condition("IsExtreme", zScore, v -> v > 3.0);
+
+// Select between two values based on the condition
+ScalarCalcNode output = builder.select("Output", isExtreme, pnlFeed, zScore);
 ```
 
 ---
@@ -176,7 +181,7 @@ For production environments, graphs are typically defined externally via JSON fi
                 "name": "EUR_USD",
                 "type": "scalar_source",
                 "properties": {
-                   "cutoff": 1e-6
+                   "cutoff": "exact"
                 }
             },
             {
@@ -191,16 +196,79 @@ For production environments, graphs are typically defined externally via JSON fi
                     "a": "EUR_USD",
                     "b": "GBP_USD"
                 }
-            },
+            }
+        ]
+    }
+}
+```
+
+### Loading and Running a JSON Graph
+
+```java
+
+// Load and compile the graph from a JSON file
+CoreGraph graph = new CoreGraph("src/main/resources/fx_arb.json");
+
+// Update source nodes
+graph.update("EUR_USD", 1.1850);
+graph.update("GBP_USD", 1.2650);
+
+// Stabilize and read
+graph.stabilize();
+System.out.println("Spread: " + graph.getDouble("EUR_GBP.Synthetic"));
+```
+
+### Supported Cutoff Strategies
+
+The `"cutoff"` property controls change-detection sensitivity:
+
+| Value | Behavior |
+|---|---|
+| `"exact"` (default) | Propagates on any bit-level change |
+| `"always"` | Always propagates (no cutoff) |
+| `"never"` | Never propagates (frozen node) |
+| `"absolute"` | Propagates if `|new - old| > tolerance` |
+| `"relative"` | Propagates if relative change exceeds `tolerance` |
+
+### Templates
+
+Templates allow you to define reusable sub-graph patterns in your JSON definitions:
+
+```json
+{
+    "graph": {
+        "name": "Template Demo",
+        "version": "1.0",
+        "templates": [
             {
-                "name": "ArbitrageOpportunity",
-                "type": "boolean",
+                "name": "spread_with_sma",
+                "nodes": [
+                    {
+                        "name": "{{prefix}}.Spread",
+                        "type": "spread",
+                        "inputs": { "a": "{{leg1}}", "b": "{{leg2}}" }
+                    },
+                    {
+                        "name": "{{prefix}}.SMA",
+                        "type": "sma",
+                        "inputs": { "a": "{{prefix}}.Spread" },
+                        "properties": { "window": "{{window}}" }
+                    }
+                ]
+            }
+        ],
+        "nodes": [
+            { "name": "A", "type": "scalar_source" },
+            { "name": "B", "type": "scalar_source" },
+            {
+                "name": "AB",
+                "type": "template",
                 "properties": {
-                    "op": ">",
-                    "threshold": 0.005
-                },
-                "inputs": {
-                    "a": "EUR_GBP.Synthetic"
+                    "template": "spread_with_sma",
+                    "prefix": "AB",
+                    "leg1": "A",
+                    "leg2": "B",
+                    "window": 20
                 }
             }
         ]
@@ -208,39 +276,19 @@ For production environments, graphs are typically defined externally via JSON fi
 }
 ```
 
-### Supported JSON Types
-
-The `"type"` field in the JSON corresponds specifically to predefined Java computations registered in the `NodeRegistry`. 
-
-**Sources:**
-*   `"scalar_source"`
-*   `"vector_source"`
-*   `"boolean_source"`
-
-**Math & Finance:**
-*   `"spread"`: Subtraction of two inputs (`a` - `b`)
-*   `"z_score"`: Normalizes standard deviations. Requires `"window"` property.
-*   `"beta"`: Calculates beta. Requires `"window"`.
-*   `"correlation"`: Rolling correlation. Requires `"window"`.
-*   `"sma"`: Simple Moving Average. Requires `"window"`.
-*   `"ewma"`: Exponentially Weighted Moving Average. Requires `"window"`.
-
-**Logic:**
-*   `"boolean"`: Compares an input to a static threshold. Requires `"op"` (`>`, `<`, `=`, `!=`) and `"threshold"`.
-*   `"alert"`: Watches a boolean. Triggers a side-effect globally.
-
 ---
 
-## 4. Performance Tuning / Properties
+## 4. Performance Tuning
 
-When building nodes (either in Java or JSON), you can supply configurations to customize precision.
+When building nodes (either in Java or JSON), you can supply configurations to customize precision and propagation behavior.
 
 **`"cutoff"` parameter:** 
-Applied to almost all Scalar nodes. If a new computed value differs from its old value by less than this `cutoff` amount, the node suppresses its dirty flag. All downstream nodes are instantly halted, saving monumental amounts of CPU. Set this to small values (e.g., `1e-6`) for high-frequency streams.
+Applied to Scalar nodes. If a new computed value differs from its old value by less than the cutoff threshold, the node suppresses its dirty flag. All downstream nodes are instantly halted, saving monumental amounts of CPU. Set tolerances to small values (e.g., `1e-6`) for high-frequency streams.
 
 ```json
 "properties": {
-  "cutoff": 0.0001
+  "cutoff": "absolute",
+  "tolerance": 0.0001
 }
 ```
 
@@ -248,53 +296,66 @@ Applied to almost all Scalar nodes. If a new computed value differs from its old
 
 ## 5. Advanced: Custom Node Creation in Java
 
-If the pre-built mathematical functions do not suit your needs, you can easily create custom nodes by implementing functional interfaces and registering them. The engine enforces strong typing and memory safety through these interfaces.
+If the pre-built mathematical functions do not suit your needs, you can easily create custom nodes by implementing functional interfaces.
 
-### Creating a Custom Multi-Input `ScalarCalcNode`
+### Creating a Custom `Fn2` Node
 
 ```java
-import com.trading.drg.fn.FnN;
-import com.trading.drg.node.ScalarCalcNode;
-import com.trading.drg.dsl.GraphBuilder;
 
-// 1. Define your custom logic implementing FnN
+// 1. Implement the Fn2 interface (2 scalar inputs → 1 output)
+public class RatioSpread implements Fn2 {
+    @Override
+    public double apply(double a, double b) {
+        if (b == 0.0) return Double.NaN;
+        return a / b;
+    }
+}
+
+// 2. Use it in the DSL
+GraphBuilder builder = GraphBuilder.create();
+ScalarSourceNode src1 = builder.scalarSource("A", 10.0);
+ScalarSourceNode src2 = builder.scalarSource("B", 5.0);
+ScalarCalcNode result = builder.compute("Ratio", new RatioSpread(), src1, src2);
+```
+
+### Creating a Custom N-Input Node
+
+```java
+
+// 1. Implement FnN for variable-arity input
 public class MyCustomAlgo implements FnN {
     @Override
     public double apply(double[] inputs) {
         if (inputs == null || inputs.length < 2) return Double.NaN;
-        // Example logic: (A * B) / C
         return (inputs[0] * inputs[1]) / (inputs.length > 2 ? inputs[2] : 1.0);
     }
 }
 
-// 2. Map it in the Builder
-GraphBuilder builder = new GraphBuilder("Custom Graph");
-var src1 = builder.scalarSource("A", 10.0);
-var src2 = builder.scalarSource("B", 5.0);
-var src3 = builder.scalarSource("C", 2.0);
-
-// 3. Inject it! The engine handles all the zero-alloc array routing for you
-var result = builder.scalarCalc("MyAlgo", new MyCustomAlgo(), src1, src2, src3);
+// 2. Use computeN for N-input nodes
+GraphBuilder builder = GraphBuilder.create();
+ScalarSourceNode src1 = builder.scalarSource("A", 10.0);
+ScalarSourceNode src2 = builder.scalarSource("B", 5.0);
+ScalarSourceNode src3 = builder.scalarSource("C", 2.0);
+ScalarCalcNode result = builder.computeN("MyAlgo", new MyCustomAlgo(), src1, src2, src3);
 ```
 
 ### Registering Custom Nodes for JSON
 
-To make your custom Java node available to analysts writing JSON definitions, register it inside the `NodeRegistry.java`:
+To make your custom Java node available to analysts writing JSON definitions, register it in `NodeRegistry.java`:
 
 ```java
-// Inside NodeRegistry constructor
-registerFactory(NodeType.MY_ALGO, (name, props, deps) -> {
-    var fn = new MyCustomAlgo();
-    return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-            () -> fn.apply(deps));
-});
+// 1. Add to the NodeType enum
+MY_ALGO(MyCustomAlgo.class),
+
+// 2. Register in NodeRegistry.registerBuiltIns()
+registerFnN(NodeType.MY_ALGO, p -> new MyCustomAlgo());
 ```
 
 ---
 
 ## 6. Advanced: Vector Operations and UI Labels
 
-Vectors are powerful for representing Yield Curves, order books, or historical timeseries. You can configure vectors to auto-expand their headers on the frontend UI for beautiful matrix displays.
+Vectors are powerful for representing Yield Curves, order books, or historical timeseries. You can configure vectors to auto-expand individual elements on the frontend dashboard.
 
 ### JSON Vector Definition with Auto-Expanding Labels
 
@@ -304,80 +365,80 @@ Vectors are powerful for representing Yield Curves, order books, or historical t
     "type": "vector_source",
     "description": "Simulates a 5-point yield curve",
     "properties": {
-        "size": 5,                 // The immutable array size
-        "auto_expand": true,       // Tell the UI to split this vector out
-        "auto_expand_labels": [    // Column titles for the dashboard
-            "1M", "3M", "6M", "1Y", "2Y"
-        ]
+        "size": 5,
+        "auto_expand": true,
+        "auto_expand_labels": ["1M", "3M", "6M", "1Y", "2Y"]
     }
 }
 ```
 
+When `auto_expand` is set to `true`, the compiler automatically generates `vector_element` child nodes for each element (e.g., `MarketYieldCurve.1M`, `MarketYieldCurve.3M`, ...), making them individually addressable in the graph.
+
 ---
 
-## 7. Engine Telemetry and Event Listeners
+## 7. Dashboard & Telemetry
 
-`CoreGraph` runs on the LMAX Disruptor and exposes extreme low-level telemetry for monitoring health, latency, and CPU cycles out-of-the-box.
+CoreGraph includes a real-time web dashboard that visualizes the graph topology, node values, per-node latency profiles, JVM metrics, and backpressure telemetry.
 
-### Attaching Listeners via the DSL Builder
+### Wiring the Dashboard
 
 ```java
-import com.trading.drg.dsl.GraphBuilder;
-import com.trading.drg.util.LatencyProfileListener;
-import com.trading.drg.util.NodeProfileListener;
-import com.trading.drg.util.DisruptorBackpressureLogger;
 
-GraphBuilder builder = new GraphBuilder("Telemetry Graph");
-// ... define nodes ...
+CoreGraph graph = new CoreGraph("src/main/resources/fx_arb.json");
 
-// 1. Node Profiling: Tracks exactly how many Nanoseconds each individual Math Node consumes
-// Requires `debug: true` on the CoreGraph instantiation, or use builder.debug(true) if supported
-NodeProfileListener npl = new NodeProfileListener();
-builder.withProfiler(npl);
+// Wire the dashboard with telemetry
+DashboardWiring dashboard = new DashboardWiring(graph)
+    .enableNodeProfiling()      // Per-node nanosecond profiling
+    .enableLatencyTracking()    // End-to-end stabilization latency
+    .enableDashboardServer(8081); // Start the web server
 
-// 2. Latency Profiling: Tracks end-to-end time-of-flight from Event dispatch to Stabilization
-LatencyProfileListener lpl = new LatencyProfileListener();
-builder.withLatencyListener(lpl);
-
-CoreGraph engine = builder.build();
-
-// 3. Backpressure Monitoring: Tracks how full the LMAX RingBuffer is getting. If this spikes > 0%, the frontend is too slow!
-DisruptorBackpressureLogger backpressureLogger = new DisruptorBackpressureLogger();
-engine.addPostCommitListener(backpressureLogger);
-
-engine.start();
-
-// After traffic flows, read exact stats:
-System.out.println("E2E Latency: " + lpl.lastLatencyMicros() + " μs");
+// Visit http://localhost:8081 for the live dashboard
 ```
+
+### Disruptor Backpressure Monitoring
+
+When using the LMAX Disruptor, bind the ring buffer to get automatic backpressure telemetry:
+
+```java
+DashboardWiring dashboard = new DashboardWiring(graph)
+    .enableNodeProfiling()
+    .enableLatencyTracking()
+    .bindDisruptorTelemetry(ringBuffer)  // Ring buffer fill % on the dashboard
+    .enableDashboardServer(8081);
+```
+
+### Exporting Snapshots
+
+To export the current state of the engine:
+1. **Dashboard UI:** Click the **"Snapshot"** button on `http://localhost:8081`.
+2. **HTTP API:** `GET /api/snapshot` returns a JSON payload with full topology and node values.
 
 ---
 
 ## 8. Reliability & Error Handling
 
-CoreGraph implements a **Fail-Safe** pattern for all calculation nodes (`Fn` implementations) to ensure that a single node failure does not crash the entire graph engine.
+CoreGraph implements a **Fail-Safe** pattern for all calculation nodes to ensure that a single node failure does not crash the entire graph engine.
 
-Because `CoreGraph` avoids object allocation to achieve zero-GC execution, exceptions are strongly discouraged inside the hot-path `calculate()` methods. Throwing exceptions forces the JVM to allocate stack-traces, destroying performance. Instead, the engine utilizes primitive `Double.NaN` (Not a Number) object semantics to propagate errors or invalid states.
+Because `CoreGraph` avoids object allocation to achieve zero-GC execution, exceptions are strongly discouraged inside the hot-path `stabilize()` methods. Throwing exceptions forces the JVM to allocate stack-traces, destroying performance. Instead, the engine utilizes primitive `Double.NaN` semantics to propagate errors or invalid states.
 
-### 8.1 The `ErrorRateLimiter` Circuit Breaker
-When a calculation node mathematically fails or throws an unexpected exception, CoreGraph handles this defensively:
+### The `ErrorRateLimiter` Circuit Breaker
 
-*   **Safety Isolation:** All `apply()` methods internally wrap their logic in `try-catch` blocks. If an exception escapes (e.g., division by zero, invalid input), the node catches it and returns `Double.NaN`.
-*   **NaN Propagation:** `Double.NaN` natively propagates downstream in constant time, marking all dependent values as "unhealthy" without stopping the engine or requiring manual error handling.
-*   **Zero-Allocation Circuit Breaker:** Creating a Java `Exception` is incredibly slow because the JVM allocates a full stack trace. To protect the **Zero-GC** guarantee of the hot-path, the `ErrorRateLimiter` acts as an active circuit breaker.
-*   **Fast-Fail:** When a node throws an exception, the limiter logs the error *once*, then **opens the circuit** (`isCircuitOpen()`). For the next 1000ms (default), that specific node's `apply()` method will instantly short-circuit and return `Double.NaN` *before* attempting computation. This guarantees **zero exception instantiations** in the hot-loop during the penalty phase, fully preserving your throughput.
+When a calculation node throws an unexpected exception:
 
-### 8.2 Handling Unhealthy Values
-Consumers reading from the graph output or WebSocket should check for `Double.isNaN(value)` to gracefully handle temporary upstream failures or open circuits.
+1. **Safety Isolation:** All `ScalarCalcNode` computation is wrapped in `try-catch`. If an exception occurs, the node returns `Double.NaN`.
+2. **NaN Propagation:** `Double.NaN` natively propagates downstream, marking all dependent values as "unhealthy" without stopping the engine.
+3. **Circuit Breaker:** The `ErrorRateLimiter` logs the error *once*, then **opens the circuit**. For the next 1000ms (default), that node's computation will short-circuit to `Double.NaN` *before* attempting computation, guaranteeing **zero exception instantiations** during the penalty phase.
+
+### Handling Unhealthy Values
+
+Consumers reading from the graph output or WebSocket should check for `Double.isNaN(value)` to gracefully handle temporary upstream failures.
 
 ```java
-// Correct standard implementation for a custom node
+// Correct implementation for a custom node
 public class SafeDivider implements Fn2 {
     @Override
     public double apply(double numerator, double denominator) {
-        if (denominator == 0.0) {
-            return Double.NaN; // Graceful failure!
-        }
+        if (denominator == 0.0) return Double.NaN; // Graceful failure
         return numerator / denominator;
     }
 }
@@ -385,134 +446,63 @@ public class SafeDivider implements Fn2 {
 
 ---
 
-## 9. Graph Exporting and Visualization
+## 9. Consuming from LMAX Disruptor
 
-CoreGraph provides built-in tools for extracting and visualizing the current topology of your compiled graph at runtime. 
+To achieve millions of ticks per second, `CoreGraph` integrates with the LMAX Disruptor RingBuffer. The graph provides a `GraphAutoRouter` that routes event fields to graph nodes using zero-allocation Trie lookups.
 
-### Web Dashboard Visualization
-When running the `CoreGraph` with the embedded web server enabled (e.g., `engine.enableDashboardServer(9090)`), the web server automatically generates an interactive map of your entire logical graph. 
-
-You can view this live visualization directly on the dashboard by visiting:
-**[http://localhost:9090](http://localhost:9090)**
-
-### Exporting Snapshots
-To export the current state of the engine, including the full topology definition and all active node values:
-1. **Dashboard Interface:** Click the **"Snapshot"** button directly on the web dashboard at `http://localhost:9090`. This will download a static JSON payload containing the topology diagram and current metrics.
-2. **HTTP Endpoint:** You can programmatically fetch the snapshot at any time by issuing an HTTP GET request to the `/snapshot` endpoint on your configured dashboard port (e.g., `http://localhost:9090/snapshot`).
-
----
-
-## 10. Custom Alerting Nodes
-
-Alert Nodes do not compute Math, but rather fire Java `Runnables` (callbacks) when specific boolean sub-graphs flip from `false` to `true`. This relies on crossing semantics to prevent spam (it only fires exactly upon crossing threshold, not continuously while over it).
+### Complete Disruptor Integration Example
 
 ```java
-import com.trading.drg.node.AlertNode;
 
-// 1. You have a node that computes some metric
-var zScore = builder.scalarCalc("CurrentZ", new ZScore(20), pnlFeed);
+// 1. Build the graph from JSON
+CoreGraph graph = new CoreGraph("src/main/resources/fx_arb.json");
 
-// 2. You build a boolean node assessing the state
-var isExtreme = builder.booleanCalc("IsExtreme", ">", 3.0, zScore);
-
-// 3. You attach an Alert Node providing a side-effect
-var myCallback = new Runnable() {
-    @Override
-    public void run() {
-        System.out.println("ALERT! Z-Score breached 3.0.");
-    }
-builder.addAlert("PnlAlert", isExtreme, myCallback);
-```
-
----
-
-## 11. Consuming from LMAX Disruptor
-
-To achieve millions of ticks per second, `CoreGraph` requires you to push your market data events into an LMAX Disruptor RingBuffer. The engine natively provides an `EventHandler` that you can wire into your Disruptor's execution chain. 
-
-The Graph handler will consume your objects, route the values into the pre-compiled `SourceNode` endpoints, and then call `CoreGraph.stabilize()` when the batch finishes.
-
-### Setting up the Disruptor Wiring
-
-```java
-import com.lmax.disruptor.dsl.Disruptor;
-import com.lmax.disruptor.YieldingWaitStrategy;
-import com.lmax.disruptor.EventHandler;
-import java.util.concurrent.Executors;
-
-// 1. Build your topogaphy
-GraphBuilder builder = new GraphBuilder("Live Graph");
-var eurusd = builder.scalarSource("EUR_USD", 1.05);
-var gbpusd = builder.scalarSource("GBP_USD", 1.25);
-builder.scalarCalc("Spread", new Spread(), eurusd, gbpusd);
-
-CoreGraph graph = builder.build();
-graph.start();
-
-// 2. Initialize your LMAX Disruptor
-int bufferSize = 1024 * 64; // Power of 2
-Disruptor<MarketDataEvent> disruptor = new Disruptor<>(
-    MarketDataEvent::new, 
-    bufferSize, 
-    Executors.defaultThreadFactory(), 
-    com.lmax.disruptor.dsl.ProducerType.SINGLE, 
-    new YieldingWaitStrategy() // Extremely low latency wait strategy
+// 2. Initialize the LMAX Disruptor
+Disruptor<FxTickEvent> disruptor = new Disruptor<>(
+    FxTickEvent::new,
+    1024,
+    DaemonThreadFactory.INSTANCE,
+    ProducerType.SINGLE,
+    new YieldingWaitStrategy()
 );
 
-// 3. Define the Handler that bridges LMAX and CoreGraph
-// CoreGraph natively provides a GraphAutoRouter that uses a zero-allocation Trie
-// to route your Pojo fields! See "Zero-GC Auto Routing" below.
-EventHandler<MarketDataEvent> graphInjector = (event, sequence, endOfBatch) -> {
-    // Zero-allocation, Zero-GC topological update based purely on Trie routing
-    router.route(event);
+// 3. Create the auto-router
+GraphAutoRouter router = new GraphAutoRouter(graph).registerClass(FxTickEvent.class);
 
-    // Only stabilize the graph when the LMAX batch natively completes!
+// 4. Wire the handler
+disruptor.handleEventsWith((event, sequence, endOfBatch) -> {
+    router.route(event);              // Zero-GC field routing
     if (endOfBatch) {
-        graph.stabilize();
+        graph.stabilize();            // Batch stabilization
     }
-};
+});
+RingBuffer<FxTickEvent> ringBuffer = disruptor.start();
 
-// 4. Wire the handler and start processing
-disruptor.handleEventsWith(graphInjector);
-disruptor.start();
-
-// 5. Publish events to the RingBuffer (Producer side)
-long seq = disruptor.getRingBuffer().next();
+// 5. Publish events
+long seq = ringBuffer.next();
 try {
-    MarketDataEvent evt = disruptor.getRingBuffer().get(seq);
-    evt.symbol = "EUR_USD";
-    evt.price = 1.051;
+    FxTickEvent evt = ringBuffer.get(seq);
+    evt.EURUSD = 1.051;
 } finally {
-    disruptor.getRingBuffer().publish(seq); // Instantly wakes up the consumer!
+    ringBuffer.publish(seq);
 }
 ```
 
 ### Zero-GC Auto Routing (`GraphAutoRouter`)
 
-In HFT, parsing strings inside the Disruptor thread is a fatal error. `CoreGraph` provides an annotation-based `GraphAutoRouter` which internally builds a constant-time `Trie` map of your POJOs at startup. 
-
-By annotating your event classes, the router can natively map memory addresses sequentially to Graph nodes without creating strings.
+In HFT, parsing strings inside the Disruptor thread is a fatal error. `CoreGraph` provides an annotation-based `GraphAutoRouter` which internally builds a constant-time Trie map of your POJOs at startup. 
 
 ```java
-import com.trading.drg.api.GraphAutoRouter.RoutingKey;
-import com.trading.drg.api.GraphAutoRouter.RoutingValue;
 
 public class MarketDataEvent {
-    // Keys defined in hierarchical order. 
-    // They combine to form a path, e.g. "USD10Y.BTEC"
-    @RoutingKey(order = 1)
-    public String instrument;
-    @RoutingKey(order = 2)
-    public String venue;
+    // Keys combine to form a path, e.g. "USD10Y.BTEC"
+    @RoutingKey(order = 1) public String instrument;
+    @RoutingKey(order = 2) public String venue;
 
-    // The data fields. The router combines the routing key path with the
-    // field name or explicit value override. 
-    // E.g., it looks for a Node named "USD10Y.BTEC.bid"
-    @RoutingValue
-    public double bid;
-    @RoutingValue(value = "custom_ask_name")
-    public double ask;
+    // Value fields map to nodes, e.g. "USD10Y.BTEC.bid"
+    @RoutingValue            public double bid;
+    @RoutingValue("ask_alt") public double ask; // Custom name override
 }
 ```
 
-When you call `router.route(marketEvent)` inside your `EventHandler`, the router recursively navigates the natively built Trie using the primitive memory structures of your POJO fields (`instrument` and `venue`), entirely avoiding `String.concat()` and instantly triggering the updates on the destination nodes.
+When you call `router.route(event)`, the router navigates the pre-built Trie using raw String references from the POJO fields, entirely avoiding `String.concat()` and instantly updating the destination nodes with zero GC overhead.

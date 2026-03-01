@@ -6,6 +6,8 @@ import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
 import com.trading.drg.api.GraphAutoRouter;
+import com.trading.drg.web.DashboardWiring;
+
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 
@@ -21,7 +23,7 @@ public class CoreGraphSimpleDemo {
         log.info("Starting CoreGraph Simple Demo...");
 
         // 1. Initialize the graph
-        var graph = new CoreGraph("src/main/resources/fx_arb.json");
+        CoreGraph graph = new CoreGraph("src/main/resources/fx_arb.json");
 
         // 2. Initialize Disruptor
         int bufferSize = 1024;
@@ -38,7 +40,7 @@ public class CoreGraphSimpleDemo {
         RingBuffer<FxTickEvent> ringBuffer = disruptor.start();
 
         // 4. Wiring
-        var dashboard = new com.trading.drg.web.DashboardWiring(graph)
+        DashboardWiring dashboard = new DashboardWiring(graph)
                 .enableNodeProfiling()
                 .enableLatencyTracking()
                 .bindDisruptorTelemetry(ringBuffer)

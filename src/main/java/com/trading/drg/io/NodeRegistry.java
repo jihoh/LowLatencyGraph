@@ -126,7 +126,7 @@ public final class NodeRegistry {
                 throw new IllegalArgumentException("vector_source needs positive 'size'");
 
             double tolerance = JsonGraphCompiler.getDouble(props, "tolerance", 1e-15);
-            var node = new VectorSourceNode(name, size, tolerance);
+            VectorSourceNode node = new VectorSourceNode(name, size, tolerance);
 
             Object headersObj = props.get("headers");
             if (headersObj == null) {
@@ -161,7 +161,7 @@ public final class NodeRegistry {
 
     private void registerFn1(NodeType type, Function<Map<String, Object>, Fn1> supplier) {
         registerFactory(type, (name, props, deps) -> {
-            var fn = supplier.apply(props);
+            Fn1 fn = supplier.apply(props);
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
                     () -> fn.apply(((ScalarValue) deps[0]).value()));
         });
@@ -169,7 +169,7 @@ public final class NodeRegistry {
 
     private void registerFn2(NodeType type, Function<Map<String, Object>, Fn2> supplier) {
         registerFactory(type, (name, props, deps) -> {
-            var fn = supplier.apply(props);
+            Fn2 fn = supplier.apply(props);
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
                     () -> fn.apply(((ScalarValue) deps[0]).value(), ((ScalarValue) deps[1]).value()));
         });
@@ -177,7 +177,7 @@ public final class NodeRegistry {
 
     private void registerFn3(NodeType type, Function<Map<String, Object>, Fn3> supplier) {
         registerFactory(type, (name, props, deps) -> {
-            var fn = supplier.apply(props);
+            Fn3 fn = supplier.apply(props);
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
                     () -> fn.apply(((ScalarValue) deps[0]).value(),
                             ((ScalarValue) deps[1]).value(), ((ScalarValue) deps[2]).value()));
@@ -186,7 +186,7 @@ public final class NodeRegistry {
 
     private void registerFnN(NodeType type, Function<Map<String, Object>, FnN> supplier) {
         registerFactory(type, (name, props, deps) -> {
-            var fn = supplier.apply(props);
+            FnN fn = supplier.apply(props);
             double[] scratch = new double[deps.length];
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props), () -> {
                 for (int i = 0; i < deps.length; i++)
