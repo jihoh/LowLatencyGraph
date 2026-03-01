@@ -2,21 +2,21 @@ package com.trading.drg.fn.finance;
 
 import com.trading.drg.fn.Fn2;
 import com.trading.drg.util.ErrorRateLimiter;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+
+import lombok.extern.log4j.Log4j2;
 
 /**
  * Base class for dual-input functions. Handles error rate limiting.
  * <p>
  * Formula: {@code y = f(x_1, x_2)}
  */
+@Log4j2
 public abstract class AbstractFn2 implements Fn2 {
-    private final Logger log = LogManager.getLogger(this.getClass());
-    private final ErrorRateLimiter limiter = new ErrorRateLimiter(log, 1000);
+    private final ErrorRateLimiter limiter = new ErrorRateLimiter();
 
     @Override
     public final double apply(double input1, double input2) {
-        if (Double.isNaN(input1) || Double.isNaN(input2)) {
+        if (Double.isNaN(input1) || Double.isNaN(input2) || limiter.isCircuitOpen()) {
             return Double.NaN;
         }
         try {

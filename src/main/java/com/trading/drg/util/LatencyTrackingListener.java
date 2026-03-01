@@ -7,10 +7,7 @@ import com.trading.drg.api.StabilizationListener;
  * stabilization.
  */
 public final class LatencyTrackingListener implements StabilizationListener {
-    private static final org.apache.logging.log4j.Logger log = org.apache.logging.log4j.LogManager
-            .getLogger(LatencyTrackingListener.class);
-
-    private final ErrorRateLimiter errLimiter = new ErrorRateLimiter(log, 1000); // 1-second throttle
+    private final ErrorRateLimiter errLimiter = new ErrorRateLimiter(); // 1-second throttle
     private long stabilizeStartNanos, lastLatencyNanos;
     private long totalStabilizations, totalLatencyNanos;
     private long minLatencyNanos = Long.MAX_VALUE, maxLatencyNanos = Long.MIN_VALUE;

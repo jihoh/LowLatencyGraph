@@ -1,20 +1,22 @@
 package com.trading.drg.util;
 
-import org.apache.logging.log4j.Logger;
+import lombok.extern.log4j.Log4j2;
 
 /**
  * Limits error logging rate in high-frequency loops to prevent log flooding.
  */
+@Log4j2
 public class ErrorRateLimiter {
-    /** Bound logger instance. */
-    private final Logger logger;
     /** Minimum interval between logs in nanos. */
     private final long minIntervalNanos;
     /** Timestamp of last log. */
     private long lastLogTime = 0;
 
-    public ErrorRateLimiter(Logger logger, long minIntervalMillis) {
-        this.logger = logger;
+    public ErrorRateLimiter() {
+        this(1000);
+    }
+
+    public ErrorRateLimiter(long minIntervalMillis) {
         this.minIntervalNanos = minIntervalMillis * 1_000_000;
     }
 
@@ -22,7 +24,17 @@ public class ErrorRateLimiter {
         long now = System.nanoTime();
         if (now - lastLogTime > minIntervalNanos) {
             lastLogTime = now;
-            logger.error(message + " (Throttled)", t);
+            log.error(message + " (Throttled)", t);
         }
+    }
+
+    /**
+     * Checks if the active cooldown period is still in effect to act as a circuit
+     * breaker.
+     * Prevents hot-loop exception generation by fast-failing nodes before
+     * computation.
+     */
+    public boolean isCircuitOpen() {
+        return (System.nanoTime() - lastLogTime) < minIntervalNanos;
     }
 }

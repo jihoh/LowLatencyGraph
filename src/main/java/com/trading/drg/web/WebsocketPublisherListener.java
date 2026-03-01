@@ -6,8 +6,6 @@ import com.trading.drg.api.StabilizationListener;
 import com.trading.drg.engine.TopologicalOrder;
 import com.trading.drg.util.LatencyTrackingListener;
 import com.trading.drg.util.NodeProfileListener;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.ThreadMXBean;
@@ -23,7 +21,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * thread.
  */
 public class WebsocketPublisherListener implements StabilizationListener {
-    private static final Logger log = LogManager.getLogger(WebsocketPublisherListener.class);
 
     private final StabilizationEngine engine;
     private final GraphDashboardServer server;
@@ -38,8 +35,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final java.util.Map<String, String> descriptions;
     private final java.util.Map<String, String> sourceCodes;
     private final java.util.Map<String, java.util.Map<String, String>> edgeLabels;
-    private final com.trading.drg.util.ErrorRateLimiter errLimiter = new com.trading.drg.util.ErrorRateLimiter(log,
-            1000);
+    private final com.trading.drg.util.ErrorRateLimiter errLimiter = new com.trading.drg.util.ErrorRateLimiter();
 
     // Pre-computed JSON key prefixes indexed by topoIndex
     private final String[] jsonKeys;
