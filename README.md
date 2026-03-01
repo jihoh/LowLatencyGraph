@@ -8,7 +8,7 @@ Unlike traditional object-oriented systems where business logic is scattered acr
 
 ### Key Capabilities
 
-*   **Ultra-Low Latency:** Optimized for sub-microsecond stabilization latency on modern CPUs.
+*   **Ultra-Low Latency:** Optimized for low single-digit microsecond stabilization latency on modern CPUs.
 *   **Predictability:** **Zero-GC** (Garbage Collection) on the hot path. All memory is pre-allocated.
 *   **Throughput:** Capable of processing millions of updates per second on a single thread. Native integration with **LMAX Disruptor**.
 *   **Zero-Overhead Read:** Direct node value access for the main application thread without GC pressure.

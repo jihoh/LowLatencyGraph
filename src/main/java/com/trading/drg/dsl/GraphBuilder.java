@@ -114,8 +114,7 @@ public final class GraphBuilder {
     public ScalarCalcNode compute(String name, ScalarCutoff cutoff, Fn1 fn, ScalarValue in) {
         checkNotBuilt();
         // Create the node with a lambda that pulls from the input interface
-        var node = new ScalarCalcNode(name, cutoff, () -> fn.apply(in.value()))
-                .withStateExtractor(fn);
+        var node = new ScalarCalcNode(name, cutoff, () -> fn.apply(in.value()));
         register(node);
         // Explicitly record dependency
         addEdge(in.name(), name);
@@ -136,8 +135,7 @@ public final class GraphBuilder {
             ScalarValue in1, ScalarValue in2) {
         checkNotBuilt();
         var node = new ScalarCalcNode(name, cutoff,
-                () -> fn.apply(in1.value(), in2.value()))
-                .withStateExtractor(fn);
+                () -> fn.apply(in1.value(), in2.value()));
         register(node);
         addEdge(in1.name(), name);
         addEdge(in2.name(), name);
@@ -153,8 +151,7 @@ public final class GraphBuilder {
             ScalarValue in1, ScalarValue in2, ScalarValue in3) {
         checkNotBuilt();
         var node = new ScalarCalcNode(name, cutoff,
-                () -> fn.apply(in1.value(), in2.value(), in3.value()))
-                .withStateExtractor(fn);
+                () -> fn.apply(in1.value(), in2.value(), in3.value()));
         register(node);
         addEdge(in1.name(), name);
         addEdge(in2.name(), name);
@@ -181,7 +178,7 @@ public final class GraphBuilder {
             for (int i = 0; i < inputs.length; i++)
                 scratch[i] = inputs[i].value();
             return fn.apply(scratch);
-        }).withStateExtractor(fn);
+        });
         register(node);
         // Register all dependencies
         for (ScalarValue input : inputs)

@@ -86,90 +86,76 @@ public final class NodeRegistry {
         registerFactory(NodeType.EWMA, (name, props, deps) -> {
             var fn = new Ewma(JsonGraphCompiler.getDouble(props, "alpha", 0.1));
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()))
-                    .withStateExtractor(fn);
+                    () -> fn.apply(((ScalarValue) deps[0]).value()));
         });
         registerFactory(NodeType.DIFF, (name, props, deps) -> {
             var fn = new Diff();
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()))
-                    .withStateExtractor(fn);
+                    () -> fn.apply(((ScalarValue) deps[0]).value()));
         });
         registerFactory(NodeType.HIST_VOL, (name, props, deps) -> {
             var fn = new HistVol(JsonGraphCompiler.getInt(props, "window", 10));
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()))
-                    .withStateExtractor(fn);
+                    () -> fn.apply(((ScalarValue) deps[0]).value()));
         });
         registerFactory(NodeType.LOG_RETURN, (name, props, deps) -> {
             var fn = new LogReturn();
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()))
-                    .withStateExtractor(fn);
+                    () -> fn.apply(((ScalarValue) deps[0]).value()));
         });
         registerFactory(NodeType.MACD, (name, props, deps) -> {
             var fn = new Macd(JsonGraphCompiler.getInt(props, "fast", 12),
                     JsonGraphCompiler.getInt(props, "slow", 26));
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()))
-                    .withStateExtractor(fn);
+                    () -> fn.apply(((ScalarValue) deps[0]).value()));
         });
         registerFactory(NodeType.ROLLING_MAX, (name, props, deps) -> {
             var fn = new RollingMax(JsonGraphCompiler.getInt(props, "window", 10));
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()))
-                    .withStateExtractor(fn);
+                    () -> fn.apply(((ScalarValue) deps[0]).value()));
         });
         registerFactory(NodeType.ROLLING_MIN, (name, props, deps) -> {
             var fn = new RollingMin(JsonGraphCompiler.getInt(props, "window", 10));
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()))
-                    .withStateExtractor(fn);
+                    () -> fn.apply(((ScalarValue) deps[0]).value()));
         });
         registerFactory(NodeType.RSI, (name, props, deps) -> {
             var fn = new Rsi(JsonGraphCompiler.getInt(props, "window", 14));
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()))
-                    .withStateExtractor(fn);
+                    () -> fn.apply(((ScalarValue) deps[0]).value()));
         });
         registerFactory(NodeType.SMA, (name, props, deps) -> {
             var fn = new Sma(JsonGraphCompiler.getInt(props, "window", 10));
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()))
-                    .withStateExtractor(fn);
+                    () -> fn.apply(((ScalarValue) deps[0]).value()));
         });
         registerFactory(NodeType.Z_SCORE, (name, props, deps) -> {
             var fn = new ZScore(JsonGraphCompiler.getInt(props, "window", 20));
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()))
-                    .withStateExtractor(fn);
+                    () -> fn.apply(((ScalarValue) deps[0]).value()));
         });
 
         // --- Fn2 Nodes ---
         registerFactory(NodeType.SPREAD, (name, props, deps) -> {
             var fn = new Spread();
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value(), ((ScalarValue) deps[1]).value()))
-                    .withStateExtractor(fn);
+                    () -> fn.apply(((ScalarValue) deps[0]).value(), ((ScalarValue) deps[1]).value()));
         });
         registerFactory(NodeType.BETA, (name, props, deps) -> {
             var fn = new Beta(JsonGraphCompiler.getInt(props, "window", 20));
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value(), ((ScalarValue) deps[1]).value()))
-                    .withStateExtractor(fn);
+                    () -> fn.apply(((ScalarValue) deps[0]).value(), ((ScalarValue) deps[1]).value()));
         });
         registerFactory(NodeType.CORRELATION, (name, props, deps) -> {
             var fn = new Correlation(JsonGraphCompiler.getInt(props, "window", 20));
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value(), ((ScalarValue) deps[1]).value()))
-                    .withStateExtractor(fn);
+                    () -> fn.apply(((ScalarValue) deps[0]).value(), ((ScalarValue) deps[1]).value()));
         });
         registerFactory(NodeType.TRI_ARB_SPREAD, (name, props, deps) -> {
             var fn = new TriangularArbSpread();
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
                     () -> fn.apply(((ScalarValue) deps[0]).value(),
-                            ((ScalarValue) deps[1]).value(), ((ScalarValue) deps[2]).value()))
-                    .withStateExtractor(fn);
+                            ((ScalarValue) deps[1]).value(), ((ScalarValue) deps[2]).value()));
         });
 
         // --- FnN Nodes ---
@@ -180,7 +166,7 @@ public final class NodeRegistry {
                 for (int i = 0; i < deps.length; i++)
                     scratch[i] = ((ScalarValue) deps[i]).value();
                 return fn.apply(scratch);
-            }).withStateExtractor(fn);
+            });
         });
         registerFactory(NodeType.WEIGHTED_AVG, (name, props, deps) -> {
             var fn = new WeightedAverage();
@@ -189,7 +175,7 @@ public final class NodeRegistry {
                 for (int i = 0; i < deps.length; i++)
                     scratch[i] = ((ScalarValue) deps[i]).value();
                 return fn.apply(scratch);
-            }).withStateExtractor(fn);
+            });
         });
         registerFactory(NodeType.AVERAGE, (name, props, deps) -> {
             var fn = new Average();
@@ -198,7 +184,7 @@ public final class NodeRegistry {
                 for (int i = 0; i < deps.length; i++)
                     scratch[i] = ((ScalarValue) deps[i]).value();
                 return fn.apply(scratch);
-            }).withStateExtractor(fn);
+            });
         });
 
         // --- Source / Structural Nodes ---

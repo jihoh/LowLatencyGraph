@@ -764,25 +764,9 @@ function updateMetricsDOM(payload) {
             if (Array.isArray(val)) {
                 // Vectors are visualized in the bottom chart; show '[...]' as the text value.
                 document.getElementById('details-value').textContent = '[...]';
-
-                // Mini sparkline for vectors
-                if (nodeHistory.has(activeDetailsNode) && nodeHistory.get(activeDetailsNode).size > 0) {
-                    const latestArr = nodeHistory.get(activeDetailsNode).last().value;
-                    drawVectorSparkline('details-sparkline-canvas', latestArr);
-                    const sparkContainer = document.getElementById('details-sparkline');
-                    if (sparkContainer) sparkContainer.style.display = 'block';
-                }
             } else {
                 // Scalar value format
                 document.getElementById('details-value').textContent = Number(val).toFixed(4);
-
-                // Line chart for history
-                if (nodeHistory.has(activeDetailsNode) && nodeHistory.get(activeDetailsNode).size > 0) {
-                    const data = nodeHistory.get(activeDetailsNode).toArray().map(d => d.value);
-                    drawScalarSparkline('details-sparkline-canvas', data);
-                    const sparkContainer = document.getElementById('details-sparkline');
-                    if (sparkContainer) sparkContainer.style.display = 'block';
-                }
             }
         }
     }

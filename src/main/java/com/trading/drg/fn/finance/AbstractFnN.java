@@ -1,6 +1,5 @@
 package com.trading.drg.fn.finance;
 
-import com.trading.drg.api.DynamicState;
 import com.trading.drg.fn.FnN;
 import com.trading.drg.util.ErrorRateLimiter;
 import org.apache.logging.log4j.LogManager;
@@ -11,7 +10,7 @@ import org.apache.logging.log4j.Logger;
  * <p>
  * Formula: {@code y = f(X)}
  */
-public abstract class AbstractFnN implements FnN, DynamicState {
+public abstract class AbstractFnN implements FnN {
     private final Logger log = LogManager.getLogger(this.getClass());
     private final ErrorRateLimiter limiter = new ErrorRateLimiter(log, 1000);
 

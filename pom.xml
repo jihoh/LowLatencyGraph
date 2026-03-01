@@ -68,6 +68,8 @@
                     <source>21</source>
                     <target>21</target>
                     <parameters>true</parameters>
+                    <fork>true</fork>
+                    <executable>/Users/jihohwang/.antigravity/extensions/redhat.java-1.52.0-darwin-arm64/jre/21.0.9-macosx-aarch64/bin/javac</executable>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>

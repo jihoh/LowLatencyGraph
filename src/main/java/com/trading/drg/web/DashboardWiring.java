@@ -170,20 +170,6 @@ public final class DashboardWiring {
 
             // Extract dynamic state and value
             Map<String, Object> props = new java.util.HashMap<>();
-            if (node instanceof com.trading.drg.api.DynamicState ds) {
-                StringBuilder stateSb = new StringBuilder("{");
-                ds.serializeDynamicState(stateSb);
-                stateSb.append("}");
-                if (stateSb.length() > 2) {
-                    try {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> parsedState = mapper.readValue(stateSb.toString(), Map.class);
-                        props.putAll(parsedState);
-                    } catch (Exception e) {
-                        props.put("stateError", e.getMessage());
-                    }
-                }
-            }
 
             if (node instanceof com.trading.drg.api.VectorValue vv) {
                 Double[] safeArr = new Double[vv.size()];

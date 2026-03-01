@@ -1,14 +1,62 @@
 # CoreGraph Developer API Guide
 
-Welcome to the CoreGraph API documentation. This guide is tailored for developers, quants, and systems engineers building zero-allocation reactive graphs.
+Welcome to the CoreGraph API documentation. This guide is tailored for building zero-allocation reactive graphs.
 
-CoreGraph is a lock-free, Directed Acyclic Graph (DAG) computing engine originally built for High-Frequency Trading (HFT). It leverages the **LMAX Disruptor** to process millions of market events per second without triggering Java Garbage Collection on the hot path.
+CoreGraph is a lock-free, Directed Acyclic Graph (DAG) computing engine originally built for High-Frequency Trading (HFT). The engine is strictly a computational model; while it does not leverage the LMAX Disruptor internally, the disruptor is commonly used externally to sequence market events into the graph. Together, they can process millions of market events per second without triggering Java Garbage Collection on the hot path.
+
+### Key Capabilities
+
+*   **Ultra-Low Latency:** Optimized for low single-digit microsecond stabilization latency on modern CPUs.
+*   **Predictability:** **Zero-GC** (Garbage Collection) on the hot path. All memory is pre-allocated.
+*   **Throughput:** Capable of processing millions of updates per second on a single thread. 
+*   **Zero-Overhead Read:** Direct node value access for the main application thread without GC pressure.
+*   **Safety:** Statically typed, cycle-free topology with explicit ownership.
+
+### Use Cases
+
+*   **Pricing:** Swaps, Bonds, and Futures pricing.
+*   **Auto-Hedging:** Real-time delta and risk calculations.
+*   **Signals:** Custom signals and technical indicators (RSI, EWMA, MACD) on tick data.
+*   **Algos:** Custom trading algorithms.
+
+## Architecture & Data Flow
+
+CoreGraph is built on a **Single-Writer / Single-Reader** architecture optimized for CPU cache locality and eliminating thread contention.
+
+The system is designed as a **Passive** graph engine. The application thread drives the execution, giving you full control over threading and batching.
+
+```text
+ [Application Thread]
+         │
+         │ (1) Update Source Nodes
+         │     node.updateDouble(value);
+         │     engine.markDirty(nodeId);
+         │
+         │ (2) Call Stabilize
+         ▼
+ [StabilizationEngine]
+         │
+         │ (3) Walk Topological Order (int[] array scan)
+         │ (4) If (Node is Dirty):
+         │         Recompute();
+         │         Detect Change;
+         │         Mark Children Dirty;
+         ▼
+ [Post-Stabilization]
+         │
+         │ (wait-free direct access as engine is stable)
+         ▼
+ [Reader / UI / Risk System]
+         │
+         │ (5) graph.getDouble("Node")
+         │ (6) Read Consistent State
+```
 
 You can construct a graph topology via two primary methods:
 1. **The JSON Compiler (Declarative) - RECOMMENDED** 
 2. **The Java Fluent DSL (Programmatic)**
 
-While the DSL is useful for writing test beds or highly specialized dynamic logic, **the JSON Compiler is strictly recommended for all production deployments**. It enforces clean separation between trading logic (Quants/Analysts) and engine execution (Core Java Engineers) without requiring binary recompilation.
+While the DSL is useful for writing test beds or highly specialized dynamic logic, **the JSON Compiler is strictly recommended for all production deployments**. It enforces clean separation between trading logic and engine execution without requiring binary recompilation.
 
 Regardless of the method chosen, the output is a highly optimized `CoreGraph` engine ready for deployment.
 
@@ -29,7 +77,7 @@ When a burst of events hits the input buffer, the engine quickly aggregates the 
 ### Stabilization
 **Stabilization** is the engine's pulse. At the end of every event batch, the engine calls `stabilize()`. 
 1. The engine checks the bitset to see exactly which Source Nodes were dirtied in the current batch.
-2. It propagates a dirty bitwave recursively down the tree in $O(K)$ time (where $K$ is the number of impacted down-stream nodes).
+2. It propagates a dirty bitwave recursively down the tree in O(K) time (where K is the number of impacted down-stream nodes).
 3. It creates a brand-new **Epoch** and fires the `calculate()` methods of only the modified nodes in perfect topological order.
 4. Nodes that haven't changed (or whose changes fell below their `"cutoff"` threshold) natively short-circuit, sparing CPU cycles.
 
@@ -62,6 +110,8 @@ The `GraphBuilder` is a fluent Java DSL ideal for generating topologies programm
 ### Example: Building a Basic Spread Calculator
 
 ```java
+import com.trading.drg.dsl.GraphBuilder;
+import com.trading.drg.fn.finance.Spread;
 
 // 1. Initialize the builder
 GraphBuilder builder = new GraphBuilder("Yield Curve Spread");
@@ -74,7 +124,7 @@ var leg2 = builder.scalarSource("US_02Y_Yield", 4.85);
 var spread = builder.scalarCalc("2Y_10Y_Spread", new Spread(), leg2, leg1);
 
 // 4. (Optional) Chain further computations
-var avgSpread = builder.scalarCalc("Avg_Spread", new Ewma(10), spread);
+var avgSpread = builder.scalarCalc("Avg_Spread", new com.trading.drg.fn.finance.Ewma(10), spread);
 
 // 5. Compile the topology and boot the engine
 CoreGraph engine = builder.build();
@@ -95,6 +145,8 @@ System.out.println("Spread: " + spread.value()); // Returns 0.68
 ### Example: Using Vectors
 
 ```java
+import com.trading.drg.dsl.GraphBuilder;
+import com.trading.drg.api.VectorValue;
 
 GraphBuilder builder = new GraphBuilder("Curve Demo");
 
@@ -203,6 +255,9 @@ If the pre-built mathematical functions do not suit your needs, you can easily c
 ### Creating a Custom Multi-Input `ScalarCalcNode`
 
 ```java
+import com.trading.drg.fn.FnN;
+import com.trading.drg.node.ScalarCalcNode;
+import com.trading.drg.dsl.GraphBuilder;
 
 // 1. Define your custom logic implementing FnN
 public class MyCustomAlgo implements FnN {
@@ -270,6 +325,10 @@ Vectors are powerful for representing Yield Curves, order books, or historical t
 ### Attaching Listeners via the DSL Builder
 
 ```java
+import com.trading.drg.dsl.GraphBuilder;
+import com.trading.drg.util.LatencyProfileListener;
+import com.trading.drg.util.NodeProfileListener;
+import com.trading.drg.util.DisruptorBackpressureLogger;
 
 GraphBuilder builder = new GraphBuilder("Telemetry Graph");
 // ... define nodes ...
@@ -322,53 +381,12 @@ public class SafeDivider implements Fn2 {
 
 ---
 
-## 9. Stateful Nodes and Rolling Windows
-
-If your custom Math node requires historical context (e.g., an Average True Range, a Moving Average, or an EWMA), it must implement the `DynamicState` interface. This allows the GUI to inspect the algorithm's internal memory state natively.
-
-```java
-
-public class StatefulMovingAverage implements FnN, DynamicState {
-    private final RingBuffer history;
-    private double sum = 0.0;
-
-    public StatefulMovingAverage(int windowSize) {
-        this.history = new RingBuffer(windowSize);
-    }
-
-    @Override
-    public double apply(double[] inputs) {
-        double newValue = inputs[0];
-        if (Double.isNaN(newValue)) return Double.NaN;
-
-        // Push new value, popping the oldest natively
-        double oldest = history.push(newValue);
-        sum += newValue - oldest;
-
-        if (history.isFull()) {
-            return sum / history.capacity();
-        }
-        return Double.NaN; // Not enough data yet
-    }
-
-    // Expose this state to the User Interface automatically!
-    @Override
-    public Object extractState() {
-        return new StateData(history.capacity(), history.isFull(), sum);
-    }
-
-    // A throw-away record used only when a User asks to inspect the node via the UI
-    private record StateData(int capacity, boolean isFull, double currentSum) {}
-}
-```
-
----
-
-## 10. Graph Exporting and Visualization
+## 9. Graph Exporting and Visualization
 
 You can generate algorithmic visualizations of your compiled `CoreGraph` at any time programmatically. The system ships natively with a transpiler that converts the Java graph topography into rendering `Mermaid.js` syntax.
 
 ```java
+import com.trading.drg.util.GraphExplain;
 
 // Compile the topology and extract Mermaid markdown
 CoreGraph engine = builder.build();
@@ -377,20 +395,21 @@ String mermaidMarkup = new GraphExplain(engine).toMermaid();
 System.out.println(mermaidMarkup);
 // Output Example:
 // graph TD;
-//   US_10Y_Yield[US_10Y_Yield] --> 2Y_10Y_Inversion[Spread];
-//   US_02Y_Yield[US_02Y_Yield] --> 2Y_10Y_Inversion;
-//   2Y_10Y_Inversion --> Avg_Inversion[Ewma];
+//   US10Y[US10Y] --> 2Y_10Y_Spread[Spread];
+//   US02Y[US02Y] --> 2Y_10Y_Spread;
+//   2Y_10Y_Spread --> Avg_Spread[Ewma];
 ```
 
 This output can be directly pasted into GitHub READMEs, Notion Docs, or HTML `<div class="mermaid">` tags.
 
 ---
 
-## 11. Custom Alerting Nodes
+## 10. Custom Alerting Nodes
 
 Alert Nodes do not compute Math, but rather fire Java `Runnables` (callbacks) when specific boolean sub-graphs flip from `false` to `true`. This relies on crossing semantics to prevent spam (it only fires exactly upon crossing threshold, not continuously while over it).
 
 ```java
+import com.trading.drg.node.AlertNode;
 
 // 1. You have a node that computes some metric
 var zScore = builder.scalarCalc("CurrentZ", new ZScore(20), pnlFeed);
@@ -402,14 +421,14 @@ var isExtreme = builder.booleanCalc("IsExtreme", ">", 3.0, zScore);
 var myCallback = new Runnable() {
     @Override
     public void run() {
-        System.out.println("ALERT! Z-Score breached 3.0. Sending PagerDuty!");
+        System.out.println("ALERT! Z-Score breached 3.0.");
     }
 builder.addAlert("PnlAlert", isExtreme, myCallback);
 ```
 
 ---
 
-## 12. Consuming from LMAX Disruptor
+## 11. Consuming from LMAX Disruptor
 
 To achieve millions of ticks per second, `CoreGraph` requires you to push your market data events into an LMAX Disruptor RingBuffer. The engine natively provides an `EventHandler` that you can wire into your Disruptor's execution chain. 
 
@@ -477,10 +496,12 @@ In HFT, parsing strings inside the Disruptor thread is a fatal error. `CoreGraph
 By annotating your event classes, the router can natively map memory addresses sequentially to Graph nodes without creating strings.
 
 ```java
+import com.trading.drg.api.GraphAutoRouter.RoutingKey;
+import com.trading.drg.api.GraphAutoRouter.RoutingValue;
 
 public class MarketDataEvent {
     // Keys defined in hierarchical order. 
-    // They combine to form a path, e.g. "EUR_USD.EBS"
+    // They combine to form a path, e.g. "USD10Y.BTEC"
     @RoutingKey(order = 1)
     public String instrument;
     @RoutingKey(order = 2)
@@ -488,7 +509,7 @@ public class MarketDataEvent {
 
     // The data fields. The router combines the routing key path with the
     // field name or explicit value override. 
-    // E.g., it looks for a Node named "EUR_USD.EBS.bid"
+    // E.g., it looks for a Node named "USD10Y.BTEC.bid"
     @RoutingValue
     public double bid;
     @RoutingValue(value = "custom_ask_name")
