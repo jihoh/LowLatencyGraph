@@ -1,12 +1,10 @@
-# CoreGraph Developer API Guide
+# CoreGraph API Guide
 
-Welcome to the CoreGraph API documentation. This guide is tailored for building zero-allocation reactive graphs.
-
-CoreGraph is a lock-free, Directed Acyclic Graph (DAG) computing engine originally built for High-Frequency Trading (HFT). The engine is strictly a computational model; while it does not leverage the LMAX Disruptor internally, the disruptor is commonly used externally to sequence market events into the graph. Together, they can process millions of market events per second without triggering Java Garbage Collection on the hot path.
+CoreGraph is a lock-free, Directed Acyclic Graph (DAG) computing engine built for High-Frequency Trading (HFT). The engine is strictly a computational model; while it does not leverage the LMAX Disruptor internally, the disruptor is commonly used externally to sequence market events into the graph. Together, they can process millions of market events per second without triggering Java Garbage Collection on the hot path.
 
 ### Key Capabilities
 
-*   **Ultra-Low Latency:** Optimized for low single-digit microsecond stabilization latency on modern CPUs.
+*   **Ultra-Low Latency:** Optimized for low single-digit microsecond stabilization latency.
 *   **Predictability:** **Zero-GC** (Garbage Collection) on the hot path. All memory is pre-allocated.
 *   **Throughput:** Capable of processing millions of updates per second on a single thread. 
 *   **Zero-Overhead Read:** Direct node value access for the main application thread without GC pressure.
@@ -288,8 +286,7 @@ To make your custom Java node available to analysts writing JSON definitions, re
 registerFactory(NodeType.MY_ALGO, (name, props, deps) -> {
     var fn = new MyCustomAlgo();
     return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-            () -> fn.apply(deps)) // Note: apply(Object[]) wrapper for abstract topologies
-            .withStateExtractor(fn); // Optional: if your node tracks internal state
+            () -> fn.apply(deps));
 });
 ```
 
@@ -390,24 +387,18 @@ public class SafeDivider implements Fn2 {
 
 ## 9. Graph Exporting and Visualization
 
-You can generate algorithmic visualizations of your compiled `CoreGraph` at any time programmatically. The system ships natively with a transpiler that converts the Java graph topography into rendering `Mermaid.js` syntax.
+CoreGraph provides built-in tools for extracting and visualizing the current topology of your compiled graph at runtime. 
 
-```java
-import com.trading.drg.util.GraphExplain;
+### Web Dashboard Visualization
+When running the `CoreGraph` with the embedded web server enabled (e.g., `engine.enableDashboardServer(9090)`), the web server automatically generates an interactive map of your entire logical graph. 
 
-// Compile the topology and extract Mermaid markdown
-CoreGraph engine = builder.build();
-String mermaidMarkup = new GraphExplain(engine).toMermaid();
+You can view this live visualization directly on the dashboard by visiting:
+**[http://localhost:9090](http://localhost:9090)**
 
-System.out.println(mermaidMarkup);
-// Output Example:
-// graph TD;
-//   US10Y[US10Y] --> 2Y_10Y_Spread[Spread];
-//   US02Y[US02Y] --> 2Y_10Y_Spread;
-//   2Y_10Y_Spread --> Avg_Spread[Ewma];
-```
-
-This output can be directly pasted into GitHub READMEs, Notion Docs, or HTML `<div class="mermaid">` tags.
+### Exporting Snapshots
+To export the current state of the engine, including the full topology definition and all active node values:
+1. **Dashboard Interface:** Click the **"Snapshot"** button directly on the web dashboard at `http://localhost:9090`. This will download a static JSON payload containing the topology diagram and current metrics.
+2. **HTTP Endpoint:** You can programmatically fetch the snapshot at any time by issuing an HTTP GET request to the `/snapshot` endpoint on your configured dashboard port (e.g., `http://localhost:9090/snapshot`).
 
 ---
 
