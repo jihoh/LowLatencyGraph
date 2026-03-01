@@ -1,0 +1,1013 @@
+{
+  "graph": {
+    "name": "Massive Graph Stress Test",
+    "version": "4.0",
+    "templates": [
+      {
+        "name": "complex_item",
+        "nodes": [
+          {
+            "name": "{{prefix}}.source1",
+            "type": "scalar_source"
+          },
+          {
+            "name": "{{prefix}}.source2",
+            "type": "scalar_source"
+          },
+          {
+            "name": "{{prefix}}.source3",
+            "type": "scalar_source"
+          },
+          {
+            "name": "{{prefix}}.N03_Avg",
+            "type": "average",
+            "inputs": {
+              "1": "{{prefix}}.source1",
+              "2": "{{prefix}}.source2",
+              "3": "{{prefix}}.source3"
+            }
+          },
+          {
+            "name": "{{prefix}}.N04_Ewma",
+            "type": "ewma",
+            "inputs": {
+              "input": "{{prefix}}.N03_Avg"
+            }
+          },
+          {
+            "name": "{{prefix}}.N05_Diff",
+            "type": "diff",
+            "inputs": {
+              "input": "{{prefix}}.N04_Ewma"
+            }
+          },
+          {
+            "name": "{{prefix}}.N06_Sma",
+            "type": "sma",
+            "inputs": {
+              "input": "{{prefix}}.N05_Diff"
+            }
+          },
+          {
+            "name": "{{prefix}}.N07_Macd",
+            "type": "macd",
+            "inputs": {
+              "input": "{{prefix}}.N06_Sma"
+            }
+          },
+          {
+            "name": "{{prefix}}.N08_Spread",
+            "type": "spread",
+            "inputs": {
+              "a": "{{prefix}}.N07_Macd",
+              "b": "{{prefix}}.source1"
+            }
+          },
+          {
+            "name": "{{prefix}}.N09_Harmonic",
+            "type": "harmonic_mean",
+            "inputs": {
+              "1": "{{prefix}}.N08_Spread",
+              "2": "{{prefix}}.source2"
+            }
+          },
+          {
+            "name": "{{prefix}}.N10_TriArb",
+            "type": "tri_arb_spread",
+            "inputs": {
+              "leg1": "{{prefix}}.N09_Harmonic",
+              "leg2": "{{prefix}}.N04_Ewma",
+              "direct": "{{prefix}}.N06_Sma"
+            }
+          },
+          {
+            "name": "{{prefix}}.N11_WeightedAvg",
+            "type": "weighted_avg",
+            "inputs": {
+              "0a_val": "{{prefix}}.N10_TriArb",
+              "0b_wt": "{{prefix}}.source1",
+              "1a_val": "{{prefix}}.N08_Spread",
+              "1b_wt": "{{prefix}}.source2"
+            }
+          },
+          {
+            "name": "{{prefix}}.N12_FinalAvg",
+            "type": "average",
+            "inputs": {
+              "1": "{{prefix}}.N11_WeightedAvg",
+              "2": "{{prefix}}.source1"
+            }
+          }
+        ]
+      }
+    ],
+    "nodes": [
+      {
+        "name": "Item_000_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_000"
+        }
+      },
+      {
+        "name": "Item_001_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_001"
+        }
+      },
+      {
+        "name": "Item_002_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_002"
+        }
+      },
+      {
+        "name": "Item_003_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_003"
+        }
+      },
+      {
+        "name": "Item_004_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_004"
+        }
+      },
+      {
+        "name": "Item_005_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_005"
+        }
+      },
+      {
+        "name": "Item_006_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_006"
+        }
+      },
+      {
+        "name": "Item_007_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_007"
+        }
+      },
+      {
+        "name": "Item_008_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_008"
+        }
+      },
+      {
+        "name": "Item_009_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_009"
+        }
+      },
+      {
+        "name": "Item_010_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_010"
+        }
+      },
+      {
+        "name": "Item_011_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_011"
+        }
+      },
+      {
+        "name": "Item_012_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_012"
+        }
+      },
+      {
+        "name": "Item_013_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_013"
+        }
+      },
+      {
+        "name": "Item_014_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_014"
+        }
+      },
+      {
+        "name": "Item_015_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_015"
+        }
+      },
+      {
+        "name": "Item_016_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_016"
+        }
+      },
+      {
+        "name": "Item_017_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_017"
+        }
+      },
+      {
+        "name": "Item_018_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_018"
+        }
+      },
+      {
+        "name": "Item_019_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_019"
+        }
+      },
+      {
+        "name": "Item_020_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_020"
+        }
+      },
+      {
+        "name": "Item_021_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_021"
+        }
+      },
+      {
+        "name": "Item_022_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_022"
+        }
+      },
+      {
+        "name": "Item_023_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_023"
+        }
+      },
+      {
+        "name": "Item_024_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_024"
+        }
+      },
+      {
+        "name": "Item_025_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_025"
+        }
+      },
+      {
+        "name": "Item_026_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_026"
+        }
+      },
+      {
+        "name": "Item_027_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_027"
+        }
+      },
+      {
+        "name": "Item_028_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_028"
+        }
+      },
+      {
+        "name": "Item_029_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_029"
+        }
+      },
+      {
+        "name": "Item_030_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_030"
+        }
+      },
+      {
+        "name": "Item_031_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_031"
+        }
+      },
+      {
+        "name": "Item_032_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_032"
+        }
+      },
+      {
+        "name": "Item_033_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_033"
+        }
+      },
+      {
+        "name": "Item_034_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_034"
+        }
+      },
+      {
+        "name": "Item_035_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_035"
+        }
+      },
+      {
+        "name": "Item_036_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_036"
+        }
+      },
+      {
+        "name": "Item_037_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_037"
+        }
+      },
+      {
+        "name": "Item_038_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_038"
+        }
+      },
+      {
+        "name": "Item_039_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_039"
+        }
+      },
+      {
+        "name": "Item_040_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_040"
+        }
+      },
+      {
+        "name": "Item_041_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_041"
+        }
+      },
+      {
+        "name": "Item_042_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_042"
+        }
+      },
+      {
+        "name": "Item_043_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_043"
+        }
+      },
+      {
+        "name": "Item_044_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_044"
+        }
+      },
+      {
+        "name": "Item_045_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_045"
+        }
+      },
+      {
+        "name": "Item_046_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_046"
+        }
+      },
+      {
+        "name": "Item_047_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_047"
+        }
+      },
+      {
+        "name": "Item_048_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_048"
+        }
+      },
+      {
+        "name": "Item_049_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_049"
+        }
+      },
+      {
+        "name": "Item_050_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_050"
+        }
+      },
+      {
+        "name": "Item_051_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_051"
+        }
+      },
+      {
+        "name": "Item_052_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_052"
+        }
+      },
+      {
+        "name": "Item_053_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_053"
+        }
+      },
+      {
+        "name": "Item_054_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_054"
+        }
+      },
+      {
+        "name": "Item_055_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_055"
+        }
+      },
+      {
+        "name": "Item_056_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_056"
+        }
+      },
+      {
+        "name": "Item_057_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_057"
+        }
+      },
+      {
+        "name": "Item_058_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_058"
+        }
+      },
+      {
+        "name": "Item_059_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_059"
+        }
+      },
+      {
+        "name": "Item_060_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_060"
+        }
+      },
+      {
+        "name": "Item_061_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_061"
+        }
+      },
+      {
+        "name": "Item_062_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_062"
+        }
+      },
+      {
+        "name": "Item_063_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_063"
+        }
+      },
+      {
+        "name": "Item_064_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_064"
+        }
+      },
+      {
+        "name": "Item_065_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_065"
+        }
+      },
+      {
+        "name": "Item_066_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_066"
+        }
+      },
+      {
+        "name": "Item_067_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_067"
+        }
+      },
+      {
+        "name": "Item_068_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_068"
+        }
+      },
+      {
+        "name": "Item_069_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_069"
+        }
+      },
+      {
+        "name": "Item_070_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_070"
+        }
+      },
+      {
+        "name": "Item_071_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_071"
+        }
+      },
+      {
+        "name": "Item_072_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_072"
+        }
+      },
+      {
+        "name": "Item_073_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_073"
+        }
+      },
+      {
+        "name": "Item_074_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_074"
+        }
+      },
+      {
+        "name": "Item_075_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_075"
+        }
+      },
+      {
+        "name": "Item_076_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_076"
+        }
+      },
+      {
+        "name": "Item_077_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_077"
+        }
+      },
+      {
+        "name": "Item_078_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_078"
+        }
+      },
+      {
+        "name": "Item_079_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_079"
+        }
+      },
+      {
+        "name": "Item_080_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_080"
+        }
+      },
+      {
+        "name": "Item_081_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_081"
+        }
+      },
+      {
+        "name": "Item_082_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_082"
+        }
+      },
+      {
+        "name": "Item_083_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_083"
+        }
+      },
+      {
+        "name": "Item_084_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_084"
+        }
+      },
+      {
+        "name": "Item_085_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_085"
+        }
+      },
+      {
+        "name": "Item_086_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_086"
+        }
+      },
+      {
+        "name": "Item_087_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_087"
+        }
+      },
+      {
+        "name": "Item_088_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_088"
+        }
+      },
+      {
+        "name": "Item_089_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_089"
+        }
+      },
+      {
+        "name": "Item_090_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_090"
+        }
+      },
+      {
+        "name": "Item_091_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_091"
+        }
+      },
+      {
+        "name": "Item_092_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_092"
+        }
+      },
+      {
+        "name": "Item_093_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_093"
+        }
+      },
+      {
+        "name": "Item_094_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_094"
+        }
+      },
+      {
+        "name": "Item_095_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_095"
+        }
+      },
+      {
+        "name": "Item_096_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_096"
+        }
+      },
+      {
+        "name": "Item_097_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_097"
+        }
+      },
+      {
+        "name": "Item_098_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_098"
+        }
+      },
+      {
+        "name": "Item_099_tpl",
+        "type": "TEMPLATE",
+        "properties": {
+          "template": "complex_item",
+          "prefix": "Item_099"
+        }
+      },
+      {
+        "name": "Global_Final_Average",
+        "type": "average",
+        "inputs": {
+          "0": "Item_000.N12_FinalAvg",
+          "1": "Item_001.N12_FinalAvg",
+          "2": "Item_002.N12_FinalAvg",
+          "3": "Item_003.N12_FinalAvg",
+          "4": "Item_004.N12_FinalAvg",
+          "5": "Item_005.N12_FinalAvg",
+          "6": "Item_006.N12_FinalAvg",
+          "7": "Item_007.N12_FinalAvg",
+          "8": "Item_008.N12_FinalAvg",
+          "9": "Item_009.N12_FinalAvg",
+          "10": "Item_010.N12_FinalAvg",
+          "11": "Item_011.N12_FinalAvg",
+          "12": "Item_012.N12_FinalAvg",
+          "13": "Item_013.N12_FinalAvg",
+          "14": "Item_014.N12_FinalAvg",
+          "15": "Item_015.N12_FinalAvg",
+          "16": "Item_016.N12_FinalAvg",
+          "17": "Item_017.N12_FinalAvg",
+          "18": "Item_018.N12_FinalAvg",
+          "19": "Item_019.N12_FinalAvg",
+          "20": "Item_020.N12_FinalAvg",
+          "21": "Item_021.N12_FinalAvg",
+          "22": "Item_022.N12_FinalAvg",
+          "23": "Item_023.N12_FinalAvg",
+          "24": "Item_024.N12_FinalAvg",
+          "25": "Item_025.N12_FinalAvg",
+          "26": "Item_026.N12_FinalAvg",
+          "27": "Item_027.N12_FinalAvg",
+          "28": "Item_028.N12_FinalAvg",
+          "29": "Item_029.N12_FinalAvg",
+          "30": "Item_030.N12_FinalAvg",
+          "31": "Item_031.N12_FinalAvg",
+          "32": "Item_032.N12_FinalAvg",
+          "33": "Item_033.N12_FinalAvg",
+          "34": "Item_034.N12_FinalAvg",
+          "35": "Item_035.N12_FinalAvg",
+          "36": "Item_036.N12_FinalAvg",
+          "37": "Item_037.N12_FinalAvg",
+          "38": "Item_038.N12_FinalAvg",
+          "39": "Item_039.N12_FinalAvg",
+          "40": "Item_040.N12_FinalAvg",
+          "41": "Item_041.N12_FinalAvg",
+          "42": "Item_042.N12_FinalAvg",
+          "43": "Item_043.N12_FinalAvg",
+          "44": "Item_044.N12_FinalAvg",
+          "45": "Item_045.N12_FinalAvg",
+          "46": "Item_046.N12_FinalAvg",
+          "47": "Item_047.N12_FinalAvg",
+          "48": "Item_048.N12_FinalAvg",
+          "49": "Item_049.N12_FinalAvg",
+          "50": "Item_050.N12_FinalAvg",
+          "51": "Item_051.N12_FinalAvg",
+          "52": "Item_052.N12_FinalAvg",
+          "53": "Item_053.N12_FinalAvg",
+          "54": "Item_054.N12_FinalAvg",
+          "55": "Item_055.N12_FinalAvg",
+          "56": "Item_056.N12_FinalAvg",
+          "57": "Item_057.N12_FinalAvg",
+          "58": "Item_058.N12_FinalAvg",
+          "59": "Item_059.N12_FinalAvg",
+          "60": "Item_060.N12_FinalAvg",
+          "61": "Item_061.N12_FinalAvg",
+          "62": "Item_062.N12_FinalAvg",
+          "63": "Item_063.N12_FinalAvg",
+          "64": "Item_064.N12_FinalAvg",
+          "65": "Item_065.N12_FinalAvg",
+          "66": "Item_066.N12_FinalAvg",
+          "67": "Item_067.N12_FinalAvg",
+          "68": "Item_068.N12_FinalAvg",
+          "69": "Item_069.N12_FinalAvg",
+          "70": "Item_070.N12_FinalAvg",
+          "71": "Item_071.N12_FinalAvg",
+          "72": "Item_072.N12_FinalAvg",
+          "73": "Item_073.N12_FinalAvg",
+          "74": "Item_074.N12_FinalAvg",
+          "75": "Item_075.N12_FinalAvg",
+          "76": "Item_076.N12_FinalAvg",
+          "77": "Item_077.N12_FinalAvg",
+          "78": "Item_078.N12_FinalAvg",
+          "79": "Item_079.N12_FinalAvg",
+          "80": "Item_080.N12_FinalAvg",
+          "81": "Item_081.N12_FinalAvg",
+          "82": "Item_082.N12_FinalAvg",
+          "83": "Item_083.N12_FinalAvg",
+          "84": "Item_084.N12_FinalAvg",
+          "85": "Item_085.N12_FinalAvg",
+          "86": "Item_086.N12_FinalAvg",
+          "87": "Item_087.N12_FinalAvg",
+          "88": "Item_088.N12_FinalAvg",
+          "89": "Item_089.N12_FinalAvg",
+          "90": "Item_090.N12_FinalAvg",
+          "91": "Item_091.N12_FinalAvg",
+          "92": "Item_092.N12_FinalAvg",
+          "93": "Item_093.N12_FinalAvg",
+          "94": "Item_094.N12_FinalAvg",
+          "95": "Item_095.N12_FinalAvg",
+          "96": "Item_096.N12_FinalAvg",
+          "97": "Item_097.N12_FinalAvg",
+          "98": "Item_098.N12_FinalAvg",
+          "99": "Item_099.N12_FinalAvg"
+        }
+      }
+    ]
+  }
+}

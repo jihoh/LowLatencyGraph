@@ -1,6 +1,10 @@
 package com.trading.drg.web;
 
+import com.trading.drg.util.AllocationProfiler;
 import com.trading.drg.util.NodeProfileListener;
+
+import java.util.Arrays;
+import java.util.function.DoubleSupplier;
 
 /**
  * Zero-allocation JSON serializer for streaming graph tick data over WebSocket.
@@ -32,8 +36,8 @@ public final class JsonSnapshotSerializer {
             long epoch, int nodesStabilized, int srcCount, long totalEvents, long epochEvents,
             double[] scalars, double[][] vectors, String[][] headers,
             JvmMetricsCollector jvmMetrics,
-            com.trading.drg.util.AllocationProfiler allocationProfiler,
-            java.util.function.DoubleSupplier backpressureSupplier,
+            AllocationProfiler allocationProfiler,
+            DoubleSupplier backpressureSupplier,
             double lastLatency, double avgLatency,
             boolean hasLatency, boolean hasProfile,
             NodeProfileListener profileListener,
@@ -60,6 +64,7 @@ public final class JsonSnapshotSerializer {
         jvmMetrics.appendJson(sb);
         if (allocationProfiler != null) {
             sb.append(",\"allocatedBytes\":").append(allocationProfiler.getLastAllocatedBytes());
+            sb.append(",\"cumulativeAllocatedBytes\":").append(allocationProfiler.getCumulativeAllocatedBytes());
         }
         sb.append("}");
 
@@ -143,7 +148,7 @@ public final class JsonSnapshotSerializer {
             }
         }
 
-        java.util.Arrays.sort(sortBuffer, 0, validCount,
+        Arrays.sort(sortBuffer, 0, validCount,
                 (s1, s2) -> Long.compare(s2.totalDurationNanos, s1.totalDurationNanos));
 
         limit = Math.min(limit, validCount);

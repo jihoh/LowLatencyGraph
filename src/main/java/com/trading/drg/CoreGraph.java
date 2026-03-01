@@ -7,6 +7,9 @@ import com.trading.drg.engine.TopologicalOrder;
 import com.trading.drg.io.GraphDefinition;
 import com.trading.drg.io.JsonGraphCompiler;
 import com.trading.drg.api.ScalarValue;
+import com.trading.drg.node.ScalarSourceNode;
+import com.trading.drg.node.VectorSourceNode;
+import com.trading.drg.util.CompositeStabilizationListener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.nio.file.Path;
@@ -30,7 +33,7 @@ public class CoreGraph {
     private final List<String> originalOrder;
     private final Map<String, Map<String, String>> edgeLabels;
 
-    private final com.trading.drg.util.CompositeStabilizationListener compositeListener;
+    private final CompositeStabilizationListener compositeListener;
 
     // Cache source nodes for O(1) updates
     private final Node[] sourceNodes;
@@ -73,7 +76,7 @@ public class CoreGraph {
         }
 
         // Register composite listener
-        this.compositeListener = new com.trading.drg.util.CompositeStabilizationListener();
+        this.compositeListener = new CompositeStabilizationListener();
         this.engine.setListener(this.compositeListener);
     }
 
@@ -88,17 +91,27 @@ public class CoreGraph {
 
     /** Reads the current value of a Scalar node. */
     public double getDouble(String name) {
-        Node node = getNode(name);
+        Node node = nodes.get(name);
+        if (node == null) {
+            throw new IllegalArgumentException("Node not found: " + name);
+        }
         if (node instanceof ScalarValue sv) {
             return sv.value();
         }
         throw new IllegalArgumentException("Node " + name + " is not a ScalarValue.");
     }
 
-    /** Retrieves a node by name. */
-    @SuppressWarnings("unchecked")
-    public <T> T getNode(String name) {
-        return (T) nodes.get(name);
+    /** Retrieves a node by name with type-safe casting. */
+    public <T> T getNode(String name, Class<T> type) {
+        Node node = nodes.get(name);
+        if (node == null) {
+            throw new IllegalArgumentException("Node not found: " + name);
+        }
+        if (!type.isInstance(node)) {
+            throw new IllegalArgumentException(
+                    "Node " + name + " is " + node.getClass().getSimpleName() + ", expected " + type.getSimpleName());
+        }
+        return type.cast(node);
     }
 
     /** Resolves a node name to its topological index. */
@@ -116,7 +129,7 @@ public class CoreGraph {
         if (nodeId < 0 || nodeId >= sourceNodes.length)
             return;
         Node node = sourceNodes[nodeId];
-        if (node instanceof com.trading.drg.node.ScalarSourceNode sn) {
+        if (node instanceof ScalarSourceNode sn) {
             sn.update(value);
             engine.markDirty(nodeId);
         }
@@ -127,7 +140,7 @@ public class CoreGraph {
         if (nodeId < 0 || nodeId >= sourceNodes.length)
             return;
         Node node = sourceNodes[nodeId];
-        if (node instanceof com.trading.drg.node.VectorSourceNode vsn) {
+        if (node instanceof VectorSourceNode vsn) {
             vsn.updateAt(index, value);
             engine.markDirty(nodeId);
         }

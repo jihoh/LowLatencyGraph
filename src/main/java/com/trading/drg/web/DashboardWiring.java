@@ -2,16 +2,24 @@ package com.trading.drg.web;
 
 import com.trading.drg.CoreGraph;
 import com.trading.drg.api.Node;
+import com.trading.drg.api.ScalarValue;
+import com.trading.drg.api.VectorValue;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.io.GraphDefinition;
 import com.trading.drg.io.NodeType;
+import com.trading.drg.node.BooleanNode;
+import com.trading.drg.util.AllocationProfiler;
 import com.trading.drg.util.LatencyTrackingListener;
 import com.trading.drg.util.NodeProfileListener;
 import com.trading.drg.util.SourceExtractor;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.DoubleSupplier;
 
 import lombok.Getter;
 
@@ -26,8 +34,8 @@ public final class DashboardWiring {
 
     private LatencyTrackingListener latencyListener;
     private NodeProfileListener profileListener;
-    private java.util.function.DoubleSupplier backpressureSupplier;
-    private com.trading.drg.util.AllocationProfiler allocationProfiler;
+    private DoubleSupplier backpressureSupplier;
+    private AllocationProfiler allocationProfiler;
     private GraphDashboardServer dashboardServer;
 
     public DashboardWiring(CoreGraph graph) {
@@ -56,7 +64,7 @@ public final class DashboardWiring {
      * Supplies dynamic backpressure load percentage (0.0 to 100.0) from a queuing
      * mechanism
      */
-    public DashboardWiring withBackpressureSupplier(java.util.function.DoubleSupplier supplier) {
+    public DashboardWiring withBackpressureSupplier(DoubleSupplier supplier) {
         this.backpressureSupplier = supplier;
         return this;
     }
@@ -64,7 +72,7 @@ public final class DashboardWiring {
     /**
      * Binds an AllocationProfiler to stream zero-GC confirmation bytes.
      */
-    public DashboardWiring withAllocationProfiler(com.trading.drg.util.AllocationProfiler profiler) {
+    public DashboardWiring withAllocationProfiler(AllocationProfiler profiler) {
         this.allocationProfiler = profiler;
         return this;
     }
@@ -146,7 +154,7 @@ public final class DashboardWiring {
         info.setEpoch(engine.epoch());
         snapshot.setGraph(info);
 
-        java.util.List<GraphDefinition.NodeDef> expandedNodes = new java.util.ArrayList<>();
+        List<GraphDefinition.NodeDef> expandedNodes = new ArrayList<>();
         ObjectMapper mapper = new ObjectMapper();
 
         for (String nodeName : graph.getOriginalOrder()) {
@@ -162,7 +170,7 @@ public final class DashboardWiring {
             Map<String, Map<String, String>> edgeLabels = graph.getEdgeLabels();
             if (edgeLabels.containsKey(nodeName)) {
                 Map<String, String> original = edgeLabels.get(nodeName);
-                Map<String, String> inverted = new java.util.HashMap<>();
+                Map<String, String> inverted = new HashMap<>();
                 for (Map.Entry<String, String> entry : original.entrySet()) {
                     inverted.put(entry.getValue(), entry.getKey());
                 }
@@ -170,25 +178,25 @@ public final class DashboardWiring {
             }
 
             // Extract dynamic state and value
-            Map<String, Object> props = new java.util.HashMap<>();
+            Map<String, Object> props = new HashMap<>();
 
-            if (node instanceof com.trading.drg.api.VectorValue vv) {
+            if (node instanceof VectorValue vv) {
                 Double[] safeArr = new Double[vv.size()];
                 for (int i = 0; i < vv.size(); i++) {
                     double v = vv.valueAt(i);
                     safeArr[i] = Double.isNaN(v) ? null : v;
                 }
                 props.put("value", safeArr);
-            } else if (node instanceof com.trading.drg.api.ScalarValue sv) {
+            } else if (node instanceof ScalarValue sv) {
                 double d = sv.value();
                 props.put("value", Double.isNaN(d) ? null : d);
-            } else if (node instanceof com.trading.drg.node.BooleanNode bn) {
+            } else if (node instanceof BooleanNode bn) {
                 props.put("value", bn.booleanValue());
             } else {
                 props.put("value", null);
             }
 
-            if (node instanceof com.trading.drg.api.VectorValue vv && vv.headers() != null) {
+            if (node instanceof VectorValue vv && vv.headers() != null) {
                 props.put("headers", vv.headers());
             }
 
@@ -203,7 +211,7 @@ public final class DashboardWiring {
 
         try {
             return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(snapshot);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (JsonProcessingException e) {
             return "{\"error\":\"Failed to serialize snapshot: " + e.getMessage() + "\"}";
         }
     }

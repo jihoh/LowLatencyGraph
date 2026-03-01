@@ -244,13 +244,17 @@
                             <span class="label">Old GC Time (ms)</span>
                             <span class="value" id="jvm-old-gc-time" style="color: var(--text-highlight);">0</span>
                         </div>
-                        <div class="metric-small">
-                            <span class="label">Disruptor Backpressure (%)</span>
-                            <span class="value" id="jvm-backpressure">0.0</span>
-                        </div>
                         <div class="metric-small" title="Thread allocation rate natively on hot path">
                             <span class="label">Allocated Bytes</span>
                             <span class="value" id="jvm-allocated-bytes">0</span>
+                        </div>
+                        <div class="metric-small" title="Cumulative thread allocation natively on hot path">
+                            <span class="label">Cumul. Allocated Bytes (MB)</span>
+                            <span class="value" id="jvm-cumulative-allocated">0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Disruptor Backpressure (%)</span>
+                            <span class="value" id="jvm-backpressure">0.0</span>
                         </div>
                         <div class="metric-small">
                             <span class="label">Uptime</span>
@@ -496,12 +500,12 @@
     <!-- Load Mermaid & Dependencies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js" crossorigin="anonymous"></script>
+    <script src="/mermaid-patched.min.js?v=2"></script>
     <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"
         crossorigin="anonymous"></script>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"
         crossorigin="anonymous"></script>
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=9"></script>
 </body>
 
 </html>

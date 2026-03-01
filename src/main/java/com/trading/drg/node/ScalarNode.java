@@ -30,11 +30,7 @@ public abstract class ScalarNode implements ScalarValue {
     @Override
     public final boolean stabilize() {
         previousValue = currentValue;
-        try {
-            currentValue = compute();
-        } catch (Throwable t) {
-            currentValue = Double.NaN;
-        }
+        currentValue = compute();
 
         if (Double.isNaN(previousValue) != Double.isNaN(currentValue))
             return true;

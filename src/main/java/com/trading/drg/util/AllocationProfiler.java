@@ -10,6 +10,7 @@ public class AllocationProfiler {
     private final com.sun.management.ThreadMXBean threadBean;
     private long startBytes;
     private volatile long lastAllocatedBytes = -1;
+    private volatile long cumulativeAllocatedBytes = 0;
 
     public AllocationProfiler() {
         ThreadMXBean bean = ManagementFactory.getThreadMXBean();
@@ -35,9 +36,16 @@ public class AllocationProfiler {
         if (threadBean != null) {
             long endBytes = threadBean.getThreadAllocatedBytes(Thread.currentThread().threadId());
             lastAllocatedBytes = endBytes - startBytes;
+            if (lastAllocatedBytes > 0) {
+                cumulativeAllocatedBytes += lastAllocatedBytes;
+            }
             return lastAllocatedBytes;
         }
         return -1;
+    }
+
+    public long getCumulativeAllocatedBytes() {
+        return cumulativeAllocatedBytes;
     }
 
     /** Returns the last measured allocation bytes for passive telemetry. */

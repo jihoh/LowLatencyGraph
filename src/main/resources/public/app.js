@@ -12,6 +12,7 @@ mermaid.initialize({
     theme: 'dark',
     securityLevel: 'loose',
     maxTextSize: 9999999, // Uncap max length for massive generated graphs
+    maxEdges: 100000,     // Prevent 'Too many edges' error on massive graphs
     fontFamily: 'Inter',
     themeVariables: {
         primaryColor: 'transparent',
@@ -23,7 +24,8 @@ mermaid.initialize({
     flowchart: {
         padding: 24,
         curve: 'basis',
-        htmlLabels: true
+        htmlLabels: true,
+        maxEdges: 100000
     }
 });
 
@@ -704,6 +706,7 @@ function updateMetricsDOM(payload) {
             const elOldGcTime = document.getElementById('jvm-old-gc-time');
             const elBackpressure = document.getElementById('jvm-backpressure');
             const elAllocatedBytes = document.getElementById('jvm-allocated-bytes');
+            const elCumulativeAllocated = document.getElementById('jvm-cumulative-allocated');
 
             let formatMB = (bytes) => (bytes >= 0) ? (bytes / 1048576).toFixed(1) : "-";
 
@@ -752,6 +755,10 @@ function updateMetricsDOM(payload) {
                 } else {
                     elAllocatedBytes.style.color = 'var(--text-color)';
                 }
+            }
+            if (payload.metrics.jvm.cumulativeAllocatedBytes !== undefined && elCumulativeAllocated) {
+                let mb = payload.metrics.jvm.cumulativeAllocatedBytes / 1048576;
+                elCumulativeAllocated.textContent = mb.toFixed(1);
             }
         }
     }
@@ -808,6 +815,7 @@ function connect() {
                     document.getElementById('graph-version').textContent = "v" + payload.graphVersion;
                     // Render layout from server once
                     if (payload.topology) {
+                        // We pass maxEdges at initialization instead of via pragma since Mermaid disabled it for security
                         const mermaidStr = payload.topology;
                         const { svg } = await mermaid.render('graph-svg', mermaidStr);
                         graphContainer.innerHTML = svg;

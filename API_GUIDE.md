@@ -29,7 +29,7 @@ The system is designed as a **Passive** graph engine. The application thread dri
  [Application Thread]
          │
          │ (1) Update Source Nodes
-         │     node.updateDouble(value);
+         │     node.update(value);
          │     engine.markDirty(nodeId);
          │
          │ (2) Call Stabilize
