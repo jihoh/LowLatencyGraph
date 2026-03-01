@@ -36,16 +36,12 @@ public abstract class VectorNode implements VectorValue {
 
     @Override
     public final boolean stabilize() {
-        // Swap or copy? Here we copy to preserve history for delta check.
-        // System.arraycopy is intrinsic and extremely fast.
         System.arraycopy(currentValues, 0, previousValues, 0, size);
 
         try {
-            // Compute new values directly into the buffer
             compute(currentValues);
         } catch (Throwable t) {
             java.util.Arrays.fill(currentValues, Double.NaN);
-            throw t;
         }
 
         // Check for changes element-wise

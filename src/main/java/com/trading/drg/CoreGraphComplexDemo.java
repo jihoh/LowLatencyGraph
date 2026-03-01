@@ -6,8 +6,8 @@ import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
 import com.lmax.disruptor.EventHandler;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import lombok.Getter;
+import lombok.extern.log4j.Log4j2;
 
 import java.util.concurrent.ThreadFactory;
 
@@ -19,9 +19,9 @@ import java.util.concurrent.ThreadFactory;
  * raw binary network events into explicit node updates and strictly triggers
  * stabilization bursts exactly per batch.
  */
+@Log4j2
 public class CoreGraphComplexDemo {
 
-    private static final Logger log = LogManager.getLogger(CoreGraphComplexDemo.class);
     private static final int PORT = 8080;
     private static final int RING_BUFFER_SIZE = 1024;
 
@@ -110,7 +110,7 @@ public class CoreGraphComplexDemo {
         private final CoreGraph graph;
         private final com.trading.drg.api.GraphAutoRouter router;
 
-        @lombok.Getter
+        @Getter
         private final com.trading.drg.util.AllocationProfiler profiler;
 
         public MarketDataEventHandler(CoreGraph graph) {
@@ -143,7 +143,7 @@ public class CoreGraphComplexDemo {
         }
     }
 
-    @lombok.Getter
+    @Getter
     public static class MarketDataEvent {
         @com.trading.drg.api.GraphAutoRouter.RoutingKey(order = 1)
         private String instrument;

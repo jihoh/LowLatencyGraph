@@ -3,6 +3,8 @@ package com.trading.drg.engine;
 import com.trading.drg.api.Node;
 import java.util.*;
 
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
 /**
@@ -12,7 +14,7 @@ import lombok.extern.log4j.Log4j2;
  * Optimized for zero-allocation, cache-friendly traversal during stabilization.
  */
 @Log4j2
-@lombok.AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public final class TopologicalOrder {
     // The nodes in topological execution order.
     private final Node[] topoOrder;

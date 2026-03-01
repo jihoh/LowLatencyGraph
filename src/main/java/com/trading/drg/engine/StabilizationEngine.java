@@ -4,6 +4,8 @@ import com.trading.drg.api.Node;
 import com.trading.drg.api.SourceNode;
 import com.trading.drg.api.StabilizationListener;
 
+import lombok.Setter;
+
 /**
  * Drives the reactive graph stabilization process.
  * <p>
@@ -21,7 +23,7 @@ public final class StabilizationEngine {
     private long eventsProcessed;
     private int eventsThisEpoch;
     private int lastEpochEvents;
-    @lombok.Setter
+    @Setter
     private StabilizationListener listener;
 
     public StabilizationEngine(TopologicalOrder topology) {

@@ -34,7 +34,6 @@ public abstract class ScalarNode implements ScalarValue {
             currentValue = compute();
         } catch (Throwable t) {
             currentValue = Double.NaN;
-            throw t;
         }
 
         if (Double.isNaN(previousValue) != Double.isNaN(currentValue))

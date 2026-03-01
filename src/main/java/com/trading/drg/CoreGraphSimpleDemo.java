@@ -6,16 +6,16 @@ import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
 import com.trading.drg.api.GraphAutoRouter;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import lombok.Getter;
+import lombok.extern.log4j.Log4j2;
 
 import java.util.Random;
 
 /**
  * Demonstrates the usage of the {@link CoreGraph} wrapper class.
  */
+@Log4j2
 public class CoreGraphSimpleDemo {
-    private static final Logger log = LogManager.getLogger(CoreGraphSimpleDemo.class);
 
     public static void main(String[] args) throws Exception {
         log.info("Starting CoreGraph Simple Demo...");
@@ -72,7 +72,7 @@ public class CoreGraphSimpleDemo {
         private final CoreGraph graph;
         private final GraphAutoRouter router;
 
-        @lombok.Getter
+        @Getter
         private final com.trading.drg.util.AllocationProfiler profiler;
 
         public FxTickEventHandler(CoreGraph graph) {

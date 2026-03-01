@@ -5,16 +5,16 @@ import com.lmax.disruptor.YieldingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import lombok.Getter;
+import lombok.extern.log4j.Log4j2;
 
 import java.util.Random;
 
 /**
  * Demonstrates the usage of Vector Nodes within the {@link CoreGraph} wrapper.
  */
+@Log4j2
 public class CoreGraphVectorDemo {
-    private static final Logger log = LogManager.getLogger(CoreGraphVectorDemo.class);
 
     public static void main(String[] args) throws Exception {
         log.info("Starting CoreGraph Vector Demo...");
@@ -66,7 +66,7 @@ public class CoreGraphVectorDemo {
     public static class VectorUpdateHandler implements com.lmax.disruptor.EventHandler<VectorUpdateEvent> {
         private final CoreGraph graph;
 
-        @lombok.Getter
+        @Getter
         private final com.trading.drg.util.AllocationProfiler profiler;
 
         public VectorUpdateHandler(CoreGraph graph) {

@@ -47,9 +47,6 @@ public final class JsonGraphCompiler {
                 .map(GraphDefinition.NodeDef::getName)
                 .toList();
 
-        // 1. Sort dependencies topologically
-        nodeDefs = topologicalSort(nodeDefs);
-
         Map<String, Node> nodesByName = new HashMap<>(nodeDefs.size() * 2);
         Map<String, String> logicalTypes = new HashMap<>(nodeDefs.size() * 2);
         Map<String, String> descriptions = new HashMap<>(nodeDefs.size() * 2);
@@ -67,126 +64,105 @@ public final class JsonGraphCompiler {
             }
         }
 
-        for (var nd : nodeDefs) {
-            NodeType type = NodeType.fromString(nd.getType());
-            NodeRegistry.NodeMetadata meta = registry.getMetadata(type);
-            if (meta == null) {
-                throw new IllegalArgumentException("No NodeFactory for type " + type + " in node " + nd.getName());
+        // 2. Instantiate nodes via iterative dependency resolution.
+        // TopologicalOrder.Builder.build() is the single source of truth for execution
+        // order.
+        java.util.Deque<GraphDefinition.NodeDef> pending = new java.util.ArrayDeque<>(nodeDefs);
+        int prevPendingSize = -1;
+
+        while (!pending.isEmpty()) {
+            if (pending.size() == prevPendingSize) {
+                String unresolved = pending.stream()
+                        .map(GraphDefinition.NodeDef::getName)
+                        .collect(java.util.stream.Collectors.joining(", "));
+                throw new IllegalStateException(
+                        "Cycle or missing dependency detected. Unresolved nodes: " + unresolved);
             }
+            prevPendingSize = pending.size();
 
-            // Resolve dependencies array
-            Node[] deps;
+            var iter = pending.iterator();
+            while (iter.hasNext()) {
+                var nd = iter.next();
 
-            if (nd.getInputs() != null && !nd.getInputs().isEmpty()) {
-                if (meta.namedInputs() != null) {
-                    deps = new Node[meta.namedInputs().length];
-                    for (int i = 0; i < deps.length; i++) {
-                        String inputKey = meta.namedInputs()[i];
-                        String depName = nd.getInputs().get(inputKey);
-                        if (depName == null) {
-                            throw new IllegalArgumentException(
-                                    "Missing @NamedInput '" + inputKey + "' in JSON inputs map for node "
-                                            + nd.getName());
+                // Skip if any dependency hasn't been created yet
+                if (nd.getInputs() != null && !nd.getInputs().isEmpty()) {
+                    boolean allReady = true;
+                    for (String depName : nd.getInputs().values()) {
+                        if (!nodesByName.containsKey(depName)) {
+                            allReady = false;
+                            break;
                         }
+                    }
+                    if (!allReady)
+                        continue;
+                }
 
-                        edgeLabels.computeIfAbsent(nd.getName(), k -> new HashMap<>()).put(depName, inputKey);
+                // All dependencies resolved — create the node
+                NodeType type = NodeType.fromString(nd.getType());
+                NodeRegistry.NodeMetadata meta = registry.getMetadata(type);
+                if (meta == null) {
+                    throw new IllegalArgumentException(
+                            "No NodeFactory for type " + type + " in node " + nd.getName());
+                }
 
-                        Node upstream = nodesByName.get(depName);
-                        if (upstream == null)
-                            throw new IllegalArgumentException(
-                                    "Dependency " + depName + " not found for node " + nd.getName());
+                Node[] deps;
 
-                        deps[i] = upstream;
+                if (nd.getInputs() != null && !nd.getInputs().isEmpty()) {
+                    if (meta.namedInputs() != null) {
+                        deps = new Node[meta.namedInputs().length];
+                        for (int i = 0; i < deps.length; i++) {
+                            String inputKey = meta.namedInputs()[i];
+                            String depName = nd.getInputs().get(inputKey);
+                            if (depName == null) {
+                                throw new IllegalArgumentException(
+                                        "Missing @NamedInput '" + inputKey + "' in JSON inputs map for node "
+                                                + nd.getName());
+                            }
+                            edgeLabels.computeIfAbsent(nd.getName(), k -> new HashMap<>()).put(depName, inputKey);
+                            deps[i] = nodesByName.get(depName);
+                        }
+                    } else {
+                        // Unbounded varargs node (e.g. AVERAGE)
+                        deps = new Node[nd.getInputs().size()];
+                        int i = 0;
+                        List<String> sortedKeys = new ArrayList<>(nd.getInputs().keySet());
+                        Collections.sort(sortedKeys);
+                        for (String inputKey : sortedKeys) {
+                            String depName = nd.getInputs().get(inputKey);
+                            edgeLabels.computeIfAbsent(nd.getName(), k -> new HashMap<>()).put(depName, inputKey);
+                            deps[i++] = nodesByName.get(depName);
+                        }
                     }
                 } else {
-                    // Unbounded varargs node (e.g. AVERAGE)
-                    deps = new Node[nd.getInputs().size()];
-                    int i = 0;
-                    List<String> sortedKeys = new ArrayList<>(nd.getInputs().keySet());
-                    Collections.sort(sortedKeys);
-                    for (String inputKey : sortedKeys) {
-                        String depName = nd.getInputs().get(inputKey);
-                        edgeLabels.computeIfAbsent(nd.getName(), k -> new HashMap<>()).put(depName, inputKey);
-                        Node upstream = nodesByName.get(depName);
-                        if (upstream == null)
-                            throw new IllegalArgumentException(
-                                    "Dependency " + depName + " not found for node " + nd.getName());
-                        deps[i++] = upstream;
+                    deps = new Node[0];
+                }
+
+                Node node = meta.factory().create(nd.getName(),
+                        nd.getProperties() != null ? nd.getProperties() : Collections.emptyMap(),
+                        deps);
+                nodesByName.put(nd.getName(), node);
+
+                topo.addNode(node);
+                if (node instanceof SourceNode)
+                    topo.markSource(nd.getName());
+
+                if (nd.getInputs() != null) {
+                    for (String dep : nd.getInputs().values()) {
+                        topo.addEdge(dep, nd.getName());
                     }
                 }
-            } else {
-                deps = new Node[0];
-            }
 
-            Node node = meta.factory().create(nd.getName(),
-                    nd.getProperties() != null ? nd.getProperties() : Collections.emptyMap(),
-                    deps);
-            nodesByName.put(nd.getName(), node);
-
-            topo.addNode(node);
-            if (node instanceof SourceNode)
-                topo.markSource(nd.getName());
-
-            if (nd.getInputs() != null) {
-                for (String dep : nd.getInputs().values()) {
-                    topo.addEdge(dep, nd.getName());
-                }
+                iter.remove();
             }
         }
 
         return new CompiledGraph(graphInfo.getName(), graphInfo.getVersion(),
-                new StabilizationEngine(topo.build()), nodesByName, logicalTypes, descriptions,
-                originalOrder,
-                edgeLabels);
-    }
-
-    private List<GraphDefinition.NodeDef> topologicalSort(List<GraphDefinition.NodeDef> nodes) {
-        Map<String, GraphDefinition.NodeDef> byName = new HashMap<>();
-        Map<String, Integer> inDegree = new HashMap<>();
-        Map<String, List<String>> outEdges = new HashMap<>();
-
-        for (var n : nodes) {
-            byName.put(n.getName(), n);
-            inDegree.put(n.getName(), 0);
-            outEdges.put(n.getName(), new ArrayList<>());
-        }
-
-        for (var n : nodes) {
-
-            // Track dependencies from new Named Inputs map
-            if (n.getInputs() != null) {
-                for (String dep : n.getInputs().values()) {
-                    if (!byName.containsKey(dep)) {
-                        throw new IllegalArgumentException("Unknown dependency: " + dep + " for node: " + n.getName());
-                    }
-                    outEdges.get(dep).add(n.getName());
-                    inDegree.put(n.getName(), inDegree.get(n.getName()) + 1);
-                }
-            }
-        }
-
-        Queue<String> q = new ArrayDeque<>();
-        for (var e : inDegree.entrySet()) {
-            if (e.getValue() == 0)
-                q.add(e.getKey());
-        }
-
-        List<GraphDefinition.NodeDef> sorted = new ArrayList<>();
-        while (!q.isEmpty()) {
-            String curr = q.poll();
-            sorted.add(byName.get(curr));
-            for (String child : outEdges.get(curr)) {
-                int deg = inDegree.get(child) - 1;
-                inDegree.put(child, deg);
-                if (deg == 0)
-                    q.add(child);
-            }
-        }
-
-        if (sorted.size() != nodes.size()) {
-            throw new IllegalStateException("Cycle detected in JSON graph definition");
-        }
-        return sorted;
+                new StabilizationEngine(topo.build()),
+                Collections.unmodifiableMap(nodesByName),
+                Collections.unmodifiableMap(logicalTypes),
+                Collections.unmodifiableMap(descriptions),
+                Collections.unmodifiableList(originalOrder),
+                Collections.unmodifiableMap(edgeLabels));
     }
 
     static ScalarCutoff parseCutoff(Map<String, Object> props) {
@@ -348,62 +324,11 @@ public final class JsonGraphCompiler {
         return copy;
     }
 
-    /**
-     * The result of compilation: a graph engine ready to run.
-     */
-    public static final class CompiledGraph {
-        private final String name, version;
-        private final StabilizationEngine engine;
-        private final Map<String, Node> nodesByName;
-        private final Map<String, String> logicalTypes;
-        private final Map<String, String> descriptions;
-        private final List<String> originalOrder;
-        private final Map<String, Map<String, String>> edgeLabels;
-
-        CompiledGraph(String name, String version, StabilizationEngine engine, Map<String, Node> nodesByName,
-                Map<String, String> logicalTypes, Map<String, String> descriptions,
-                List<String> originalOrder,
-                Map<String, Map<String, String>> edgeLabels) {
-            this.name = name;
-            this.version = version;
-            this.engine = engine;
-            this.nodesByName = Collections.unmodifiableMap(nodesByName);
-            this.logicalTypes = Collections.unmodifiableMap(logicalTypes);
-            this.descriptions = Collections.unmodifiableMap(descriptions);
-            this.originalOrder = Collections.unmodifiableList(originalOrder);
-            this.edgeLabels = Collections.unmodifiableMap(edgeLabels);
-        }
-
-        public String name() {
-            return name;
-        }
-
-        public String version() {
-            return version;
-        }
-
-        public StabilizationEngine engine() {
-            return engine;
-        }
-
-        public Map<String, Node> nodesByName() {
-            return nodesByName;
-        }
-
-        public Map<String, String> logicalTypes() {
-            return logicalTypes;
-        }
-
-        public Map<String, String> descriptions() {
-            return descriptions;
-        }
-
-        public List<String> originalOrder() {
-            return originalOrder;
-        }
-
-        public Map<String, Map<String, String>> edgeLabels() {
-            return edgeLabels;
-        }
+    /** The result of compilation: a graph engine ready to run. */
+    public record CompiledGraph(
+            String name, String version, StabilizationEngine engine,
+            Map<String, Node> nodesByName, Map<String, String> logicalTypes,
+            Map<String, String> descriptions, List<String> originalOrder,
+            Map<String, Map<String, String>> edgeLabels) {
     }
 }

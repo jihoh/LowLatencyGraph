@@ -1,5 +1,9 @@
 package com.trading.drg.io;
 
+import com.trading.drg.fn.Fn1;
+import com.trading.drg.fn.Fn2;
+import com.trading.drg.fn.Fn3;
+import com.trading.drg.fn.FnN;
 import com.trading.drg.fn.finance.Average;
 import com.trading.drg.fn.finance.Beta;
 import com.trading.drg.fn.finance.Correlation;
@@ -22,9 +26,13 @@ import com.trading.drg.node.ScalarSourceNode;
 
 import com.trading.drg.node.VectorSourceNode;
 import com.trading.drg.api.ScalarValue;
+import com.trading.drg.api.VectorValue;
+import com.trading.drg.dsl.GraphBuilder;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 
@@ -82,116 +90,36 @@ public final class NodeRegistry {
     // ── Built-in Factories ──────────────────────────────────────────
 
     private void registerBuiltIns() {
-        // --- Fn1 Nodes ---
-        registerFactory(NodeType.EWMA, (name, props, deps) -> {
-            var fn = new Ewma(JsonGraphCompiler.getDouble(props, "alpha", 0.1));
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()));
-        });
-        registerFactory(NodeType.DIFF, (name, props, deps) -> {
-            var fn = new Diff();
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()));
-        });
-        registerFactory(NodeType.HIST_VOL, (name, props, deps) -> {
-            var fn = new HistVol(JsonGraphCompiler.getInt(props, "window", 10));
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()));
-        });
-        registerFactory(NodeType.LOG_RETURN, (name, props, deps) -> {
-            var fn = new LogReturn();
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()));
-        });
-        registerFactory(NodeType.MACD, (name, props, deps) -> {
-            var fn = new Macd(JsonGraphCompiler.getInt(props, "fast", 12),
-                    JsonGraphCompiler.getInt(props, "slow", 26));
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()));
-        });
-        registerFactory(NodeType.ROLLING_MAX, (name, props, deps) -> {
-            var fn = new RollingMax(JsonGraphCompiler.getInt(props, "window", 10));
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()));
-        });
-        registerFactory(NodeType.ROLLING_MIN, (name, props, deps) -> {
-            var fn = new RollingMin(JsonGraphCompiler.getInt(props, "window", 10));
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()));
-        });
-        registerFactory(NodeType.RSI, (name, props, deps) -> {
-            var fn = new Rsi(JsonGraphCompiler.getInt(props, "window", 14));
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()));
-        });
-        registerFactory(NodeType.SMA, (name, props, deps) -> {
-            var fn = new Sma(JsonGraphCompiler.getInt(props, "window", 10));
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()));
-        });
-        registerFactory(NodeType.Z_SCORE, (name, props, deps) -> {
-            var fn = new ZScore(JsonGraphCompiler.getInt(props, "window", 20));
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value()));
-        });
+        // --- Fn1 Nodes (1 scalar input) ---
+        registerFn1(NodeType.EWMA, p -> new Ewma(JsonGraphCompiler.getDouble(p, "alpha", 0.1)));
+        registerFn1(NodeType.DIFF, p -> new Diff());
+        registerFn1(NodeType.HIST_VOL, p -> new HistVol(JsonGraphCompiler.getInt(p, "window", 10)));
+        registerFn1(NodeType.LOG_RETURN, p -> new LogReturn());
+        registerFn1(NodeType.MACD, p -> new Macd(JsonGraphCompiler.getInt(p, "fast", 12),
+                JsonGraphCompiler.getInt(p, "slow", 26)));
+        registerFn1(NodeType.ROLLING_MAX, p -> new RollingMax(JsonGraphCompiler.getInt(p, "window", 10)));
+        registerFn1(NodeType.ROLLING_MIN, p -> new RollingMin(JsonGraphCompiler.getInt(p, "window", 10)));
+        registerFn1(NodeType.RSI, p -> new Rsi(JsonGraphCompiler.getInt(p, "window", 14)));
+        registerFn1(NodeType.SMA, p -> new Sma(JsonGraphCompiler.getInt(p, "window", 10)));
+        registerFn1(NodeType.Z_SCORE, p -> new ZScore(JsonGraphCompiler.getInt(p, "window", 20)));
 
-        // --- Fn2 Nodes ---
-        registerFactory(NodeType.SPREAD, (name, props, deps) -> {
-            var fn = new Spread();
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value(), ((ScalarValue) deps[1]).value()));
-        });
-        registerFactory(NodeType.BETA, (name, props, deps) -> {
-            var fn = new Beta(JsonGraphCompiler.getInt(props, "window", 20));
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value(), ((ScalarValue) deps[1]).value()));
-        });
-        registerFactory(NodeType.CORRELATION, (name, props, deps) -> {
-            var fn = new Correlation(JsonGraphCompiler.getInt(props, "window", 20));
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value(), ((ScalarValue) deps[1]).value()));
-        });
-        registerFactory(NodeType.TRI_ARB_SPREAD, (name, props, deps) -> {
-            var fn = new TriangularArbSpread();
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
-                    () -> fn.apply(((ScalarValue) deps[0]).value(),
-                            ((ScalarValue) deps[1]).value(), ((ScalarValue) deps[2]).value()));
-        });
+        // --- Fn2 Nodes (2 scalar inputs) ---
+        registerFn2(NodeType.SPREAD, p -> new Spread());
+        registerFn2(NodeType.BETA, p -> new Beta(JsonGraphCompiler.getInt(p, "window", 20)));
+        registerFn2(NodeType.CORRELATION, p -> new Correlation(JsonGraphCompiler.getInt(p, "window", 20)));
 
-        // --- FnN Nodes ---
-        registerFactory(NodeType.HARMONIC_MEAN, (name, props, deps) -> {
-            var fn = new HarmonicMean();
-            double[] scratch = new double[deps.length];
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props), () -> {
-                for (int i = 0; i < deps.length; i++)
-                    scratch[i] = ((ScalarValue) deps[i]).value();
-                return fn.apply(scratch);
-            });
-        });
-        registerFactory(NodeType.WEIGHTED_AVG, (name, props, deps) -> {
-            var fn = new WeightedAverage();
-            double[] scratch = new double[deps.length];
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props), () -> {
-                for (int i = 0; i < deps.length; i++)
-                    scratch[i] = ((ScalarValue) deps[i]).value();
-                return fn.apply(scratch);
-            });
-        });
-        registerFactory(NodeType.AVERAGE, (name, props, deps) -> {
-            var fn = new Average();
-            double[] scratch = new double[deps.length];
-            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props), () -> {
-                for (int i = 0; i < deps.length; i++)
-                    scratch[i] = ((ScalarValue) deps[i]).value();
-                return fn.apply(scratch);
-            });
-        });
+        // --- Fn3 Nodes (3 scalar inputs) ---
+        registerFn3(NodeType.TRI_ARB_SPREAD, p -> new TriangularArbSpread());
 
-        // --- Source / Structural Nodes ---
-        registerFactory(NodeType.SCALAR_SOURCE, (name, props, deps) -> {
-            return new ScalarSourceNode(name, JsonGraphCompiler.getDouble(props, "value", 0.0),
-                    JsonGraphCompiler.parseCutoff(props));
-        });
+        // --- FnN Nodes (N scalar inputs) ---
+        registerFnN(NodeType.HARMONIC_MEAN, p -> new HarmonicMean());
+        registerFnN(NodeType.WEIGHTED_AVG, p -> new WeightedAverage());
+        registerFnN(NodeType.AVERAGE, p -> new Average());
+
+        // --- Source / Structural Nodes (unique logic, kept explicit) ---
+        registerFactory(NodeType.SCALAR_SOURCE,
+                (name, props, deps) -> new ScalarSourceNode(name, JsonGraphCompiler.getDouble(props, "value", 0.0),
+                        JsonGraphCompiler.parseCutoff(props)));
         registerFactory(NodeType.VECTOR_SOURCE, (name, props, deps) -> {
             int size = JsonGraphCompiler.getInt(props, "size", 0);
             if (size <= 0)
@@ -205,7 +133,7 @@ public final class NodeRegistry {
                 headersObj = props.get("auto_expand_labels");
             }
 
-            if (headersObj instanceof java.util.List<?> list) {
+            if (headersObj instanceof List<?> list) {
                 String[] headers = list.stream().map(Object::toString).toArray(String[]::new);
                 node.withHeaders(headers);
             }
@@ -213,19 +141,58 @@ public final class NodeRegistry {
         });
         registerFactory(NodeType.VECTOR_ELEMENT, (name, props, deps) -> {
             int index = JsonGraphCompiler.getInt(props, "index", 0);
-            return com.trading.drg.dsl.GraphBuilder.create().vectorElement(name,
-                    (com.trading.drg.api.VectorValue) deps[0], index);
+            return GraphBuilder.create().vectorElement(name,
+                    (VectorValue) deps[0], index);
         });
         registerFactory(NodeType.COMPUTE_VECTOR, (name, props, deps) -> {
             int size = JsonGraphCompiler.getInt(props, "size", -1);
             double tolerance = JsonGraphCompiler.getDouble(props, "tolerance", 1e-15);
-            return com.trading.drg.dsl.GraphBuilder.create().computeVector(name, size, tolerance,
+            return GraphBuilder.create().computeVector(name, size, tolerance,
                     (inNodes, out) -> {
-                        if (inNodes.length > 0 && inNodes[0] instanceof com.trading.drg.api.VectorValue v) {
+                        if (inNodes.length > 0 && inNodes[0] instanceof VectorValue v) {
                             for (int i = 0; i < Math.min(size, v.size()); i++)
                                 out[i] = v.valueAt(i);
                         }
                     }, deps);
+        });
+    }
+
+    // ── Helper methods to eliminate Fn registration boilerplate ──────────
+
+    private void registerFn1(NodeType type, Function<Map<String, Object>, Fn1> supplier) {
+        registerFactory(type, (name, props, deps) -> {
+            var fn = supplier.apply(props);
+            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
+                    () -> fn.apply(((ScalarValue) deps[0]).value()));
+        });
+    }
+
+    private void registerFn2(NodeType type, Function<Map<String, Object>, Fn2> supplier) {
+        registerFactory(type, (name, props, deps) -> {
+            var fn = supplier.apply(props);
+            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
+                    () -> fn.apply(((ScalarValue) deps[0]).value(), ((ScalarValue) deps[1]).value()));
+        });
+    }
+
+    private void registerFn3(NodeType type, Function<Map<String, Object>, Fn3> supplier) {
+        registerFactory(type, (name, props, deps) -> {
+            var fn = supplier.apply(props);
+            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
+                    () -> fn.apply(((ScalarValue) deps[0]).value(),
+                            ((ScalarValue) deps[1]).value(), ((ScalarValue) deps[2]).value()));
+        });
+    }
+
+    private void registerFnN(NodeType type, Function<Map<String, Object>, FnN> supplier) {
+        registerFactory(type, (name, props, deps) -> {
+            var fn = supplier.apply(props);
+            double[] scratch = new double[deps.length];
+            return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props), () -> {
+                for (int i = 0; i < deps.length; i++)
+                    scratch[i] = ((ScalarValue) deps[i]).value();
+                return fn.apply(scratch);
+            });
         });
     }
 }

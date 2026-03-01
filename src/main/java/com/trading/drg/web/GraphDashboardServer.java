@@ -2,8 +2,8 @@ package com.trading.drg.web;
 
 import io.javalin.Javalin;
 import io.javalin.websocket.WsContext;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import lombok.Setter;
+import lombok.extern.log4j.Log4j2;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,19 +13,19 @@ import java.util.function.Supplier;
  * Lightweight web server for the real-time graph dashboard and WebSocket state
  * pushing.
  */
+@Log4j2
 public class GraphDashboardServer {
-    private static final Logger log = LogManager.getLogger(GraphDashboardServer.class);
 
     // Track active WebSocket client sessions (Set wrapper)
     private final Set<WsContext> sessions = ConcurrentHashMap.newKeySet();
     private Javalin app;
 
     // Cached heavy structural JSON sent upon connection
-    @lombok.Setter
+    @Setter
     private volatile String initialGraphConfig = null;
 
     // Supplier to build the snapshot JSON on demand
-    @lombok.Setter
+    @Setter
     private Supplier<String> snapshotSupplier = null;
 
     /** Starts the dashboard server on the specified port. */
