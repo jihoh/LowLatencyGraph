@@ -357,7 +357,7 @@ registerFnN(NodeType.MY_ALGO, p -> new MyCustomAlgo());
 
 ---
 
-## 6. Advanced: Vector Operations and UI Labels
+## 6. Advanced: Vector Operations
 
 Vectors are powerful for representing Yield Curves, order books, or historical timeseries. You can configure vectors to auto-expand individual elements on the frontend dashboard. 
 
