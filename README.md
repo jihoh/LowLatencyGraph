@@ -488,6 +488,15 @@ try {
 }
 ```
 
+### Smart Batching (`endOfBatch`)
+**CRITICAL:** Using `if (endOfBatch)` is absolutely *necessary* to achieve millions of updates per second. 
+
+When market data events are rapidly published, the Disruptor uses `endOfBatch` to signal whether the queue has more events waiting immediately behind the current one. 
+- **Low Traffic:** If a single tick arrives alone, `endOfBatch` is `true`. The graph stabilizes immediately for ultra-low latency. 
+- **High Traffic:** If a burst of 500 ticks arrives simultaneously, `endOfBatch` is `false` for the first 499 events. The engine rapidly routes the values to memory (marking nodes dirty) but skips the heavy computation. On the 500th tick, it flips to `true` and the graph stabilizes all 500 changes in a single sweep (`graph.stabilize()`).
+
+Without `endOfBatch`, the engine would be forced to compute the full graph geometry 500 individual times, destroying throughput.
+
 ### Zero-GC Auto Routing (`GraphAutoRouter`)
 
 In HFT, parsing strings inside the Disruptor thread is a fatal error. `CoreGraph` provides an annotation-based `GraphAutoRouter` which internally builds a constant-time Trie map of your POJOs at startup. 
