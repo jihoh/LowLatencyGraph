@@ -548,12 +548,13 @@ Internal velocity and latency of the Graph engine during event processing.
 *   **Events in Epoch:** How many discrete events were bundled together into the latest Stabilization sweep.
 *   **Evaluated Nodes:** The raw count of nodes whose `apply()` functions were invoked during the last Stabilization.
 *   **Latency (μs) / Avg Latency:** The end-to-end duration (in microseconds) the engine spent stabilizing the graph.
+*   **Mem Alloc (Byte):** Advanced thread telemetry tracking exactly how many bytes the hot-path stabilizing thread forces onto the JVM heap per stabilization cycle. For maximum performance, this should read `0`.
 
 ### JVM & System Metrics
 Tracks memory layout and external constraints influencing graph performance.
 *   **Heap Used / Max / Eden / Survivor / Old:** Real-time visibility into the memory pools.
 *   **Young/Old GC Count & Time:** In a perfectly optimized pipeline, Old GC should remain zero forever, and Young GC should stabilize once the JVM warms up.
-*   **Hot-path alloc (Byte) & Cumul (MB):** Advanced thread telemetry. The engine tracks exactly how many bytes the hot-path stabilizing thread forces onto the JVM heap. For maximum performance, this should read `0`.
+*   **Cumul. Hot Mem Alloc (MB):** Cumulative bytes allocated onto the JVM heap by the hot-path stabilizing thread over the engine's lifetime.
 *   **Disruptor Backpressure (%):** Measures queue fullness if using an LMAX Disruptor upstream. Elevated percentages indicate the graph engine is falling behind market ingestion speed.
 
 ### Node Profile Metrics

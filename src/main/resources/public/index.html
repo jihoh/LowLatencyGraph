@@ -207,6 +207,10 @@
                             <span class="label">Avg Latency (μs)</span>
                             <span class="value" id="lat-avg">0.00</span>
                         </div>
+                        <div class="metric-small" title="Thread allocation rate natively on hot path">
+                            <span class="label">Malloc (Byte)</span>
+                            <span class="value" id="jvm-allocated-bytes">0</span>
+                        </div>
                     </div>
 
                     <h3 id="header-jvm-metrics" style="cursor: pointer; user-select: none;">JVM Metrics <span>▼</span>
@@ -252,12 +256,8 @@
                             <span class="label">Old GC Time (ms)</span>
                             <span class="value" id="jvm-old-gc-time" style="color: var(--text-highlight);">0</span>
                         </div>
-                        <div class="metric-small" title="Thread allocation rate natively on hot path">
-                            <span class="label">Hot-path alloc (Byte)</span>
-                            <span class="value" id="jvm-allocated-bytes">0</span>
-                        </div>
                         <div class="metric-small" title="Cumulative thread allocation natively on hot path">
-                            <span class="label">Cumul. Hot-path alloc (MB)</span>
+                            <span class="label">Cumul. Hot-Path Malloc (MB)</span>
                             <span class="value" id="jvm-cumulative-allocated">0</span>
                         </div>
                         <div class="metric-small">

@@ -989,7 +989,7 @@ function connect() {
                 }
 
                 if (!payload.metrics) payload.metrics = {};
-                payload.metrics.frontendHz = latestEpochsPerSec.toLocaleString();
+                payload.metrics.frontendHz = latestEpochsPerSec;
 
                 // Hot Path: update metrics and DOM only when live
                 if (!isScrubbing) {
