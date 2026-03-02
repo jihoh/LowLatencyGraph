@@ -26,7 +26,7 @@ import com.trading.drg.api.GraphAutoRouter;
 public class CoreGraphStressDemo {
 
     private static final int PORT = 8082;
-    private static final int RING_BUFFER_SIZE = 65536;
+    private static final int RING_BUFFER_SIZE = 4096;
     private static final int ITEM_COUNT = 100;
     private static final String[] ITEM_CODES = new String[ITEM_COUNT];
 
@@ -67,7 +67,7 @@ public class CoreGraphStressDemo {
         new DashboardWiring(graph)
                 // .enableNodeProfiling() // disabling saves 1us per stabilization in this demo
                 .enableLatencyTracking()
-                // .withThrottleIntervalMs(1000)
+                .withThrottleIntervalMs(1000) // enable this for ultimate performance - enable for PROD
                 .bindDisruptorTelemetry(ringBuffer)
                 .withAllocationProfiler(handler.getProfiler())
                 .enableDashboardServer(PORT);
@@ -99,7 +99,7 @@ public class CoreGraphStressDemo {
                         ringBuffer.publish(sequence);
                     }
                 }
-                TimeUnit.MICROSECONDS.sleep(100);
+                TimeUnit.MICROSECONDS.sleep(10);
             } catch (Exception e) {
                 log.error("Simulator interrupted", e);
                 break;
