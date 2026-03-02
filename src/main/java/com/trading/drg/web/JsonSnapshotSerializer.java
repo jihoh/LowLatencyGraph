@@ -4,7 +4,6 @@ import com.trading.drg.util.AllocationProfiler;
 import com.trading.drg.util.NodeProfileListener;
 
 import java.util.Arrays;
-import java.util.function.DoubleSupplier;
 
 /**
  * Zero-allocation JSON serializer for streaming graph tick data over WebSocket.
@@ -16,15 +15,18 @@ public final class JsonSnapshotSerializer {
     private final String[] jsonKeys;
     private final String[] jsonHeaderKeys;
     private final int nodeCount;
+    private final int edgeCount;
 
     static final byte KIND_SCALAR = 0;
     static final byte KIND_VECTOR = 1;
 
-    public JsonSnapshotSerializer(String[] jsonKeys, String[] jsonHeaderKeys, byte[] nodeKinds, int nodeCount) {
+    public JsonSnapshotSerializer(String[] jsonKeys, String[] jsonHeaderKeys, byte[] nodeKinds, int nodeCount,
+            int edgeCount) {
         this.sb = new StringBuilder(4096);
         this.jsonKeys = jsonKeys;
         this.jsonHeaderKeys = jsonHeaderKeys;
         this.nodeCount = nodeCount;
+        this.edgeCount = edgeCount;
     }
 
     /**
@@ -37,7 +39,7 @@ public final class JsonSnapshotSerializer {
             double[] scalars, double[][] vectors, String[][] headers,
             JvmMetricsCollector jvmMetrics,
             AllocationProfiler allocationProfiler,
-            DoubleSupplier backpressureSupplier,
+            double maxBackpressure,
             double lastLatency, double avgLatency,
             boolean hasLatency, boolean hasProfile,
             NodeProfileListener profileListener,
@@ -55,6 +57,7 @@ public final class JsonSnapshotSerializer {
         sb.append("},\"metrics\":{")
                 .append("\"nodesUpdated\":").append(nodesStabilized).append(",")
                 .append("\"totalNodes\":").append(nodeCount).append(",")
+                .append("\"totalEdges\":").append(edgeCount).append(",")
                 .append("\"totalSourceNodes\":").append(srcCount).append(",")
                 .append("\"eventsProcessed\":").append(totalEvents).append(",")
                 .append("\"epochEvents\":").append(epochEvents);
@@ -69,9 +72,9 @@ public final class JsonSnapshotSerializer {
         sb.append("}");
 
         // ── Disruptor backpressure ──
-        if (backpressureSupplier != null) {
+        if (maxBackpressure >= 0) {
             sb.append(",\"disruptor\":{\"backpressure\":");
-            appendDouble(sb, backpressureSupplier.getAsDouble());
+            appendDouble(sb, maxBackpressure);
             sb.append("}");
         }
 
@@ -91,7 +94,6 @@ public final class JsonSnapshotSerializer {
 
         sb.append("}"); // close metrics
         sb.append("}"); // close tick
-
         return sb.toString();
     }
 
@@ -135,16 +137,35 @@ public final class JsonSnapshotSerializer {
         }
     }
 
+    private static class LocalStat {
+        final String name;
+        final long totalDurationNanos;
+        final long lastDurationNanos;
+        final double avgMicros;
+        final long count;
+        final long nanCount;
+
+        LocalStat(NodeProfileListener.NodeStats s, int topoId, long[] nanCounters) {
+            this.name = s.name;
+            this.totalDurationNanos = s.totalDurationNanos;
+            this.lastDurationNanos = s.lastDurationNanos;
+            this.avgMicros = s.avgMicros();
+            this.count = s.count;
+            this.nanCount = topoId != -1 && topoId < nanCounters.length ? nanCounters[topoId] : 0;
+        }
+    }
+
     private void appendProfileStats(NodeProfileListener profileListener, long[] nanCounters) {
         sb.append(",\"profile\":[");
         NodeProfileListener.NodeStats[] rawStats = profileListener.getStatsArray();
 
         int limit = Math.min(50, rawStats.length);
-        NodeProfileListener.NodeStats[] sortBuffer = new NodeProfileListener.NodeStats[rawStats.length];
+        LocalStat[] sortBuffer = new LocalStat[rawStats.length];
         int validCount = 0;
         for (int i = 0; i < rawStats.length; i++) {
-            if (rawStats[i] != null && rawStats[i].count > 0) {
-                sortBuffer[validCount++] = rawStats[i];
+            NodeProfileListener.NodeStats s = rawStats[i];
+            if (s != null && s.count > 0) {
+                sortBuffer[validCount++] = new LocalStat(s, i, nanCounters);
             }
         }
 
@@ -155,23 +176,14 @@ public final class JsonSnapshotSerializer {
         for (int i = 0; i < limit; i++) {
             if (i > 0)
                 sb.append(",");
-            NodeProfileListener.NodeStats s = sortBuffer[i];
-
-            int localTopoId = -1;
-            for (int t = 0; t < rawStats.length; t++) {
-                if (rawStats[t] == s) {
-                    localTopoId = t;
-                    break;
-                }
-            }
-            long nanCount = localTopoId != -1 && localTopoId < nanCounters.length ? nanCounters[localTopoId] : 0;
+            LocalStat s = sortBuffer[i];
 
             sb.append("{\"name\":\"").append(s.name).append("\",\"latest\":");
             appendDouble(sb, s.lastDurationNanos / 1000.0);
             sb.append(",\"avg\":");
-            appendDouble(sb, s.avgMicros());
+            appendDouble(sb, s.avgMicros);
             sb.append(",\"evaluations\":").append(s.count)
-                    .append(",\"nans\":").append(nanCount)
+                    .append(",\"nans\":").append(s.nanCount)
                     .append("}");
         }
         sb.append("]");

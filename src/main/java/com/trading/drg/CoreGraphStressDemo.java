@@ -12,6 +12,8 @@ import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+
 import com.trading.drg.api.GraphAutoRouter;
 
 /**
@@ -21,11 +23,18 @@ import com.trading.drg.api.GraphAutoRouter;
  * layers of depth.
  */
 @Log4j2
-public class CoreGraphComplexDemo2 {
+public class CoreGraphStressDemo {
 
     private static final int PORT = 8082;
-    private static final int RING_BUFFER_SIZE = 4096;
+    private static final int RING_BUFFER_SIZE = 65536;
     private static final int ITEM_COUNT = 100;
+    private static final String[] ITEM_CODES = new String[ITEM_COUNT];
+
+    static {
+        for (int i = 0; i < ITEM_COUNT; i++) {
+            ITEM_CODES[i] = String.format("Item_%03d", i);
+        }
+    }
 
     public static void main(String[] args) throws Exception {
         log.info("Generating 1300-node Massive Generic JSON Graph...");
@@ -56,8 +65,9 @@ public class CoreGraphComplexDemo2 {
 
         // 3. Setup Dashboard Server with Telemetry
         new DashboardWiring(graph)
-                .enableNodeProfiling()
+                // .enableNodeProfiling() // disabling saves 1us per stabilization in this demo
                 .enableLatencyTracking()
+                // .withThrottleIntervalMs(1000)
                 .bindDisruptorTelemetry(ringBuffer)
                 .withAllocationProfiler(handler.getProfiler())
                 .enableDashboardServer(PORT);
@@ -75,7 +85,7 @@ public class CoreGraphComplexDemo2 {
 
                 for (int i = 0; i < burstSize; i++) {
                     int itemIdx = (int) (Math.random() * ITEM_COUNT);
-                    String itemCode = String.format("Item_%03d", itemIdx);
+                    String itemCode = ITEM_CODES[itemIdx];
 
                     long sequence = ringBuffer.next();
                     try {
@@ -89,8 +99,7 @@ public class CoreGraphComplexDemo2 {
                         ringBuffer.publish(sequence);
                     }
                 }
-
-                Thread.sleep(10);
+                TimeUnit.MICROSECONDS.sleep(100);
             } catch (Exception e) {
                 log.error("Simulator interrupted", e);
                 break;
@@ -106,9 +115,6 @@ public class CoreGraphComplexDemo2 {
         @Getter
         private final AllocationProfiler profiler;
 
-        private long lastLogTime = System.currentTimeMillis();
-        private long eventCount = 0;
-
         public MarketDataEventHandler(CoreGraph graph) {
             this.graph = graph;
             this.router = new GraphAutoRouter(graph)
@@ -122,17 +128,9 @@ public class CoreGraphComplexDemo2 {
         public void onEvent(MarketDataEvent event, long sequence, boolean endOfBatch) throws Exception {
             profiler.start();
             router.route(event);
-            eventCount++;
 
             if (endOfBatch && graph != null) {
                 graph.stabilize();
-
-                long now = System.currentTimeMillis();
-                if (now - lastLogTime > 2000) {
-                    log.info("Processed " + eventCount + " events. Current Epoch: " + graph.getEngine().epoch());
-                    lastLogTime = now;
-                    eventCount = 0;
-                }
             }
 
             long bytesAllocated = profiler.stop();

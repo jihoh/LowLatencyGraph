@@ -41,6 +41,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
     // Pre-computed node metadata
     private final byte[] nodeKinds;
     private final int nodeCount;
+    private final int edgeCount;
 
     // Track NaNs natively via topoIndex
     private final long[] nanCounters;
@@ -89,6 +90,13 @@ public class WebsocketPublisherListener implements StabilizationListener {
         // Pre-compute JSON keys and node kinds
         TopologicalOrder topology = engine.topology();
         this.nodeCount = topology.nodeCount();
+
+        int edges = 0;
+        for (int i = 0; i < nodeCount; i++) {
+            edges += topology.childCount(i);
+        }
+        this.edgeCount = edges;
+
         String[] jsonKeys = new String[nodeCount];
         String[] jsonHeaderKeys = new String[nodeCount];
         this.nodeKinds = new byte[nodeCount];
@@ -105,7 +113,7 @@ public class WebsocketPublisherListener implements StabilizationListener {
             }
         }
 
-        this.serializer = new JsonSnapshotSerializer(jsonKeys, jsonHeaderKeys, nodeKinds, nodeCount);
+        this.serializer = new JsonSnapshotSerializer(jsonKeys, jsonHeaderKeys, nodeKinds, nodeCount, edgeCount);
 
         // Pre-allocate double buffers
         for (int b = 0; b < 2; b++) {
@@ -228,6 +236,12 @@ public class WebsocketPublisherListener implements StabilizationListener {
     /** Hot path: Copies values to buffer and publishes atomically (Zero alloc). */
     @Override
     public void onStabilizationEnd(long epoch, int nodesStabilized) {
+        // Fast-path drop if the configured throttle interval hasn't elapsed
+        long intervalNanos = throttleIntervalMs * 1_000_000L;
+        if (intervalNanos > 0 && (System.nanoTime() - lastPublishTime) < intervalNanos) {
+            return;
+        }
+
         // Pick the write slot: toggle between 0 and 1
         int ws = (readySlot.get() == 0) ? 1 : 0;
 
@@ -280,9 +294,35 @@ public class WebsocketPublisherListener implements StabilizationListener {
         readySlot.set(ws);
     }
 
+    private volatile long throttleIntervalMs = 0;
+    private volatile long lastPublishTime = 0;
+
+    public void setThrottleIntervalMs(long ms) {
+        this.throttleIntervalMs = ms;
+    }
+
     /** Dedicated I/O thread polling ready snapshots to build JSON and broadcast. */
     private void ioLoop() {
+        double maxBackpressure = -1.0;
+
         while (!Thread.currentThread().isInterrupted()) {
+            if (backpressureSupplier != null) {
+                maxBackpressure = Math.max(maxBackpressure, backpressureSupplier.getAsDouble());
+            }
+
+            // Throttle check
+            long now = System.nanoTime();
+            long intervalNanos = throttleIntervalMs * 1_000_000L; // volatile read
+            if (intervalNanos > 0 && (now - lastPublishTime) < intervalNanos) {
+                try {
+                    Thread.sleep(1);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                continue;
+            }
+
             int slot = readySlot.getAndSet(-1);
             if (slot < 0) {
                 try {
@@ -297,17 +337,21 @@ public class WebsocketPublisherListener implements StabilizationListener {
             // Sample JVM telemetry on the I/O thread (never on hot path)
             jvmMetrics.collect();
 
-            // Delegate JSON serialization
+            double reportedBp = maxBackpressure;
+            maxBackpressure = -1.0;
+
+            // Delegate JSON serialization (heavy work)
             String json = serializer.buildTickJson(
                     bufEpoch[slot], bufNodesStabilized[slot], bufSourceCount[slot],
                     bufTotalEvents[slot], bufEpochEvents[slot],
                     bufScalars[slot], bufVectors[slot], bufHeaders[slot],
-                    jvmMetrics, allocationProfiler, backpressureSupplier,
+                    jvmMetrics, allocationProfiler, reportedBp,
                     bufLastLatency[slot], bufAvgLatency[slot],
                     latencyListener != null, profileListener != null,
                     profileListener, nanCounters);
 
             server.broadcast(json);
+            lastPublishTime = System.nanoTime();
         }
     }
 

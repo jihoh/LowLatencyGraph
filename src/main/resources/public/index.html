@@ -156,7 +156,7 @@
                     <h3 id="header-graph-metrics" style="cursor: pointer; user-select: none;">Graph Metrics
                         <span>▼</span>
                     </h3>
-                    <div id="content-graph-metrics" class="metric-row">
+                    <div id="content-graph-metrics" class="metric-row metric-grid-3">
                         <div class="metric-small">
                             <span class="label">Total Nodes</span>
                             <span class="value" id="graph-total-nodes">0</span>
@@ -166,8 +166,20 @@
                             <span class="value" id="graph-source-nodes">0</span>
                         </div>
                         <div class="metric-small">
+                            <span class="label">Total Edges</span>
+                            <span class="value" id="graph-total-edges">0</span>
+                        </div>
+                        <div class="metric-small">
                             <span class="label">Events Processed</span>
                             <span class="value" id="events-value">0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Avg Events/sec</span>
+                            <span class="value" id="events-avg-value">0</span>
+                        </div>
+                        <div class="metric-small">
+                            <span class="label">Rate (Hz)</span>
+                            <span class="value" id="stab-rate">0</span>
                         </div>
                     </div>
 
@@ -184,8 +196,8 @@
                             <span class="value" id="events-epoch-value">0</span>
                         </div>
                         <div class="metric-small">
-                            <span class="label">Rate (Hz)</span>
-                            <span class="value" id="stab-rate">0</span>
+                            <span class="label">Evaluated Nodes</span>
+                            <span class="value" id="reactive-eff">0</span>
                         </div>
                         <div class="metric-small">
                             <span class="label">Latency (μs)</span>
@@ -194,10 +206,6 @@
                         <div class="metric-small">
                             <span class="label">Avg Latency (μs)</span>
                             <span class="value" id="lat-avg">0.00</span>
-                        </div>
-                        <div class="metric-small">
-                            <span class="label">Evaluated Nodes</span>
-                            <span class="value" id="reactive-eff">0</span>
                         </div>
                     </div>
 
@@ -245,11 +253,11 @@
                             <span class="value" id="jvm-old-gc-time" style="color: var(--text-highlight);">0</span>
                         </div>
                         <div class="metric-small" title="Thread allocation rate natively on hot path">
-                            <span class="label">Allocated Bytes</span>
+                            <span class="label">Hot-path alloc (Byte)</span>
                             <span class="value" id="jvm-allocated-bytes">0</span>
                         </div>
                         <div class="metric-small" title="Cumulative thread allocation natively on hot path">
-                            <span class="label">Cumul. Allocated Bytes (MB)</span>
+                            <span class="label">Cumul. Hot-path alloc (MB)</span>
                             <span class="value" id="jvm-cumulative-allocated">0</span>
                         </div>
                         <div class="metric-small">

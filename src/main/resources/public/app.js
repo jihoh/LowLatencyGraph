@@ -648,6 +648,13 @@ function updateMetricsDOM(payload) {
     if (payload.metrics) {
         if (payload.metrics.eventsProcessed !== undefined) {
             document.getElementById('events-value').textContent = payload.metrics.eventsProcessed;
+
+            // Calculate Avg Events/s if we have uptime
+            if (payload.metrics.jvm && payload.metrics.jvm.uptime > 0) {
+                let uptimeSec = payload.metrics.jvm.uptime / 1000.0;
+                let avg = payload.metrics.eventsProcessed / uptimeSec;
+                document.getElementById('events-avg-value').textContent = avg.toFixed(0);
+            }
         }
         if (payload.metrics.epochEvents !== undefined) {
             const el = document.getElementById('events-epoch-value');
@@ -659,6 +666,10 @@ function updateMetricsDOM(payload) {
         }
         if (payload.metrics.totalSourceNodes !== undefined) {
             document.getElementById('graph-source-nodes').textContent = payload.metrics.totalSourceNodes;
+        }
+        if (payload.metrics.totalEdges !== undefined) {
+            const el = document.getElementById('graph-total-edges');
+            if (el) el.textContent = payload.metrics.totalEdges;
         }
         if (payload.metrics.frontendHz !== undefined) {
             stabRate.textContent = payload.metrics.frontendHz;
@@ -745,8 +756,8 @@ function updateMetricsDOM(payload) {
                 if (payload.metrics.jvm.oldGcCount > 0) elOldGcTime.style.color = '#ef4444';
             }
 
-            if (payload.disruptor && elBackpressure) {
-                elBackpressure.textContent = payload.disruptor.backpressure.toFixed(1);
+            if (payload.metrics.disruptor && elBackpressure) {
+                elBackpressure.textContent = payload.metrics.disruptor.backpressure.toFixed(1);
             }
             if (payload.metrics.jvm.allocatedBytes !== undefined && elAllocatedBytes) {
                 elAllocatedBytes.textContent = payload.metrics.jvm.allocatedBytes;

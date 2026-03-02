@@ -37,6 +37,7 @@ public final class DashboardWiring {
     private DoubleSupplier backpressureSupplier;
     private AllocationProfiler allocationProfiler;
     private GraphDashboardServer dashboardServer;
+    private long throttleIntervalMs = 0;
 
     public DashboardWiring(CoreGraph graph) {
         this.graph = graph;
@@ -78,6 +79,14 @@ public final class DashboardWiring {
     }
 
     /**
+     * Configure a backend WebSocket publish interval.
+     */
+    public DashboardWiring withThrottleIntervalMs(long ms) {
+        this.throttleIntervalMs = ms;
+        return this;
+    }
+
+    /**
      * Binds Disruptor ring buffer telemetry for measuring backpressure percentage
      * automatically.
      */
@@ -85,7 +94,7 @@ public final class DashboardWiring {
         return withBackpressureSupplier(() -> {
             long remaining = ringBuffer.remainingCapacity();
             long total = ringBuffer.getBufferSize();
-            double used = (double) (total - remaining) / total;
+            double used = (double) (total - remaining) / (double) total;
             return used * 100.0;
         });
     }
@@ -116,6 +125,9 @@ public final class DashboardWiring {
             }
             if (this.allocationProfiler != null) {
                 wsListener.setAllocationProfiler(this.allocationProfiler);
+            }
+            if (this.throttleIntervalMs > 0) {
+                wsListener.setThrottleIntervalMs(this.throttleIntervalMs);
             }
 
             graph.setListener(wsListener);
