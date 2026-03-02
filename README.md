@@ -144,8 +144,12 @@ VectorSourceNode yieldCurve = builder.vectorSource("Curve", 3);
 // Populate headers for the GUI dashboard
 yieldCurve.withHeaders(new String[]{"1Y", "5Y", "10Y"});
 
+// Pre-allocate your buffers to maintain zero-GC
+double[] curveData = new double[3];
+
 // Update values atomically
-yieldCurve.update(new double[]{ 4.1, 3.8, 3.9 });
+curveData[0] = 4.1;
+yieldCurve.update(curveData);
 ```
 
 ### Example: Boolean Conditions
@@ -167,7 +171,7 @@ ScalarCalcNode output = builder.select("Output", isExtreme, pnlFeed, zScore);
 
 ## 3. JSON Declarative Compilation
 
-For production environments, graphs are typically defined externally via JSON files and hot-loaded by the `JsonGraphCompiler`. This allows Quants and Analysts to modify business logic without recompiling the Java binary.
+For production environments, graphs are typically defined externally via JSON files and hot-loaded by the `JsonGraphCompiler`. This allows modify business logic without recompiling the Java binary.
 
 ### Example Schema (fx_arb.json)
 
@@ -355,7 +359,14 @@ registerFnN(NodeType.MY_ALGO, p -> new MyCustomAlgo());
 
 ## 6. Advanced: Vector Operations and UI Labels
 
-Vectors are powerful for representing Yield Curves, order books, or historical timeseries. You can configure vectors to auto-expand individual elements on the frontend dashboard.
+Vectors are powerful for representing Yield Curves, order books, or historical timeseries. You can configure vectors to auto-expand individual elements on the frontend dashboard. 
+
+### Why Use Vectors vs Scalars?
+If vectors can be exploded into scalars, why not just use multiple "ScalarSourceNodes"? In HFT, vectors (`double[]`) unlock three massive performance optimizations:
+
+1. **Memory Coalescing:** `ScalarSourceNodes` are individual objects scattered across the heap causing slow cache-misses. An array (`double[]`) is a single contiguous memory block. Iterating over it pulls data into the L1 CPU Cache for free.
+2. **SIMD Parallelism:** Grouping data into vectors allows mathematical nodes (`VectorCalcNode`) to utilize AVX hardware auto-vectorization, processing multiple data points simultaneously in one CPU cycle.
+3. **Routing Overhead:** Market updates naturally arrive as grouped payloads (e.g. an order book state). A Vector allows the `GraphAutoRouter` to do *one* map lookup and update the *entire* array atomically instead of doing 100 individual lookups.
 
 ### JSON Vector Definition with Auto-Expanding Labels
 
