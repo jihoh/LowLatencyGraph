@@ -637,6 +637,14 @@ document.getElementById('text-reset').addEventListener('click', () => {
     document.documentElement.style.setProperty('--node-text-scale', textScale);
 });
 
+let lastEventsTs = 0;
+let lastEventsCount = 0;
+let latestEventsPerSec = 0;
+
+let lastEpochTs = 0;
+let lastEpochCount = 0;
+let latestEpochsPerSec = 0;
+
 function updateMetricsDOM(payload) {
     if (payload.epoch !== undefined) {
         epochValue.textContent = payload.epoch;
@@ -649,12 +657,19 @@ function updateMetricsDOM(payload) {
         if (payload.metrics.eventsProcessed !== undefined) {
             document.getElementById('events-value').textContent = payload.metrics.eventsProcessed;
 
-            // Calculate Avg Events/s if we have uptime
-            if (payload.metrics.jvm && payload.metrics.jvm.uptime > 0) {
-                let uptimeSec = payload.metrics.jvm.uptime / 1000.0;
-                let avg = payload.metrics.eventsProcessed / uptimeSec;
-                document.getElementById('events-avg-value').textContent = avg.toFixed(0);
+            const now = Date.now();
+            if (lastEventsTs === 0) {
+                lastEventsTs = now;
+                lastEventsCount = payload.metrics.eventsProcessed;
+            } else if (now - lastEventsTs >= 1000) {
+                const deltaEvents = payload.metrics.eventsProcessed - lastEventsCount;
+                const deltaMs = now - lastEventsTs;
+                latestEventsPerSec = (deltaEvents / deltaMs) * 1000;
+                lastEventsTs = now;
+                lastEventsCount = payload.metrics.eventsProcessed;
             }
+
+            document.getElementById('events-avg-value').textContent = latestEventsPerSec.toFixed(0);
         }
         if (payload.metrics.epochEvents !== undefined) {
             const el = document.getElementById('events-epoch-value');
@@ -958,17 +973,23 @@ function connect() {
             // Branch 2: High Frequency Tick Logic (10Hz+)
             if (payload.type === 'tick' && isGraphRendered) {
 
-                // Real-time Stabilizations / sec using a sliding window
-                let currentHz = 0;
-                const now = performance.now();
-                messageTimes.push(now);
-                if (messageTimes.size > 1) {
-                    const elapsedSc = (now - messageTimes.get(0)) / 1000.0;
-                    currentHz = Math.round((messageTimes.size - 1) / elapsedSc);
+                // Real-time Stabilizations / sec
+                if (payload.epoch !== undefined) {
+                    const now = Date.now();
+                    if (lastEpochTs === 0) {
+                        lastEpochTs = now;
+                        lastEpochCount = payload.epoch;
+                    } else if (now - lastEpochTs >= 1000) {
+                        const deltaEpochs = payload.epoch - lastEpochCount;
+                        const deltaMs = now - lastEpochTs;
+                        latestEpochsPerSec = Math.round((deltaEpochs / deltaMs) * 1000);
+                        lastEpochTs = now;
+                        lastEpochCount = payload.epoch;
+                    }
                 }
 
                 if (!payload.metrics) payload.metrics = {};
-                payload.metrics.frontendHz = currentHz;
+                payload.metrics.frontendHz = latestEpochsPerSec.toLocaleString();
 
                 // Hot Path: update metrics and DOM only when live
                 if (!isScrubbing) {
