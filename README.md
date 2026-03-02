@@ -506,3 +506,38 @@ public class MarketDataEvent {
 ```
 
 When you call `router.route(event)`, the router navigates the pre-built Trie using raw String references from the POJO fields, entirely avoiding `String.concat()` and instantly updating the destination nodes with zero GC overhead.
+
+---
+
+## 10. Dashboard Metrics Reference
+
+The dashboard provides a wealth of telemetry about the engine's real-time state. All metrics run lock-free on separate background threads to ensure zero interference with the hot-path execution.
+
+### Graph Metrics
+Overview of the graph's structural load and event ingest rates.
+*   **Total Nodes:** The total number of nodes in the compiled graph schema.
+*   **Source Nodes:** The number of entry points (source nodes) in the graph.
+*   **Total Edges:** The number of directed dependency links computed by the engine.
+*   **Events Processed:** A lifetime counter of total external events routed into the engine.
+*   **Events Last Sec:** Rolling 1-second dynamic rates indicating input pressure. 
+*   **Stabilizations/sec:** Rolling 1-second dynamic rates indicating the engine's processing velocity.
+
+### Stabilization Metrics
+Internal velocity and latency of the Graph engine during event processing.
+*   **Epoch:** A monotonically increasing counter indicating the current discrete state version of the graph.
+*   **Events in Epoch:** How many discrete events were bundled together into the latest Stabilization sweep.
+*   **Evaluated Nodes:** The raw count of nodes whose `apply()` functions were invoked during the last Stabilization.
+*   **Latency (μs) / Avg Latency:** The end-to-end duration (in microseconds) the engine spent stabilizing the graph.
+
+### JVM & System Metrics
+Tracks memory layout and external constraints influencing graph performance.
+*   **Heap Used / Max / Eden / Survivor / Old:** Real-time visibility into the memory pools.
+*   **Young/Old GC Count & Time:** In a perfectly optimized pipeline, Old GC should remain zero forever, and Young GC should stabilize once the JVM warms up.
+*   **Hot-path alloc (Byte) & Cumul (MB):** Advanced thread telemetry. The engine tracks exactly how many bytes the hot-path stabilizing thread forces onto the JVM heap. For maximum performance, this should read `0`.
+*   **Disruptor Backpressure (%):** Measures queue fullness if using an LMAX Disruptor upstream. Elevated percentages indicate the graph engine is falling behind market ingestion speed.
+
+### Node Profile Metrics
+If `.enableNodeProfiling()` is wired, this table breaks down compute speed per individual node.
+*   **Update:** Cumulative number of times the engine has executed this node's `apply()` logic.
+*   **Latest / Avg (μs):** Execution speed of the node logic in microseconds.
+*   **NaN:** Cumulative count of times this node computed a `Double.NaN` (often indicating a `try-catch` recovery sequence or division by zero).
