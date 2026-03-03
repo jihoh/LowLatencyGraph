@@ -22,7 +22,7 @@ mermaid.initialize({
         fontSize: '18px'
     },
     flowchart: {
-        padding: 24,
+        padding: 0,
         curve: 'basis',
         htmlLabels: true,
         maxEdges: 100000
