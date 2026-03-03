@@ -135,21 +135,23 @@ public class CoreGraphSimpleDemo {
 
                 nanCountdown--;
                 if (nanCountdown == 0) {
-                    currentEurUsd = 1.18;
-                    currentUsdJpy = 154.9;
-                    currentEurJpy = 182.8;
+                    if (nanTargetIndex == 0)
+                        currentEurUsd = 1.18;
+                    if (nanTargetIndex == 1)
+                        currentUsdJpy = 154.9;
+                    if (nanTargetIndex == 2)
+                        currentEurJpy = 182.8;
                     log.info("Recovered from NaN fault.");
                 }
             } else if (i > 0 && i % 500 == 0) {
                 nanTargetIndex = rng.nextInt(3);
                 nanCountdown = 100;
                 log.info("Injected NaN fault into index " + nanTargetIndex + " for 100 seconds.");
-            } else {
-                int targetNode = rng.nextInt(3);
-                while (nanCountdown > 0 && nanTargetIndex == targetNode) {
-                    targetNode = rng.nextInt(3);
-                }
+            }
 
+            // Always apply random walk updates to the nodes that are not currently faulted
+            int targetNode = rng.nextInt(3);
+            if (nanCountdown == 0 || nanTargetIndex != targetNode) {
                 double shock = (rng.nextDouble() - 0.5) * 0.05;
                 if (targetNode == 0) {
                     currentEurUsd += shock;
