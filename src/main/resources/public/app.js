@@ -62,6 +62,7 @@ const downstreamCache = new Map(); // Pre-computed transitive children per node
 const upstreamCache = new Map();   // Pre-computed transitive parents per node
 let panZoomInstance = null;
 const graphElementsCache = new Map(); // O(1) memory bindings for static Graph SVG elements
+let defaultMarkerUrl = null; // Stores the original marker-end URL for resetting arrows
 
 /**
  * A zero-allocation fixed-size circular buffer.
@@ -523,8 +524,10 @@ function initMinimap(mainSvg) {
 
     if (!minimapSvg || !minimapViewport || !minimapContainer || !panZoomInstance) return;
 
-    // Clone the static SVG content into the minimap
-    minimapSvg.innerHTML = mainSvg.innerHTML;
+    // Clone the static SVG content into the minimap, preventing ID collisions
+    minimapSvg.innerHTML = mainSvg.innerHTML
+        .replace(/id="/g, 'id="minimap-')
+        .replace(/url\(\#/g, 'url(#minimap-');
 
     // Set the minimap viewBox to match the original graph's initial natural bounds
     const bbox = mainSvg.getBBox();
@@ -850,6 +853,35 @@ function connect() {
                         // Hook into SVG and enable interactive vector tracking
                         const svgEl = graphContainer.querySelector('svg');
                         if (svgEl) {
+                            // Create colored arrow markers for hover states
+                            const firstPath = svgEl.querySelector('path.flowchart-link');
+                            if (firstPath && firstPath.getAttribute('marker-end')) {
+                                defaultMarkerUrl = firstPath.getAttribute('marker-end');
+                                const markerId = defaultMarkerUrl.replace(/url\(["']?#/, '').replace(/["']?\)/, '');
+                                const baseMarker = document.getElementById(markerId);
+                                if (baseMarker) {
+                                    const defs = baseMarker.parentNode;
+                                    const colors = {
+                                        downstream: '#1ABC9C',
+                                        upstream: '#5DADE2',
+                                        self: '#F39C12',
+                                        nan: '#dc3545'
+                                    };
+                                    for (const [suffix, color] of Object.entries(colors)) {
+                                        const newId = markerId + '-' + suffix;
+                                        if (!document.getElementById(newId)) {
+                                            const m = baseMarker.cloneNode(true);
+                                            m.id = newId;
+                                            m.querySelectorAll('path').forEach(p => {
+                                                p.style.fill = color;
+                                                p.style.stroke = 'none';
+                                            });
+                                            defs.appendChild(m);
+                                        }
+                                    }
+                                }
+                            }
+
                             svgEl.removeAttribute('width');
                             svgEl.removeAttribute('height');
                             svgEl.style.width = '100%';
@@ -917,10 +949,17 @@ function connect() {
                                 });
                             });
 
+                            const allEdgePaths = Array.from(document.querySelectorAll('path.flowchart-link'));
+                            const lsPaths = allEdgePaths.filter(p => p.id && p.id.startsWith(`L_${svgNodeId}_`));
+
+                            // To find incoming paths, target must be at the end before the _number
+                            const leRegex = new RegExp(`_${svgNodeId}_\\d+$`);
+                            const lePaths = allEdgePaths.filter(p => p.id && leRegex.test(p.id));
+
                             graphElementsCache.set(nodeName, {
                                 instances: cachedInstances,
-                                lsPaths: document.querySelectorAll(`.LS-${svgNodeId}`),
-                                lePaths: document.querySelectorAll(`.LE-${svgNodeId}`)
+                                lsPaths: lsPaths,
+                                lePaths: lePaths
                             });
                         });
 
@@ -1345,10 +1384,19 @@ function updateGraphDOM(newValues) {
                 const isValNaN = newVal === "NaN";
 
                 if (isValNaN) {
-                    cachedDOM.lsPaths.forEach(e => e.dataset.sourceNan = "true");
+                    cachedDOM.lsPaths.forEach(e => {
+                        e.dataset.sourceNan = "true";
+                        if (defaultMarkerUrl) {
+                            const base = defaultMarkerUrl.replace(/url\(["']?#/, '').replace(/["']?\)/, '');
+                            e.setAttribute('marker-end', `url(#${base}-nan)`);
+                        }
+                    });
                     cachedDOM.lePaths.forEach(e => e.dataset.targetNan = "true");
                 } else {
-                    cachedDOM.lsPaths.forEach(e => e.dataset.sourceNan = "false");
+                    cachedDOM.lsPaths.forEach(e => {
+                        e.dataset.sourceNan = "false";
+                        if (defaultMarkerUrl) e.setAttribute('marker-end', defaultMarkerUrl);
+                    });
                     cachedDOM.lePaths.forEach(e => e.dataset.targetNan = "false");
                 }
 
@@ -1483,7 +1531,8 @@ function highlightNodes(nodeNames, isHovered, type = 'downstream', lineageSet = 
             if (isHovered && lineageSet) {
                 let targetInLineage = false;
                 for (const lineageNode of lineageSet) {
-                    if (e.classList.contains('LE-' + getMermaidNodeId(lineageNode))) {
+                    const lineageRegex = new RegExp(`_${getMermaidNodeId(lineageNode)}_\\d+$`);
+                    if (e.id && lineageRegex.test(e.id)) {
                         targetInLineage = true;
                         break;
                     }
@@ -1491,21 +1540,22 @@ function highlightNodes(nodeNames, isHovered, type = 'downstream', lineageSet = 
                 shouldHighlight = targetInLineage;
             }
             e.dataset[`sourceHover${type.charAt(0).toUpperCase() + type.slice(1)}`] = shouldHighlight ? "true" : "false";
-        });
-        cachedDOM.lePaths.forEach(e => {
-            let shouldHighlight = isHovered;
-            if (isHovered && lineageSet) {
-                let sourceInLineage = false;
-                for (const lineageNode of lineageSet) {
-                    if (e.classList.contains('LS-' + getMermaidNodeId(lineageNode))) {
-                        sourceInLineage = true;
-                        break;
-                    }
+
+
+
+            // Swap marker-end to colored arrow
+            if (defaultMarkerUrl) {
+                if (shouldHighlight) {
+                    const base = defaultMarkerUrl.replace(/url\(["']?#/, '').replace(/["']?\)/, '');
+                    e.setAttribute('marker-end', `url(#${base}-${type})`);
+                } else {
+                    e.setAttribute('marker-end', defaultMarkerUrl);
                 }
-                shouldHighlight = sourceInLineage;
             }
-            e.dataset[`targetHover${type.charAt(0).toUpperCase() + type.slice(1)}`] = shouldHighlight ? "true" : "false";
         });
+        // We no longer style edges based on their target node (lePaths) 
+        // to strictly honor the user requirement that the edge color
+        // exactly matches its source node's active color state.
     }
 }
 

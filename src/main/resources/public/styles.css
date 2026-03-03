@@ -745,13 +745,11 @@ path.flowchart-link[data-source-hover-self="true"] {
     opacity: 0.15 !important;
 }
 
-#graph-view.graph-hover-active .edgePath,
-#graph-view.graph-hover-active .edgePaths path {
+#graph-view.graph-search-active path.flowchart-link {
     transition: opacity 0.2s ease;
 }
 
-#graph-view.graph-hover-active .edgePath:not(:has([data-source-hover-downstream="true"])):not(:has([data-source-hover-upstream="true"])):not(:has([data-source-hover-self="true"])):not([data-source-hover-downstream="true"]):not([data-source-hover-upstream="true"]):not([data-source-hover-self="true"]),
-#graph-view.graph-hover-active .edgePaths path:not([data-source-hover-downstream="true"]):not([data-source-hover-upstream="true"]):not([data-source-hover-self="true"]) {
+#graph-view.graph-hover-active path.flowchart-link:not([data-source-hover-downstream="true"]):not([data-source-hover-upstream="true"]):not([data-source-hover-self="true"]) {
     opacity: 0.15 !important;
 }
 
@@ -764,8 +762,7 @@ path.flowchart-link[data-source-hover-self="true"] {
     opacity: 0.15 !important;
 }
 
-#graph-view.graph-search-active .edgePath,
-#graph-view.graph-search-active .edgePaths path {
+#graph-view.graph-search-active path.flowchart-link {
     opacity: 0.15 !important;
 }
 
