@@ -21,6 +21,8 @@ import com.trading.drg.fn.finance.Spread;
 import com.trading.drg.fn.finance.TriangularArbSpread;
 import com.trading.drg.fn.finance.WeightedAverage;
 import com.trading.drg.fn.finance.ZScore;
+import com.trading.drg.node.ConditionalSwitchNode;
+import com.trading.drg.node.BooleanNode;
 import com.trading.drg.node.ScalarCalcNode;
 import com.trading.drg.node.ScalarSourceNode;
 
@@ -144,6 +146,30 @@ public final class NodeRegistry {
             return GraphBuilder.create().vectorElement(name,
                     (VectorValue) deps[0], index);
         });
+        // --- Conditional Switch Nodes ---
+        // Creates the switch node. The two branch nodes (name+".true" / name+".false")
+        // are pre-built inside the switch and must be referenced via SWITCH_BRANCH entries
+        // in the JSON definition.
+        registerFactory(NodeType.CONDITIONAL_SWITCH, new String[]{"condition", "input"},
+                (name, props, deps) -> {
+                    BooleanNode condition = (BooleanNode) deps[0];
+                    ScalarValue input = (ScalarValue) deps[1];
+                    return new ConditionalSwitchNode(name, condition, input);
+                });
+
+        // Returns the true or false branch from a ConditionalSwitchNode.
+        // Set property "branch" to "true" or "false".
+        registerFactory(NodeType.SWITCH_BRANCH, new String[]{"switch"},
+                (name, props, deps) -> {
+                    ConditionalSwitchNode sw = (ConditionalSwitchNode) deps[0];
+                    boolean isTrue = !"false".equalsIgnoreCase(
+                            props.getOrDefault("branch", "true").toString());
+                    // Return a new BranchNode with the caller-supplied name so the
+                    // topology records it correctly.
+                    return new ConditionalSwitchNode.BranchNode(
+                            name, sw.getCondition(), sw.getInput(), isTrue);
+                });
+
         registerFactory(NodeType.COMPUTE_VECTOR, (name, props, deps) -> {
             int size = JsonGraphCompiler.getInt(props, "size", -1);
             double tolerance = JsonGraphCompiler.getDouble(props, "tolerance", 1e-15);

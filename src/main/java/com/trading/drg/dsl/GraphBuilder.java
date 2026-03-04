@@ -14,6 +14,7 @@ import com.trading.drg.fn.FnN;
 import com.trading.drg.fn.TemplateFactory;
 import com.trading.drg.fn.VectorFn;
 import com.trading.drg.node.BooleanNode;
+import com.trading.drg.node.ConditionalSwitchNode;
 import com.trading.drg.node.ScalarCalcNode;
 import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.node.VectorCalcNode;
@@ -219,6 +220,38 @@ public final class GraphBuilder {
         BooleanNode node = new BooleanNode(name, () -> pred.test(input.value()));
         register(node);
         addEdge(input.name(), name);
+        return node;
+    }
+
+    /**
+     * Creates a conditional switch node that routes its input to one of two branches.
+     * <p>
+     * When {@code condition} is {@code true}, updates propagate to
+     * {@link ConditionalSwitchNode#branchTrue()}; when {@code false}, to
+     * {@link ConditionalSwitchNode#branchFalse()}. The inactive branch silently
+     * suppresses propagation each cycle.
+     *
+     * @param name      Unique name for the switch node.
+     * @param condition Boolean gate node that controls routing.
+     * @param input     Scalar value to route.
+     * @return The switch node; use {@code .branchTrue()} / {@code .branchFalse()}
+     *         to obtain the two output nodes for wiring downstream computation.
+     */
+    public ConditionalSwitchNode conditionalSwitch(String name, BooleanNode condition,
+            ScalarValue input) {
+        checkNotBuilt();
+        ConditionalSwitchNode node = new ConditionalSwitchNode(name, condition, input);
+        register(node);
+        addEdge(condition.name(), name);
+        addEdge(input.name(), name);
+
+        // Register both branch nodes and their edges into the topology
+        register(node.branchTrue());
+        addEdge(name, node.branchTrue().name());
+
+        register(node.branchFalse());
+        addEdge(name, node.branchFalse().name());
+
         return node;
     }
 

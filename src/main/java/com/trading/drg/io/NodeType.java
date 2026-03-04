@@ -17,6 +17,7 @@ import com.trading.drg.fn.finance.Spread;
 import com.trading.drg.fn.finance.TriangularArbSpread;
 import com.trading.drg.fn.finance.WeightedAverage;
 import com.trading.drg.fn.finance.ZScore;
+import com.trading.drg.node.ConditionalSwitchNode;
 import com.trading.drg.node.ScalarCalcNode;
 import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.node.VectorCalcNode;
@@ -47,6 +48,8 @@ public enum NodeType {
     VECTOR_SOURCE(VectorSourceNode.class),
     VECTOR_ELEMENT(ScalarCalcNode.class),
     COMPUTE_VECTOR(VectorCalcNode.class),
+    CONDITIONAL_SWITCH(ConditionalSwitchNode.class),
+    SWITCH_BRANCH(ConditionalSwitchNode.BranchNode.class),
     TEMPLATE(null);
 
     private final Class<?> nodeClass;
