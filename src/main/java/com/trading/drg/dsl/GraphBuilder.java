@@ -238,6 +238,41 @@ public final class GraphBuilder {
         return node;
     }
 
+    // ── Conditionally Routing (Switch) ──────────────────────────
+
+    /**
+     * Creates a SwitchNode that acts as a demultiplexer, conditionally routing
+     * execution
+     * flag propagation to specific children based on the provided boolean
+     * condition.
+     */
+    public com.trading.drg.node.SwitchNode switchNode(String name, ScalarValue input, BooleanNode condition) {
+        checkNotBuilt();
+        com.trading.drg.node.SwitchNode node = new com.trading.drg.node.SwitchNode(name, input, condition);
+        register(node);
+        addEdge(input.name(), name);
+        addEdge(condition.name(), name);
+        return node;
+    }
+
+    /**
+     * Registers a downstream compute node to only receive execution pulses when the
+     * switch's condition evaluates to true.
+     */
+    public void markTrueBranch(com.trading.drg.node.SwitchNode switchNode, Node targetNode) {
+        checkNotBuilt();
+        switchNode.addTrueBranch(targetNode.name());
+    }
+
+    /**
+     * Registers a downstream compute node to only receive execution pulses when the
+     * switch's condition evaluates to false.
+     */
+    public void markFalseBranch(com.trading.drg.node.SwitchNode switchNode, Node targetNode) {
+        checkNotBuilt();
+        switchNode.addFalseBranch(targetNode.name());
+    }
+
     // ── Templates ────────────────────────────────────────────────
 
     public <C, T> T template(String prefix, TemplateFactory<C, T> factory, C config) {

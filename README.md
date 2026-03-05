@@ -167,6 +167,27 @@ BooleanNode isExtreme = builder.condition("IsExtreme", zScore, v -> v > 3.0);
 ScalarCalcNode output = builder.select("Output", isExtreme, pnlFeed, zScore);
 ```
 
+### Example: Branching Logic (SwitchNode)
+
+While `select` merges two inputs into one stream, `switchNode` does the opposite: it routes *execution* to specific downstream branches in `O(1)` time without evaluating the inactive branch.
+
+```java
+GraphBuilder builder = GraphBuilder.create();
+ScalarSourceNode input = builder.scalarSource("Input", 10.0);
+BooleanNode isHigh = builder.condition("IsHigh", input, v -> v > 5.0);
+
+// Create the Switch router
+SwitchNode router = builder.switchNode("Router", input, isHigh);
+
+// Define branch logic
+Node trueBranch = builder.compute("TrueBranch", val -> val * 2, router);
+Node falseBranch = builder.compute("FalseBranch", val -> val / 2, router);
+
+// Register branches to conditionally execute
+builder.markTrueBranch(router, trueBranch);
+builder.markFalseBranch(router, falseBranch);
+```
+
 ---
 
 ## 3. JSON Declarative Compilation

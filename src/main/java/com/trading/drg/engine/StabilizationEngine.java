@@ -109,11 +109,18 @@ public final class StabilizationEngine {
 
                     // Visit children if value changed.
                     if (changed) {
+                        boolean isBranch = node instanceof com.trading.drg.api.BranchingNode;
+                        com.trading.drg.api.BranchingNode branch = isBranch ? (com.trading.drg.api.BranchingNode) node
+                                : null;
+
                         // Iterate children via CSR
                         final int start = topology.childrenStart(ti);
                         final int end = topology.childrenEnd(ti);
                         for (int ci = start; ci < end; ci++) {
                             int childTi = topology.childAt(ci);
+                            if (isBranch && !branch.isBranchActive(topology.node(childTi).name())) {
+                                continue;
+                            }
                             dirtyWords[childTi >> 6] |= (1L << childTi);
                         }
                     }
