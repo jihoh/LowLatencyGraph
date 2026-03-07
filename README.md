@@ -219,6 +219,7 @@ Node falseBranch = builder.compute("FalseBranch", val -> val / 2, router);
 builder.markTrueBranch(router, trueBranch);
 builder.markFalseBranch(router, falseBranch);
 ```
+➡️ *See `CoreGraphSwitchDemo.java` for a complete runnable example of Switch routing.*
 
 ### Example: Time-based Throttling (ThrottleNode)
 
@@ -234,6 +235,7 @@ ThrottleNode throttledData = builder.throttle("ThrottledTick", fastMarketData, 5
 // Expensive computation runs on the throttled stream, saving CPU
 ScalarCalcNode expensiveModel = builder.compute("PricingModel", new HeavyPricingAlgorithm(), throttledData);
 ```
+➡️ *See `CoreGraphThrottleDemo.java` for a complete runnable example of market data throttling.*
 
 ### Example: Real-Time Decay (TimeDecayNode)
 
@@ -249,6 +251,7 @@ ScalarSourceNode spotPrice = builder.scalarSource("EUR_USD", 1.0500);
 // of if ticks arrive 1ms apart or 100ms apart.
 TimeDecayNode smoothPrice = builder.timeDecay("SmoothPrice", spotPrice, 50);
 ```
+➡️ *See `CoreGraphTimeDecayDemo.java` for a complete runnable example of true time-elapsed EWMA.*
 
 ### Example: O(1) Rolling Windows (WindowedNode)
 

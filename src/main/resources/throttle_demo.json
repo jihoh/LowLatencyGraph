@@ -1,0 +1,32 @@
+{
+    "graph": {
+        "name": "THROTTLE_DEMO",
+        "version": "1.0",
+        "nodes": [
+            {
+                "name": "MarketTick",
+                "type": "SCALAR_SOURCE",
+                "properties": {
+                    "value": 100.0
+                }
+            },
+            {
+                "name": "ThrottledTick",
+                "type": "THROTTLE",
+                "inputs": {
+                    "input": "MarketTick"
+                },
+                "properties": {
+                    "windowMs": 1000
+                }
+            },
+            {
+                "name": "PricingModel",
+                "type": "AVERAGE",
+                "inputs": {
+                    "in1": "ThrottledTick"
+                }
+            }
+        ]
+    }
+}

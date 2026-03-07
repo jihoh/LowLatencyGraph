@@ -23,6 +23,8 @@ import com.trading.drg.fn.finance.WeightedAverage;
 import com.trading.drg.fn.finance.ZScore;
 import com.trading.drg.node.ScalarCalcNode;
 import com.trading.drg.node.ScalarSourceNode;
+import com.trading.drg.node.BooleanNode;
+import com.trading.drg.node.SwitchNode;
 
 import com.trading.drg.node.VectorSourceNode;
 import com.trading.drg.api.ScalarValue;
@@ -154,6 +156,50 @@ public final class NodeRegistry {
                                 out[i] = v.valueAt(i);
                         }
                     }, deps);
+        });
+        
+        // --- High-Performance Special Nodes ---
+        registerFactory(NodeType.THROTTLE, new String[]{"input"}, (name, props, deps) -> {
+            long windowMs = (long) JsonGraphCompiler.getDouble(props, "windowMs", 100.0);
+            return GraphBuilder.create().throttle(name, (ScalarValue) deps[0], windowMs);
+        });
+        
+        registerFactory(NodeType.TIME_DECAY, new String[]{"input"}, (name, props, deps) -> {
+            long halfLifeMs = (long) JsonGraphCompiler.getDouble(props, "halfLifeMs", 100.0);
+            return GraphBuilder.create().timeDecay(name, (ScalarValue) deps[0], halfLifeMs);
+        });
+        
+        registerFactory(NodeType.CONDITION, new String[]{"input"}, (name, props, deps) -> {
+            String op = props.getOrDefault("operator", ">").toString();
+            double threshold = JsonGraphCompiler.getDouble(props, "threshold", 0.0);
+            ScalarValue input = (ScalarValue) deps[0];
+            
+            return GraphBuilder.create().condition(name, input, v -> {
+                switch(op) {
+                    case ">": return v > threshold;
+                    case "<": return v < threshold;
+                    case ">=": return v >= threshold;
+                    case "<=": return v <= threshold;
+                    case "==": return v == threshold;
+                    case "!=": return v != threshold;
+                    default: throw new IllegalArgumentException("Unknown operator: " + op);
+                }
+            });
+        });
+        
+        registerFactory(NodeType.SWITCH, new String[]{"input", "condition"}, (name, props, deps) -> {
+            ScalarValue input = (ScalarValue) deps[0];
+            BooleanNode condition = (BooleanNode) deps[1];
+
+            SwitchNode switchNode = new SwitchNode(name, input, condition);
+            
+            if (props.containsKey("true_branch")) {
+                switchNode.addTrueBranch(props.get("true_branch").toString());
+            }
+            if (props.containsKey("false_branch")) {
+                switchNode.addFalseBranch(props.get("false_branch").toString());
+            }
+            return switchNode;
         });
     }
 

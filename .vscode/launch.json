@@ -6,6 +6,27 @@
     "configurations": [
         {
             "type": "java",
+            "name": "CoreGraphThrottleDemo",
+            "request": "launch",
+            "mainClass": "com.trading.drg.CoreGraphThrottleDemo",
+            "projectName": "claude-graph"
+        },
+        {
+            "type": "java",
+            "name": "CoreGraphSwitchDemo",
+            "request": "launch",
+            "mainClass": "com.trading.drg.CoreGraphSwitchDemo",
+            "projectName": "claude-graph"
+        },
+        {
+            "type": "java",
+            "name": "CoreGraphTimeDecayDemo",
+            "request": "launch",
+            "mainClass": "com.trading.drg.CoreGraphTimeDecayDemo",
+            "projectName": "claude-graph"
+        },
+        {
+            "type": "java",
             "name": "CoreGraphStressDemo",
             "request": "launch",
             "mainClass": "com.trading.drg.CoreGraphStressDemo",

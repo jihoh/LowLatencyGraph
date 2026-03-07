@@ -1,0 +1,75 @@
+{
+    "graph": {
+        "name": "SWITCH_DEMO",
+        "version": "1.0",
+        "nodes": [
+            {
+                "name": "MarketPx",
+                "type": "SCALAR_SOURCE",
+                "properties": {
+                    "value": 10.0
+                }
+            },
+            {
+                "name": "Threshold",
+                "type": "SCALAR_SOURCE",
+                "properties": {
+                    "value": 15.0
+                }
+            },
+            {
+                "name": "IsHighPx",
+                "type": "CONDITION",
+                "inputs": {
+                    "input": "MarketPx"
+                },
+                "properties": {
+                    "operator": ">",
+                    "threshold": 15.0
+                }
+            },
+            {
+                "name": "Router",
+                "type": "SWITCH",
+                "inputs": {
+                    "input": "MarketPx",
+                    "condition": "IsHighPx"
+                },
+                "properties": {
+                    "true_branch": "SellLogic",
+                    "false_branch": "BuyLogic"
+                }
+            },
+            {
+                "name": "SellMargin",
+                "type": "SCALAR_SOURCE",
+                "properties": {
+                    "value": 2.0
+                }
+            },
+            {
+                "name": "BuyMargin",
+                "type": "SCALAR_SOURCE",
+                "properties": {
+                    "value": -2.0
+                }
+            },
+            {
+                "name": "SellLogic",
+                "type": "SPREAD",
+                "inputs": {
+                    "a": "Router",
+                    "b": "SellMargin"
+                }
+            },
+            {
+                "name": "BuyLogic",
+                "type": "SPREAD",
+                "inputs": {
+                    "a": "Router",
+                    "b": "BuyMargin"
+                }
+            }
+        ]
+    }
+}

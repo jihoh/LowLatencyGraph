@@ -17,11 +17,14 @@ import com.trading.drg.fn.finance.Spread;
 import com.trading.drg.fn.finance.TriangularArbSpread;
 import com.trading.drg.fn.finance.WeightedAverage;
 import com.trading.drg.fn.finance.ZScore;
+import com.trading.drg.node.BooleanNode;
 import com.trading.drg.node.ScalarCalcNode;
 import com.trading.drg.node.ScalarSourceNode;
+import com.trading.drg.node.SwitchNode;
+import com.trading.drg.node.ThrottleNode;
+import com.trading.drg.node.TimeDecayNode;
 import com.trading.drg.node.VectorCalcNode;
 import com.trading.drg.node.VectorSourceNode;
-
 /**
  * Enum of all built-in node types.
  */
@@ -47,6 +50,10 @@ public enum NodeType {
     VECTOR_SOURCE(VectorSourceNode.class),
     VECTOR_ELEMENT(ScalarCalcNode.class),
     COMPUTE_VECTOR(VectorCalcNode.class),
+    THROTTLE(ThrottleNode.class),
+    TIME_DECAY(TimeDecayNode.class),
+    SWITCH(SwitchNode.class),
+    CONDITION(BooleanNode.class),
     TEMPLATE(null);
 
     private final Class<?> nodeClass;

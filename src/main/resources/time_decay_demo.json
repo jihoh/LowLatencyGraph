@@ -1,0 +1,25 @@
+{
+    "graph": {
+        "name": "TIME_DECAY_DEMO",
+        "version": "1.0",
+        "nodes": [
+            {
+                "name": "EUR_USD",
+                "type": "SCALAR_SOURCE",
+                "properties": {
+                    "value": 1.0500
+                }
+            },
+            {
+                "name": "SmoothPrice",
+                "type": "TIME_DECAY",
+                "inputs": {
+                    "input": "EUR_USD"
+                },
+                "properties": {
+                    "halfLifeMs": 500
+                }
+            }
+        ]
+    }
+}
