@@ -273,6 +273,20 @@ public final class GraphBuilder {
         switchNode.addFalseBranch(targetNode.name());
     }
 
+    // ── Time-based Filters ───────────────────────────────────────
+
+    /**
+     * Creates a ThrottleNode that restricts downstream propagation to update
+     * at most once every {@code throttleMs} milliseconds.
+     */
+    public com.trading.drg.node.ThrottleNode throttle(String name, com.trading.drg.api.ScalarValue input, long throttleMs) {
+        checkNotBuilt();
+        com.trading.drg.node.ThrottleNode node = new com.trading.drg.node.ThrottleNode(name, input, throttleMs);
+        register(node);
+        addEdge(input.name(), name);
+        return node;
+    }
+
     // ── Templates ────────────────────────────────────────────────
 
     public <C, T> T template(String prefix, TemplateFactory<C, T> factory, C config) {
