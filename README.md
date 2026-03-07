@@ -235,6 +235,21 @@ ThrottleNode throttledData = builder.throttle("ThrottledTick", fastMarketData, 5
 ScalarCalcNode expensiveModel = builder.compute("PricingModel", new HeavyPricingAlgorithm(), throttledData);
 ```
 
+### Example: Real-Time Decay (TimeDecayNode)
+
+Standard Exponentially Weighted Moving Averages (EWMA) recalculate their weighting based purely on the sequential arrival of ticks. In HFT, market updates arrive in unpredictable bursts, meaning a tick-based EWMA distorts the true temporal average.
+
+The `TimeDecayNode` provides a true real-time elapsed EWMA. It checks `System.nanoTime()` on every stabilization to decay the previous state exactly proportional to the physical time elapsed since the last observation. 
+
+```java
+GraphBuilder builder = GraphBuilder.create();
+ScalarSourceNode spotPrice = builder.scalarSource("EUR_USD", 1.0500);
+
+// Creates an EWMA that accurately decays with a 50ms half-life, regardless 
+// of if ticks arrive 1ms apart or 100ms apart.
+TimeDecayNode smoothPrice = builder.timeDecay("SmoothPrice", spotPrice, 50);
+```
+
 ---
 
 ## 3. JSON Declarative Compilation

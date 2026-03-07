@@ -287,6 +287,18 @@ public final class GraphBuilder {
         return node;
     }
 
+    /**
+     * Creates a TimeDecayNode that calculates a true time-elapsed Exponentially 
+     * Weighted Moving Average (EWMA).
+     */
+    public com.trading.drg.node.TimeDecayNode timeDecay(String name, com.trading.drg.api.ScalarValue input, long halfLifeMs) {
+        checkNotBuilt();
+        com.trading.drg.node.TimeDecayNode node = new com.trading.drg.node.TimeDecayNode(name, input, halfLifeMs);
+        register(node);
+        addEdge(input.name(), name);
+        return node;
+    }
+
     // ── Templates ────────────────────────────────────────────────
 
     public <C, T> T template(String prefix, TemplateFactory<C, T> factory, C config) {
