@@ -17,6 +17,31 @@ CoreGraph is a lock-free, Directed Acyclic Graph (DAG) computing engine built fo
 *   **Signals:** Custom signals and technical indicators (RSI, EWMA, MACD) on tick data.
 *   **Algos:** Custom trading algorithms.
 
+## Low-Latency Architecture & Optimizations
+
+CoreGraph's ability to process millions of ticks per second with sub-microsecond latency stems from a set of aggressive engine optimizations designed specifically for High-Frequency Trading (HFT):
+
+### 1. O(K) Sparse Topological Traversal
+In reactive graph computing, a single tick usually only updates a tiny fraction (K) of the total nodes (N). Instead of an O(N) sweep, the `StabilizationEngine` uses a 64-bit packed `long[] dirtyWords` array to track only the nodes that require recomputation. 
+By utilizing the hardware intrinsic `Long.numberOfTrailingZeros`, the engine leaps from one dirty node to the next without scanning clean bits, achieving true O(K) sparse evaluation.
+
+### 2. Zero-Allocation Hot-Path Execution
+To ensure predictable latency, the stabilization hot-path completely avoids creating objects, eliminating "Stop-the-World" Garbage Collection (GC) pauses.
+*   **Pre-allocation:** All graph topology arrays, BitSets, and node structures are initialized once at startup.
+*   **Primitive Specialization:** Computations rely strictly on `double` and `long` primitive arrays, avoiding Java wrapper objects (e.g., `Double`).
+*   **In-Place Mutations:** Nodes with state (like moving averages or rolling statistical windows) use internally mutating circular buffers rather than allocating new arrays.
+
+### 3. Cache-Friendly CSR Edge Encoding
+Graph edges are not modeled as individual Java objects. Instead, the `TopologicalOrder` uses a flattened Compressed Sparse Row (CSR) structure (`childrenOffset[]`, `childrenList[]`). When a node updates its children, memory access is strictly contiguous, triggering CPU pre-fetching and maximizing L1/L2 cache hits.
+
+### 4. Disruptor Smart Batching
+Integration with the LMAX Disruptor is optimized down to the batch boundary. During micro-bursts of market data, intermediate events only toggle dirty flags (memory writes) but skip all mathematical processing. The engine only executes the heavy O(K) mathematical stabilization when the Disruptor signals `endOfBatch == true`, drastically reducing redundant compute cycles and preserving throughput.
+
+### 5. Dynamic Topological Routing (SwitchNode)
+The `SwitchNode` provides an optimization known as dynamic topological routing. By evaluating a boolean condition, it can actively remove entire sub-graphs from the `dirtyWords` BitSet. Unused branches are never flagged, causing the engine to skip the "dead" code entirely in O(1) time and preserving CPU cache integrity for active logic.
+
+---
+
 ## Architecture & Data Flow
 
 CoreGraph is built on a **Single-Writer / Single-Reader** architecture optimized for CPU cache locality and eliminating thread contention.
@@ -163,13 +188,20 @@ ScalarCalcNode zScore = builder.compute("CurrentZ", new ZScore(20), pnlFeed);
 // Creates a boolean node that flips when Z-Score > 3.0
 BooleanNode isExtreme = builder.condition("IsExtreme", zScore, v -> v > 3.0);
 
-// Select between two values based on the condition
+// Select acts as a multiplexer between two computed inputs
 ScalarCalcNode output = builder.select("Output", isExtreme, pnlFeed, zScore);
 ```
 
+**SelectNode vs SwitchNode:**
+*   **Use `SelectNode`** when you want to **merge** two separate streams of data that are already running into a single output stream. It acts as an electrical multiplexer, passing through the result of Branch A or Branch B.
+*   **Use `SwitchNode`** when you want to **route execution** down Branch A or Branch B. It tells the engine to completely halt the execution of the inactive branch, saving CPU cycles on the hot-path.
+
 ### Example: Branching Logic (SwitchNode)
 
-While `select` merges two inputs into one stream, `switchNode` does the opposite: it routes *execution* to specific downstream branches in `O(1)` time without evaluating the inactive branch.
+While `select` merges two inputs into one stream, `switchNode` does the opposite: it acts as a dynamic topological firewall. It routes *execution* to specific downstream branches without evaluating the inactive branch.
+
+**Why it's critical for HFT:**
+If a `SwitchNode`'s condition routes to the "True" branch, the engine completely ignores the "False" branch. Those inactive children never get their bits flipped to `1` in the engine's 64-bit sparse topological `BitSet`. Because the engine uses the `Long.numberOfTrailingZeros` hardware intrinsic to jump between dirty nodes, it skips the entire inactive subgraph in **O(1) time**. This saves precious nanoseconds/microseconds on the hot-path and avoids CPU cache destruction from evaluating dead branches.
 
 ```java
 GraphBuilder builder = GraphBuilder.create();
@@ -583,3 +615,5 @@ If `.enableNodeProfiling()` is wired, this table breaks down compute speed per i
 *   **Update:** Cumulative number of times the engine has executed this node's `apply()` logic.
 *   **Latest / Avg (μs):** Execution speed of the node logic in microseconds.
 *   **NaN:** Cumulative count of times this node computed a `Double.NaN` (often indicating a `try-catch` recovery sequence or division by zero).
+
+
