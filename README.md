@@ -220,6 +220,21 @@ builder.markTrueBranch(router, trueBranch);
 builder.markFalseBranch(router, falseBranch);
 ```
 
+### Example: Time-based Throttling (ThrottleNode)
+
+In high-frequency environments, micro-bursts of market data can trigger expensive computations (like heavy pricing models or network I/O) thousands of times per millisecond. The `ThrottleNode` provides a zero-allocation, thread-safe rate limit, ensuring downstream branches only execute at most once per specified time window.
+
+```java
+GraphBuilder builder = GraphBuilder.create();
+ScalarSourceNode fastMarketData = builder.scalarSource("MarketTick", 100.0);
+
+// Throttle updates to at most once every 50ms
+ThrottleNode throttledData = builder.throttle("ThrottledTick", fastMarketData, 50);
+
+// Expensive computation runs on the throttled stream, saving CPU
+ScalarCalcNode expensiveModel = builder.compute("PricingModel", new HeavyPricingAlgorithm(), throttledData);
+```
+
 ---
 
 ## 3. JSON Declarative Compilation
