@@ -288,6 +288,45 @@ public final class GraphBuilder {
     }
 
     /**
+     * Creates a WindowedNode that calculates a rolling sum over the last N values
+     * in O(1) time and zero-allocation.
+     */
+    public com.trading.drg.node.WindowedNode rollingSum(String name, com.trading.drg.api.ScalarValue input, int windowSize) {
+        checkNotBuilt();
+        com.trading.drg.node.WindowedNode node = new com.trading.drg.node.WindowedNode(
+            name, input, windowSize, new com.trading.drg.node.accumulators.RollingSum());
+        register(node);
+        addEdge(input.name(), name);
+        return node;
+    }
+
+    /**
+     * Creates a WindowedNode that calculates a robust rolling variance over the last N values
+     * using Welford's Method in O(1) time.
+     */
+    public com.trading.drg.node.WindowedNode rollingVariance(String name, com.trading.drg.api.ScalarValue input, int windowSize) {
+        checkNotBuilt();
+        com.trading.drg.node.WindowedNode node = new com.trading.drg.node.WindowedNode(
+            name, input, windowSize, new com.trading.drg.node.accumulators.RollingVariance(windowSize));
+        register(node);
+        addEdge(input.name(), name);
+        return node;
+    }
+
+    /**
+     * Creates a WindowedNode that maintains the rolling maximum over the last N values
+     * using an O(1) monotonic Deque.
+     */
+    public com.trading.drg.node.WindowedNode rollingMax(String name, com.trading.drg.api.ScalarValue input, int windowSize) {
+        checkNotBuilt();
+        com.trading.drg.node.WindowedNode node = new com.trading.drg.node.WindowedNode(
+            name, input, windowSize, new com.trading.drg.node.accumulators.RollingMax(windowSize));
+        register(node);
+        addEdge(input.name(), name);
+        return node;
+    }
+
+    /**
      * Creates a TimeDecayNode that calculates a true time-elapsed Exponentially 
      * Weighted Moving Average (EWMA).
      */

@@ -250,6 +250,24 @@ ScalarSourceNode spotPrice = builder.scalarSource("EUR_USD", 1.0500);
 TimeDecayNode smoothPrice = builder.timeDecay("SmoothPrice", spotPrice, 50);
 ```
 
+### Example: O(1) Rolling Windows (WindowedNode)
+
+Calculating trailing statistics (rolling minimums, maximums, or volatility) over raw data feeds is a staple in quantitative finance. However, doing this naively by iterating over a large array on every tick destroys latency.
+
+The `WindowedNode` maintains a zero-allocation, fixed-size circular buffer in memory and leverages distinct `WindowedAccumulator` mathematics to calculate results in strict $O(1)$ time complexity, regardless of whether the window size is 10 or 100,000.
+
+```java
+GraphBuilder builder = GraphBuilder.create();
+ScalarSourceNode tradePrice = builder.scalarSource("VIX_Trade", 14.50);
+
+// O(1) monotonic deque-based Rolling Max over the last 500 trades
+WindowedNode rollingHigh = builder.rollingMax("DailyHigh", tradePrice, 500);
+
+// O(1) Welford's Method Rolling Variance over the last 10,000 trades
+// Welford's method prevents catastrophic floating-point cancellation.
+WindowedNode rollingVar = builder.rollingVariance("RealizedVolatility", tradePrice, 10000);
+```
+
 ---
 
 ## 3. JSON Declarative Compilation
