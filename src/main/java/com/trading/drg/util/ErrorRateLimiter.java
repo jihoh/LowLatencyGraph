@@ -11,6 +11,8 @@ public class ErrorRateLimiter {
     private final long minIntervalNanos;
     /** Timestamp of last log. */
     private long lastLogTime = 0;
+    /** Fast-path flag to avoid System.nanoTime() on the hot path */
+    private boolean hasErrored = false;
 
     public ErrorRateLimiter() {
         this(1000);
@@ -21,6 +23,7 @@ public class ErrorRateLimiter {
     }
 
     public void log(String message, Throwable t) {
+        hasErrored = true;
         long now = System.nanoTime();
         if (now - lastLogTime > minIntervalNanos) {
             lastLogTime = now;
@@ -35,6 +38,15 @@ public class ErrorRateLimiter {
      * computation.
      */
     public boolean isCircuitOpen() {
-        return (System.nanoTime() - lastLogTime) < minIntervalNanos;
+        if (!hasErrored) {
+            return false;
+        }
+        
+        boolean stillOpen = (System.nanoTime() - lastLogTime) < minIntervalNanos;
+        if (!stillOpen) {
+            // Cooldown expired, we can try computing again
+            hasErrored = false;
+        }
+        return stillOpen;
     }
 }

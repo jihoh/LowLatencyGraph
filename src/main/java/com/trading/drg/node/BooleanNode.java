@@ -14,9 +14,9 @@ public final class BooleanNode implements Node {
     private boolean currentValue;
     private boolean previousValue;
 
-    // Efficiency flag: track if we've ever stabilized to handle the "first run"
-    // edge case.
-    private boolean initialized;
+    // Efficiency flag: track if we've ever evaluated to handle the "first run" edge
+    // case.
+    private boolean initialized = false;
 
     /**
      * Creates a new BooleanNode.
@@ -49,13 +49,9 @@ public final class BooleanNode implements Node {
         currentValue = fn.compute();
 
         // 3. Handle initialization edge case
-        // On the very first run, we must return 'true' (changed) so downstream nodes
-        // get a chance to see the initial value, even if that value happens to be
-        // 'false'
-        // (matching the default field value).
         if (!initialized) {
             initialized = true;
-            return true;
+            previousValue = !currentValue;
         }
 
         // 4. Standard change detection: strictly equals check (XOR logic effectively)

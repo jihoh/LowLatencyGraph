@@ -3,9 +3,6 @@ package com.trading.drg.node;
 import com.trading.drg.api.BranchingNode;
 import com.trading.drg.api.ScalarValue;
 
-import java.util.HashSet;
-import java.util.Set;
-
 /**
  * A branching node that routes execution to specific child paths based on a
  * boolean condition.
@@ -20,9 +17,9 @@ public class SwitchNode implements BranchingNode, ScalarValue {
     private final ScalarValue input;
     private final BooleanNode condition;
 
-    // Topology router targets
-    private final Set<String> trueChildren = new HashSet<>();
-    private final Set<String> falseChildren = new HashSet<>();
+    // Topology router targets (Using arrays for L1 cache locality on the hot path)
+    private String[] trueChildren = new String[0];
+    private String[] falseChildren = new String[0];
 
     private double currentValue = Double.NaN;
     private boolean lastConditionResult;
@@ -34,11 +31,17 @@ public class SwitchNode implements BranchingNode, ScalarValue {
     }
 
     public void addTrueBranch(String childName) {
-        trueChildren.add(childName);
+        String[] newArr = new String[trueChildren.length + 1];
+        System.arraycopy(trueChildren, 0, newArr, 0, trueChildren.length);
+        newArr[trueChildren.length] = childName;
+        trueChildren = newArr;
     }
 
     public void addFalseBranch(String childName) {
-        falseChildren.add(childName);
+        String[] newArr = new String[falseChildren.length + 1];
+        System.arraycopy(falseChildren, 0, newArr, 0, falseChildren.length);
+        newArr[falseChildren.length] = childName;
+        falseChildren = newArr;
     }
 
     @Override
@@ -70,15 +73,16 @@ public class SwitchNode implements BranchingNode, ScalarValue {
 
     @Override
     public boolean isBranchActive(String childName) {
-        if (trueChildren.contains(childName)) {
-            return lastConditionResult;
+        for (int i = 0; i < trueChildren.length; i++) {
+            if (trueChildren[i].equals(childName)) {
+                return lastConditionResult;
+            }
         }
-        if (falseChildren.contains(childName)) {
-            return !lastConditionResult;
+        for (int i = 0; i < falseChildren.length; i++) {
+            if (falseChildren[i].equals(childName)) {
+                return !lastConditionResult;
+            }
         }
-        // If a child (like a telemetry reporter) isn't explicitly registered as a
-        // branch,
-        // it always receives updates natively.
         return true;
     }
 }
