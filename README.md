@@ -22,7 +22,7 @@ CoreGraph is a lock-free, Directed Acyclic Graph (DAG) computing engine built fo
 CoreGraph's ability to process millions of ticks per second with sub-microsecond latency stems from a set of aggressive engine optimizations designed specifically for High-Frequency Trading (HFT):
 
 ### 1. O(K) Sparse Topological Traversal
-In reactive graph computing, a single tick usually only updates a tiny fraction (K) of the total nodes (N). Instead of an O(N) sweep, the `StabilizationEngine` uses a 64-bit packed `long[] dirtyWords` array to track only the nodes that require recomputation. 
+In reactive graph computing, a single tick usually only updates a tiny fraction (K) of the total nodes (N). Instead of an O(N) sweep, the `StabilizationEngine` uses a 64-bit packed `long[] dirtyNodeBits` array to track only the nodes that require recomputation. 
 By utilizing the hardware intrinsic `Long.numberOfTrailingZeros`, the engine leaps from one dirty node to the next without scanning clean bits, achieving true O(K) sparse evaluation.
 
 ### 2. Zero-Allocation Hot-Path Execution
@@ -38,7 +38,7 @@ Graph edges are not modeled as individual Java objects. Instead, the `Topologica
 Integration with the LMAX Disruptor is optimized down to the batch boundary. During micro-bursts of market data, intermediate events only toggle dirty flags (memory writes) but skip all mathematical processing. The engine only executes the heavy O(K) mathematical stabilization when the Disruptor signals `endOfBatch == true`, drastically reducing redundant compute cycles and preserving throughput.
 
 ### 5. Dynamic Topological Routing (SwitchNode)
-The `SwitchNode` provides an optimization known as dynamic topological routing. By evaluating a boolean condition, it can actively remove entire sub-graphs from the `dirtyWords` BitSet. Unused branches are never flagged, causing the engine to skip the "dead" code entirely in O(1) time and preserving CPU cache integrity for active logic.
+The `SwitchNode` provides an optimization known as dynamic topological routing. By evaluating a boolean condition, it can actively remove entire sub-graphs from the `dirtyNodeBits` BitSet. Unused branches are never flagged, causing the engine to skip the "dead" code entirely in O(1) time and preserving CPU cache integrity for active logic.
 
 ---
 

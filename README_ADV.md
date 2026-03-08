@@ -2,35 +2,35 @@
 
 ## 1. Advanced Performance: The Sparse Bitset (dirtyWords)
 
-The `StabilizationEngine` achieves its extreme O(K) performance (where K is the number of dirty nodes) using a Sparse Bitset called `dirtyWords`. This avoids scanning clean nodes and eliminates objects and garbage collection from the hot path.
+The `StabilizationEngine` achieves its extreme O(K) performance (where K is the number of dirty nodes) using a Sparse Bitset called `dirtyNodeBits`. This avoids scanning clean nodes and eliminates objects and garbage collection from the hot path.
 
 ### The Bitset Structure
 The engine packs the topological status of all nodes into an array of 64-bit `long` primitives.
 ```java
-this.dirtyWords = new long[(topology.nodeCount() + 63) / 64];
+this.dirtyNodeBits = new long[(topology.nodeCount() + 63) / 64];
 ```
-If a graph has 100 nodes, it allocates an array of two `longs` (`dirtyWords[0]` and `dirtyWords[1]`), providing 128 bits of tracking space.
+If a graph has 100 nodes, it allocates an array of two `longs` (`dirtyNodeBits[0]` and `dirtyNodeBits[1]`), providing 128 bits of tracking space.
 
 ### Marking a Node Dirty
 When an external event updates a node (e.g., Node 3 or Node 70), the engine calculates its exact bit position using bitwise operations:
 
 **For Node 3:**
-1. **Find Array Index:** `3 >> 6` (divides by 64) = 0. It belongs in `dirtyWords[0]`.
+1. **Find Array Index:** `3 >> 6` (divides by 64) = 0. It belongs in `dirtyNodeBits[0]`.
 2. **Find Bit Mask:** `1L << 3` = 8 (Binary `1000`).
-3. **Apply Mask:** `dirtyWords[0] |= 8`.
+3. **Apply Mask:** `dirtyNodeBits[0] |= 8`.
 
 **For Node 70:**
-1. **Find Array Index:** `70 >> 6` = 1. It belongs in `dirtyWords[1]`.
+1. **Find Array Index:** `70 >> 6` = 1. It belongs in `dirtyNodeBits[1]`.
 2. **Find Bit Mask:** `1L << 70` wraps around to `1L << 6` = 64 (Binary `100 0000`).
-3. **Apply Mask:** `dirtyWords[1] |= 64`.
+3. **Apply Mask:** `dirtyNodeBits[1] |= 64`.
 
 ### Sparse Traversal (The Magic)
-During the `stabilize()` execution, the engine loops through the `dirtyWords` array.
+During the `stabilize()` execution, the engine loops through the `dirtyNodeBits` array.
 
-1. **Instant Skip:** `if (dirtyWords[w] == 0L)` - If a 64-bit block is empty, the engine skips 64 nodes in a single CPU cycle.
-2. **Finding the Bit:** If `dirtyWords[0]` is `8` (`1000` in binary), the engine uses the hardware intrinsic `Long.numberOfTrailingZeros(8)` to return exactly `3`. 
+1. **Instant Skip:** `if (dirtyNodeBits[w] == 0L)` - If a 64-bit block is empty, the engine skips 64 nodes in a single CPU cycle.
+2. **Finding the Bit:** If `dirtyNodeBits[0]` is `8` (`1000` in binary), the engine uses the hardware intrinsic `Long.numberOfTrailingZeros(8)` to return exactly `3`. 
 3. **Reconstructing the ID:** It calculates `(0 << 6) + 3 = 3`. The engine executes `topology.node(3).stabilize()`.
-4. **Clearing the Bit:** It clears the 3rd bit. `dirtyWords[0]` becomes `0L`, and the engine instantly moves to the next block.
+4. **Clearing the Bit:** It clears the 3rd bit. `dirtyNodeBits[0]` becomes `0L`, and the engine instantly moves to the next block.
 
 For 128 tracked nodes where only Nodes 3 and 70 changed, the engine never checked the other 126 nodes. It executed two array lookups and two O(1) hardware zero-counts, instantly triggering the required computations without allocating a single Java object.
 
@@ -96,7 +96,7 @@ When the Engine stabilizes Node 0 and flags its children as dirty, the CPU pulls
 
 ### The Intersection: CSR + BitSet
 
-Let's tie the two concepts together: **CSR** (how edges are physically mapped) and **dirtyWords** (the BitSet that tracks which nodes hold new data). 
+Let's tie the two concepts together: **CSR** (how edges are physically mapped) and **dirtyNodeBits** (the BitSet that tracks which nodes hold new data). 
 
 Here is exactly what the engine code looks like when Node `ti` finishes calculating and needs to inform its children that they should wake up and recalculate too:
 
@@ -116,7 +116,7 @@ for (int ci = start; ci < end; ci++) {
     long bitMask = 1L << childTi;     // Shift 1 over to the exact slot
     
     // 5. Flip the bit in the BitSet to '1'
-    dirtyWords[wordIdx] |= bitMask;
+    dirtyNodeBits[wordIdx] |= bitMask;
 }
 ```
 
@@ -200,18 +200,18 @@ If `b.value()` causes a cache miss anyway, wouldn't a `List<Node> children` be a
 
 **No.** While we accept the L1 cache miss to retrieve the mathematical `value()`, we absolutely must prevent cache misses during the **Topological Marking Phase**.
 
-When Node 0 recalculates, it must alert Node 1 and Node 2 that they are now dirty. It does this by flipping bits in the `dirtyWords` Bitset.
+When Node 0 recalculates, it must alert Node 1 and Node 2 that they are now dirty. It does this by flipping bits in the `dirtyNodeBits` Bitset.
 If Node 0 had a `List<Node> children`, the CPU would do this:
 1. Fetch the `ArrayList` object (Cache Miss)
 2. Fetch the internal `Object[]` array (Cache Miss)
 3. Fetch `Node 1` to get its `topologicalId` (Cache Miss)
-4. Bitwise OR the `dirtyWords` array.
+4. Bitwise OR the `dirtyNodeBits` array.
 5. Fetch `Node 2` to get its `topologicalId` (Cache Miss)
-6. Bitwise OR the `dirtyWords` array.
+6. Bitwise OR the `dirtyNodeBits` array.
 
 With **CSR Encoding**:
 1. The CPU fetches `childrenOffset[0]` to find the bounds (`0` to `2`).
 2. The CPU fetches `childrenList[0]` and `childrenList[1]`. Because they are primitives stored contiguously, they arrive in the L1 cache *simultaneously* in a single 64-byte burst fetch.
-3. The engine uses those IDs to bitwise OR the `dirtyWords` array.
+3. The engine uses those IDs to bitwise OR the `dirtyNodeBits` array.
 
 By using CSR, the engine completes the entire downstream marking phase in just a few CPU cycles, completely eliminating the traversal overhead that a traditional Java Object graph would incur.

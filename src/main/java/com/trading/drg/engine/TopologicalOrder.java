@@ -33,8 +33,8 @@ public final class TopologicalOrder {
     // Lookup map for name resolution
     private final Map<String, Integer> nameToIndex;
 
-    // Bitset: packs 64 source flags per long, matching dirtyWords layout
-    private final long[] sourceWords;
+    // Bitset: packs 64 source flags per long, matching dirtyNodeBits layout
+    private final long[] sourceNodeBits;
 
     public int nodeCount() {
         return topoOrder.length;
@@ -54,7 +54,7 @@ public final class TopologicalOrder {
     }
 
     public boolean isSource(int ti) {
-        return (sourceWords[ti >> 6] & (1L << ti)) != 0;
+        return (sourceNodeBits[ti >> 6] & (1L << ti)) != 0;
     }
 
     public int childCount(int ti) {

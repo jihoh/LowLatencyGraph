@@ -16,7 +16,7 @@ public final class StabilizationEngine {
     private final TopologicalOrder topology;
 
     // Packed dirty flags for O(K) sparse traversal.
-    private final long[] dirtyWords;
+    private final long[] dirtyNodeBits;
 
     private int lastStabilizedCount;
     private long epoch;
@@ -28,7 +28,7 @@ public final class StabilizationEngine {
 
     public StabilizationEngine(TopologicalOrder topology) {
         this.topology = topology;
-        this.dirtyWords = new long[(topology.nodeCount() + 63) / 64];
+        this.dirtyNodeBits = new long[(topology.nodeCount() + 63) / 64];
 
         // Mark source nodes dirty for initial propagation.
         for (int i = 0; i < topology.nodeCount(); i++) {
@@ -47,8 +47,8 @@ public final class StabilizationEngine {
     public void markDirty(int topoIndex) {
         int wordIdx = topoIndex >> 6;
         long bitMask = 1L << topoIndex;
-        if ((dirtyWords[wordIdx] & bitMask) == 0) {
-            dirtyWords[wordIdx] |= bitMask;
+        if ((dirtyNodeBits[wordIdx] & bitMask) == 0) {
+            dirtyNodeBits[wordIdx] |= bitMask;
             eventsProcessed++;
             eventsThisEpoch++;
         }
@@ -71,13 +71,13 @@ public final class StabilizationEngine {
 
         try {
             // Sparse O(K) traversal skipping clean nodes.
-            for (int w = 0; w < dirtyWords.length; w++) {
-                while (dirtyWords[w] != 0L) {
-                    int bitIndex = Long.numberOfTrailingZeros(dirtyWords[w]); // Find lowest set bit
+            for (int w = 0; w < dirtyNodeBits.length; w++) {
+                while (dirtyNodeBits[w] != 0L) {
+                    int bitIndex = Long.numberOfTrailingZeros(dirtyNodeBits[w]); // Find lowest set bit
                     int ti = (w << 6) + bitIndex; // Reconstruct topological ID
 
                     // Clear dirty flag before processing.
-                    dirtyWords[w] &= ~(1L << bitIndex);
+                    dirtyNodeBits[w] &= ~(1L << bitIndex);
 
                     // Re-entrant bounds guard.
                     if (ti >= n)
@@ -121,7 +121,7 @@ public final class StabilizationEngine {
                             if (isBranch && !branch.isBranchActive(topology.node(childTi).name())) {
                                 continue;
                             }
-                            dirtyWords[childTi >> 6] |= (1L << childTi);
+                            dirtyNodeBits[childTi >> 6] |= (1L << childTi);
                         }
                     }
                 }

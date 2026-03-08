@@ -183,7 +183,7 @@ public class StabilizationEngineTest {
 
     @Test
     public void testLargeGraphBitSetLogic() {
-        // Create 100 isolated sources to test the long[] dirtyWords > 64 bits logic
+        // Create 100 isolated sources to test the long[] dirtyNodeBits > 64 bits logic
         TopologicalOrder.Builder builder = TopologicalOrder.builder();
         List<ScalarSourceNode> nodes = new ArrayList<>();
 
