@@ -10,8 +10,8 @@ import com.trading.drg.node.BooleanNode;
 import com.trading.drg.util.AllocationProfiler;
 import com.trading.drg.util.ErrorRateLimiter;
 import com.trading.drg.util.GraphExplain;
-import com.trading.drg.util.LatencyTrackingListener;
-import com.trading.drg.util.NodeProfileListener;
+import com.trading.drg.engine.telemetry.LatencyTrackingListener;
+import com.trading.drg.engine.telemetry.NodeProfileListener;
 
 import lombok.Setter;
 

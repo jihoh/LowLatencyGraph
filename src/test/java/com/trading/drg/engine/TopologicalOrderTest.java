@@ -3,7 +3,7 @@ package com.trading.drg.engine;
 import com.trading.drg.api.Node;
 import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.node.ScalarCalcNode;
-import com.trading.drg.util.ScalarCutoffs;
+import com.trading.drg.api.ScalarCutoffs;
 import org.junit.Test;
 
 import static org.junit.Assert.*;

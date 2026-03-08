@@ -11,14 +11,14 @@ import com.trading.drg.fn.Fn1;
 import com.trading.drg.fn.Fn2;
 import com.trading.drg.fn.Fn3;
 import com.trading.drg.fn.FnN;
-import com.trading.drg.fn.TemplateFactory;
+
 import com.trading.drg.fn.VectorFn;
 import com.trading.drg.node.BooleanNode;
 import com.trading.drg.node.ScalarCalcNode;
 import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.node.VectorCalcNode;
 import com.trading.drg.node.VectorSourceNode;
-import com.trading.drg.util.ScalarCutoffs;
+import com.trading.drg.api.ScalarCutoffs;
 import java.util.*;
 
 /**

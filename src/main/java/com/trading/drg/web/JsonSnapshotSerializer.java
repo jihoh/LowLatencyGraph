@@ -1,7 +1,7 @@
 package com.trading.drg.web;
 
 import com.trading.drg.util.AllocationProfiler;
-import com.trading.drg.util.NodeProfileListener;
+import com.trading.drg.engine.telemetry.NodeProfileListener;
 
 import java.util.Arrays;
 

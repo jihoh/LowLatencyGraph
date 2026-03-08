@@ -1,6 +1,6 @@
-package com.trading.drg.util;
+package com.trading.drg.api;
 
-import com.trading.drg.api.ScalarCutoff;
+
 
 /** Standard implementations of {@link ScalarCutoff} for change detection. */
 public final class ScalarCutoffs {

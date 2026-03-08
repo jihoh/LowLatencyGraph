@@ -9,7 +9,7 @@ import com.trading.drg.io.JsonGraphCompiler;
 import com.trading.drg.api.ScalarValue;
 import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.node.VectorSourceNode;
-import com.trading.drg.util.CompositeStabilizationListener;
+import com.trading.drg.engine.telemetry.CompositeStabilizationListener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.nio.file.Path;

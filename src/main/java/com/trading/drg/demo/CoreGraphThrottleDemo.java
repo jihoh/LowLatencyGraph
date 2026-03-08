@@ -1,4 +1,6 @@
-package com.trading.drg;
+package com.trading.drg.demo;
+
+import com.trading.drg.CoreGraph;
 
 import com.trading.drg.web.DashboardWiring;
 import com.trading.drg.node.ThrottleNode;

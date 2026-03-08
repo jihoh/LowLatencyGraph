@@ -4,7 +4,7 @@ import com.trading.drg.api.StabilizationListener;
 import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.node.ScalarNode;
 import com.trading.drg.node.ScalarCalcNode;
-import com.trading.drg.util.ScalarCutoffs;
+import com.trading.drg.api.ScalarCutoffs;
 import org.junit.Before;
 import org.junit.Test;
 

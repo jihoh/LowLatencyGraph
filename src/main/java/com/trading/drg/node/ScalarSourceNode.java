@@ -3,7 +3,7 @@ package com.trading.drg.node;
 import com.trading.drg.api.ScalarCutoff;
 import com.trading.drg.api.ScalarValue;
 import com.trading.drg.api.SourceNode;
-import com.trading.drg.util.ScalarCutoffs;
+import com.trading.drg.api.ScalarCutoffs;
 
 /**
  * A source node acting as an input for scalar double values.

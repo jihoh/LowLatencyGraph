@@ -2,7 +2,7 @@ package com.trading.drg.node;
 
 import com.trading.drg.api.ScalarValue;
 import com.trading.drg.api.WindowedAccumulator;
-import com.trading.drg.util.ScalarCutoffs;
+import com.trading.drg.api.ScalarCutoffs;
 
 /**
  * A stateful node that maintains a rolling sliding window of the last N values

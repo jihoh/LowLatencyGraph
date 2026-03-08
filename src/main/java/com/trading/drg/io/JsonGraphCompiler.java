@@ -8,7 +8,7 @@ import com.trading.drg.engine.TopologicalOrder;
 import java.util.*;
 import java.util.Iterator;
 
-import com.trading.drg.util.ScalarCutoffs;
+import com.trading.drg.api.ScalarCutoffs;
 
 /**
  * Compiles a JSON {@link GraphDefinition} into a live, executable graph.

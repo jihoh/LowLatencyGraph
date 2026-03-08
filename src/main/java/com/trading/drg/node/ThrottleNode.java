@@ -1,7 +1,7 @@
 package com.trading.drg.node;
 
 import com.trading.drg.api.ScalarValue;
-import com.trading.drg.util.ScalarCutoffs;
+import com.trading.drg.api.ScalarCutoffs;
 
 /**
  * A pass-through node that throttles incoming events, ensuring the value 
