@@ -41,15 +41,14 @@ The system is designed as a **Passive** graph engine. The application thread dri
          │         Recompute();
          │         Detect Change;
          │         Mark Children Dirty;
+         │         Record in UpdatedNodes BitSet;
          ▼
  [Post-Stabilization]
          │
-         │ (wait-free direct access as engine is stable)
+         │ (5) Iterate UpdatedNodes (zero-alloc sparse BitSet)
+         │ (6) graph.getDouble("Node") for wait-free reads
          ▼
  [Reader / UI / Risk System]
-         │
-         │ (5) graph.getDouble("Node")
-         │ (6) Read Consistent State
 ```
 
 You can construct a graph topology via two primary methods:
@@ -518,3 +517,68 @@ public class MarketDataEvent {
 ```
 
 When you call `router.route(marketEvent)` inside your `EventHandler`, the router recursively navigates the natively built Trie using the primitive memory structures of your POJO fields (`instrument` and `venue`), entirely avoiding `String.concat()` and instantly triggering the updates on the destination nodes.
+
+---
+
+## 12. Consuming Updated Nodes After Stabilization
+
+After `stabilize()` completes, the engine provides a zero-allocation `UpdatedNodes` view of exactly which nodes changed. This enables reactive downstream consumers to process only the nodes that actually moved, rather than polling every node in the graph.
+
+### Design
+
+`UpdatedNodes` uses a pre-allocated `long[]` BitSet — the same sparse traversal pattern as the engine's internal dirty flags. It is allocated once per engine and reused across stabilization cycles. **No objects are created on the hot path.**
+
+All nodes whose `stabilize()` returned `true` (i.e., the value meaningfully changed) are included — both source nodes and derived compute nodes.
+
+### Basic Usage
+
+```java
+// 1. Update sources and stabilize
+graph.update("price", 105.5);
+graph.update("volume", 2000);
+graph.stabilize();
+
+// 2. Iterate only the nodes that changed (zero-allocation, O(K) sparse)
+graph.updatedNodes().forEach(node -> {
+    if (node instanceof ScalarValue sv) {
+        System.out.println(node.name() + " = " + sv.value());
+    }
+});
+```
+
+### LMAX Disruptor Integration
+
+In an HFT event loop, consume updated nodes immediately after the batch stabilizes:
+
+```java
+EventHandler<MarketDataEvent> handler = (event, sequence, endOfBatch) -> {
+    router.route(event);
+
+    if (endOfBatch) {
+        graph.stabilize();
+
+        // React to only the nodes that changed this batch
+        graph.updatedNodes().forEach(node -> {
+            if (node instanceof ScalarValue sv) {
+                riskEngine.onNodeUpdate(node.name(), sv.value());
+            }
+        });
+    }
+};
+```
+
+### API Reference
+
+| Method | Description |
+|---|---|
+| `forEach(Consumer<Node>)` | Visits every changed node in topological order. |
+| `forEach(NodeVisitor)` | Same, but also provides the topological index: `(int topoIndex, Node node)`. |
+| `isChanged(int topoIndex)` | Point query: did this node change? |
+| `count()` | Total number of changed nodes. |
+| `node(int topoIndex)` | Resolves a topo index to its `Node` object. |
+
+### Performance Characteristics
+
+*   **Zero-allocation:** The `UpdatedNodes` BitSet is pre-allocated once. No `Iterator`, no boxing, no `List` creation.
+*   **O(K) iteration:** Where K = number of changed nodes. Uses `Long.numberOfTrailingZeros` to skip clean words instantly.
+*   **Topological order:** `forEach()` visits nodes in topological order, so dependencies are always visited before dependents.

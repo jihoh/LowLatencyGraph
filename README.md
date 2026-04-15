@@ -63,15 +63,14 @@ The system is designed as a **Passive** graph engine. The application thread dri
          │         Recompute();
          │         Detect Change;
          │         Mark Children Dirty;
+         │         Record in UpdatedNodes BitSet;
          ▼
  [Post-Stabilization]
          │
-         │ (wait-free direct access as engine is stable)
+         │ (5) Iterate UpdatedNodes (zero-alloc sparse BitSet)
+         │ (6) graph.getDouble("Node") for wait-free reads
          ▼
  [Reader / UI / Risk System]
-         │
-         │ (5) graph.getDouble("Node")
-         │ (6) Read Consistent State
 ```
 
 You can construct a graph topology via two primary methods:
@@ -102,6 +101,7 @@ When a burst of events hits the input buffer, the engine quickly aggregates the 
 2. It propagates a dirty bitwave recursively down the tree in O(K) time (where K is the number of impacted downstream nodes).
 3. It creates a brand-new **Epoch** and fires the `stabilize()` methods of only the modified nodes in perfect topological order.
 4. Nodes that haven't changed (or whose changes fell below their `"cutoff"` threshold) natively short-circuit, sparing CPU cycles.
+5. Every node whose value actually changed is recorded in the `UpdatedNodes` BitSet, enabling zero-allocation downstream consumption.
 
 ---
 
@@ -589,6 +589,13 @@ disruptor.handleEventsWith((event, sequence, endOfBatch) -> {
     router.route(event);              // Zero-GC field routing
     if (endOfBatch) {
         graph.stabilize();            // Batch stabilization
+
+        // Consume only the nodes that changed (zero-allocation)
+        graph.updatedNodes().forEach(node -> {
+            if (node instanceof ScalarValue sv) {
+                // Forward to risk engine, send order, etc.
+            }
+        });
     }
 });
 RingBuffer<FxTickEvent> ringBuffer = disruptor.start();
@@ -633,7 +640,48 @@ When you call `router.route(event)`, the router navigates the pre-built Trie usi
 
 ---
 
-## 10. Dashboard Metrics Reference
+## 10. Consuming Updated Nodes After Stabilization
+
+After `stabilize()` completes, the engine exposes a zero-allocation `UpdatedNodes` view of exactly which nodes changed. This enables reactive downstream consumers to process only the outputs that actually moved, rather than polling every node in the graph.
+
+### How It Works
+
+`UpdatedNodes` uses a pre-allocated `long[]` BitSet — the same sparse traversal mechanism as the engine's internal dirty flags. It is allocated once per engine at initialization and reused across all stabilization cycles. **No objects are created on the hot path.**
+
+All nodes whose `stabilize()` returned `true` (i.e., the value meaningfully changed) are included — both source and derived nodes.
+
+### Usage
+
+```java
+// After stabilize(), iterate only the changed nodes
+graph.stabilize();
+
+graph.updatedNodes().forEach(node -> {
+    if (node instanceof ScalarValue sv) {
+        System.out.println(node.name() + " = " + sv.value());
+    }
+});
+```
+
+### API
+
+| Method | Description |
+|---|---|
+| `forEach(Consumer<Node>)` | Visits every changed node in topological order. |
+| `forEach(NodeVisitor)` | Same, but also provides the topological index: `(int topoIndex, Node node)`. |
+| `isChanged(int topoIndex)` | Point query: did this specific node change? |
+| `count()` | Total number of changed nodes this cycle. |
+| `node(int topoIndex)` | Resolves a topo index to its `Node` object. |
+
+### Performance
+
+*   **Zero-allocation:** Pre-allocated `long[]` BitSet, no `Iterator`, no boxing, no `List` creation.
+*   **O(K) iteration:** Uses `Long.numberOfTrailingZeros` to skip clean words. K = number of changed nodes.
+*   **Topological order:** `nextChanged()` returns nodes in dependency order — parents before children.
+
+---
+
+## 11. Dashboard Metrics Reference
 
 The dashboard provides a wealth of telemetry about the engine's real-time state. All metrics run lock-free on separate background threads to ensure zero interference with the hot-path execution.
 

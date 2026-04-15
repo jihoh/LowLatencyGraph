@@ -18,6 +18,9 @@ public final class StabilizationEngine {
     // Packed dirty flags for O(K) sparse traversal.
     private final long[] dirtyNodeBits;
 
+    // Tracks which nodes changed during the last stabilize() pass.
+    private final UpdatedNodes updatedNodes;
+
     private int lastStabilizedCount;
     private long epoch;
     private long eventsProcessed;
@@ -29,6 +32,7 @@ public final class StabilizationEngine {
     public StabilizationEngine(TopologicalOrder topology) {
         this.topology = topology;
         this.dirtyNodeBits = new long[(topology.nodeCount() + 63) / 64];
+        this.updatedNodes = new UpdatedNodes(topology);
 
         // Mark source nodes dirty for initial propagation.
         for (int i = 0; i < topology.nodeCount(); i++) {
@@ -62,6 +66,7 @@ public final class StabilizationEngine {
     public int stabilize() {
         epoch++;
         int stabilizedCount = 0;
+        updatedNodes.clear();
         final int n = topology.nodeCount();
         final StabilizationListener l = this.listener;
         final boolean hasListener = l != null;
@@ -109,6 +114,8 @@ public final class StabilizationEngine {
 
                     // Visit children if value changed.
                     if (changed) {
+                        updatedNodes.mark(ti);
+
                         boolean isBranch = node instanceof com.trading.drg.api.BranchingNode;
                         com.trading.drg.api.BranchingNode branch = isBranch ? (com.trading.drg.api.BranchingNode) node
                                 : null;
@@ -161,5 +168,12 @@ public final class StabilizationEngine {
 
     public TopologicalOrder topology() {
         return topology;
+    }
+
+    /**
+     * Returns the set of nodes whose values changed in the last stabilize() call.
+     */
+    public UpdatedNodes updatedNodes() {
+        return updatedNodes;
     }
 }

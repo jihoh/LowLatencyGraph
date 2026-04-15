@@ -1,6 +1,7 @@
 package com.trading.drg.demo;
 
 import com.trading.drg.CoreGraph;
+import com.trading.drg.api.ScalarValue;
 
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.YieldingWaitStrategy;
@@ -99,6 +100,13 @@ public class CoreGraphSimpleDemo {
 
             if (endOfBatch && graph != null) {
                 graph.stabilize();
+
+                // Log each updated node
+                graph.updatedNodes().forEach(node -> {
+                    if (node instanceof ScalarValue sv) {
+                        log.info("{} = {}", node.name(), sv.value());
+                    }
+                });
             }
 
             profiler.stop();

@@ -4,6 +4,7 @@ import com.trading.drg.api.Node;
 import com.trading.drg.api.StabilizationListener;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.engine.TopologicalOrder;
+import com.trading.drg.engine.UpdatedNodes;
 import com.trading.drg.io.GraphDefinition;
 import com.trading.drg.io.JsonGraphCompiler;
 import com.trading.drg.api.ScalarValue;
@@ -149,5 +150,10 @@ public class CoreGraph {
     /** Triggers a stabilization cycle. @return Number of nodes recomputed. */
     public int stabilize() {
         return engine.stabilize();
+    }
+
+    /** Returns the set of nodes whose values changed in the last stabilize() call. */
+    public UpdatedNodes updatedNodes() {
+        return engine.updatedNodes();
     }
 }

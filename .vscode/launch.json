@@ -6,6 +6,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "CoreGraphSimpleDemo",
+            "request": "launch",
+            "mainClass": "com.trading.drg.demo.CoreGraphSimpleDemo",
+            "projectName": "claude-graph"
+        },
+        {
+            "type": "java",
             "name": "CoreGraphThrottleDemo",
             "request": "launch",
             "mainClass": "com.trading.drg.CoreGraphThrottleDemo",
