@@ -4,6 +4,7 @@ import com.trading.drg.fn.Fn1;
 import com.trading.drg.fn.Fn2;
 import com.trading.drg.fn.Fn3;
 import com.trading.drg.fn.FnN;
+import com.trading.drg.fn.VectorMathFn;
 import com.trading.drg.fn.finance.Average;
 import com.trading.drg.fn.finance.Beta;
 import com.trading.drg.fn.finance.Correlation;
@@ -25,6 +26,7 @@ import com.trading.drg.node.ScalarCalcNode;
 import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.node.BooleanNode;
 import com.trading.drg.node.SwitchNode;
+import com.trading.drg.node.VectorCalcNode;
 
 import com.trading.drg.node.VectorSourceNode;
 import com.trading.drg.api.ScalarValue;
@@ -239,6 +241,26 @@ public final class NodeRegistry {
                     scratch[i] = ((ScalarValue) deps[i]).value();
                 return fn.apply(scratch);
             });
+        });
+    }
+
+    public void registerVectorMathFn(NodeType type, Function<Map<String, Object>, VectorMathFn> supplier) {
+        registerFactory(type, (name, props, deps) -> {
+            int size = JsonGraphCompiler.getInt(props, "size", 0);
+            if (size <= 0)
+                throw new IllegalArgumentException(
+                        "VectorMathFn node '" + name + "' requires positive 'size' property");
+            double tolerance = JsonGraphCompiler.getDouble(props, "tolerance", 1e-15);
+
+            VectorMathFn fn = supplier.apply(props);
+
+            // Build scratch buffer once; reused every stabilization cycle.
+            final double[] scratch = new double[deps.length];
+            return new VectorCalcNode(name, size, tolerance, (inNodes, out) -> {
+                for (int i = 0; i < deps.length; i++)
+                    scratch[i] = ((ScalarValue) deps[i]).value();
+                fn.apply(scratch, out);
+            }, deps);
         });
     }
 }

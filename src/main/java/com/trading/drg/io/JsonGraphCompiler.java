@@ -16,6 +16,11 @@ import com.trading.drg.api.ScalarCutoffs;
 public final class JsonGraphCompiler {
     private final NodeRegistry registry = new NodeRegistry();
 
+    /** Returns the node registry for custom type registration. */
+    public NodeRegistry getRegistry() {
+        return registry;
+    }
+
     /**
      * Registers a factory for a specific node type enum.
      */

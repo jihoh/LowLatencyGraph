@@ -13,6 +13,7 @@ import com.trading.drg.fn.Fn3;
 import com.trading.drg.fn.FnN;
 
 import com.trading.drg.fn.VectorFn;
+import com.trading.drg.fn.VectorMathFn;
 import com.trading.drg.node.BooleanNode;
 import com.trading.drg.node.ScalarCalcNode;
 import com.trading.drg.node.ScalarSourceNode;
@@ -186,15 +187,36 @@ public final class GraphBuilder {
         return node;
     }
 
-    /**
-     * computeVector: Creates a vector computation node.
-     */
     public VectorCalcNode computeVector(String name, int size, double tolerance, VectorFn fn, Node... inputs) {
         checkNotBuilt();
         VectorCalcNode node = new VectorCalcNode(name, size, tolerance, fn, inputs);
         register(node);
         for (Node in : inputs)
             addEdge(in.name(), name);
+        return node;
+    }
+
+    /**
+     * computeVectorMath: Creates a vector computation node mapping N scalar inputs to M outputs via VectorMathFn.
+     */
+    public VectorCalcNode computeVectorMath(String name, int size, double tolerance, VectorMathFn fn, ScalarValue... inputs) {
+        checkNotBuilt();
+        if (size <= 0)
+            throw new IllegalArgumentException("computeVectorMath '" + name + "' requires positive size, got: " + size);
+        // Allocate scratch buffer once at build time.
+        final double[] scratch = new double[inputs.length];
+        
+        VectorCalcNode node = new VectorCalcNode(name, size, tolerance, (inNodes, out) -> {
+            for (int i = 0; i < inputs.length; i++) {
+                scratch[i] = inputs[i].value();
+            }
+            fn.apply(scratch, out);
+        }, inputs);
+        
+        register(node);
+        for (ScalarValue in : inputs) {
+            addEdge(in.name(), name);
+        }
         return node;
     }
 

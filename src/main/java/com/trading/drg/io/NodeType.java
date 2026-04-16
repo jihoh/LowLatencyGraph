@@ -54,6 +54,7 @@ public enum NodeType {
     TIME_DECAY(TimeDecayNode.class),
     SWITCH(SwitchNode.class),
     CONDITION(BooleanNode.class),
+    VECTOR_MATH(VectorCalcNode.class),
     TEMPLATE(null);
 
     private final Class<?> nodeClass;
