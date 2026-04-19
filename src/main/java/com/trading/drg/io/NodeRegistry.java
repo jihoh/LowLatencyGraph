@@ -92,6 +92,11 @@ public final class NodeRegistry {
         registerFactory(type.name(), named, factory);
     }
 
+    private void registerFactory(NodeType type, String[] namedInputs,
+            JsonGraphCompiler.NodeFactory factory) {
+        registerFactory(type.name(), namedInputs, factory);
+    }
+
     public void registerFactory(String type, String[] namedInputs,
             JsonGraphCompiler.NodeFactory factory) {
         registry.put(type.toUpperCase(), new NodeMetadata(namedInputs, factory));
@@ -169,27 +174,27 @@ public final class NodeRegistry {
                         }
                     }, deps);
         });
-        
+
         // --- High-Performance Special Nodes ---
-        registerFactory(NodeType.THROTTLE.name(), new String[]{"input"}, (name, props, deps) -> {
+        registerFactory(NodeType.THROTTLE, new String[] { "input" }, (name, props, deps) -> {
             long windowMs = (long) JsonGraphCompiler.getDouble(props, "windowMs", 100.0);
             return GraphBuilder.create().throttle(name, (ScalarValue) deps[0], windowMs);
         });
-        
-        registerFactory(NodeType.TIME_DECAY.name(), new String[]{"input"}, (name, props, deps) -> {
+
+        registerFactory(NodeType.TIME_DECAY, new String[] { "input" }, (name, props, deps) -> {
             long halfLifeMs = (long) JsonGraphCompiler.getDouble(props, "halfLifeMs", 100.0);
             return GraphBuilder.create().timeDecay(name, (ScalarValue) deps[0], halfLifeMs);
         });
-        
-        registerFactory(NodeType.CONDITION.name(), new String[]{"input"}, (name, props, deps) -> {
+
+        registerFactory(NodeType.CONDITION, new String[] { "input" }, (name, props, deps) -> {
             String op = props.getOrDefault("operator", ">").toString();
             double threshold = JsonGraphCompiler.getDouble(props, "threshold", 0.0);
             ScalarValue input = (ScalarValue) deps[0];
-            
+
             return GraphBuilder.create().condition(name, input, v -> {
                 return switch (op) {
-                    case ">"  -> v > threshold;
-                    case "<"  -> v < threshold;
+                    case ">" -> v > threshold;
+                    case "<" -> v < threshold;
                     case ">=" -> v >= threshold;
                     case "<=" -> v <= threshold;
                     case "==" -> v == threshold;
@@ -198,13 +203,13 @@ public final class NodeRegistry {
                 };
             });
         });
-        
-        registerFactory(NodeType.SWITCH.name(), new String[]{"input", "condition"}, (name, props, deps) -> {
+
+        registerFactory(NodeType.SWITCH, new String[] { "input", "condition" }, (name, props, deps) -> {
             ScalarValue input = (ScalarValue) deps[0];
             BooleanNode condition = (BooleanNode) deps[1];
 
             SwitchNode switchNode = new SwitchNode(name, input, condition);
-            
+
             if (props.containsKey("true_branch")) {
                 switchNode.addTrueBranch(props.get("true_branch").toString());
             }
@@ -310,7 +315,8 @@ public final class NodeRegistry {
         registerFactory(type, vectorMathFactory(supplier));
     }
 
-    public void registerVectorMathFn(String type, String[] namedInputs, Function<Map<String, Object>, VectorMathFn> supplier) {
+    public void registerVectorMathFn(String type, String[] namedInputs,
+            Function<Map<String, Object>, VectorMathFn> supplier) {
         registerFactory(type, namedInputs, vectorMathFactory(supplier));
     }
 }
