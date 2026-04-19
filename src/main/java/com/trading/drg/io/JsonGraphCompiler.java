@@ -22,14 +22,6 @@ public final class JsonGraphCompiler {
     }
 
     /**
-     * Registers a factory for a specific node type enum.
-     */
-    public JsonGraphCompiler registerFactory(NodeType type, NodeRegistry.NodeMetadata meta) {
-        registry.registerFactory(type, meta.namedInputs(), meta.factory());
-        return this;
-    }
-
-    /**
      * Compiles the definition into a graph.
      * 
      * @param def The graph definition.
@@ -59,10 +51,9 @@ public final class JsonGraphCompiler {
         Map<String, Map<String, String>> edgeLabels = new HashMap<>(nodeDefs.size() * 2);
         TopologicalOrder.Builder topo = TopologicalOrder.builder();
 
-        // 2. Instantiate and Build Topology
+        // 1. Instantiate and Build Topology
         for (GraphDefinition.NodeDef nd : nodeDefs) {
-            NodeType type = NodeType.fromString(nd.getType());
-            logicalTypes.put(nd.getName(), type.name());
+            logicalTypes.put(nd.getName(), nd.getType().toUpperCase());
 
             String configDesc = nd.getDescription();
             if (configDesc != null) {
@@ -104,11 +95,10 @@ public final class JsonGraphCompiler {
                 }
 
                 // All dependencies resolved — create the node
-                NodeType type = NodeType.fromString(nd.getType());
-                NodeRegistry.NodeMetadata meta = registry.getMetadata(type);
+                NodeRegistry.NodeMetadata meta = registry.getMetadata(nd.getType());
                 if (meta == null) {
                     throw new IllegalArgumentException(
-                            "No NodeFactory for type " + type + " in node " + nd.getName());
+                            "No NodeFactory for type " + nd.getType() + " in node " + nd.getName());
                 }
 
                 Node[] deps;
@@ -243,7 +233,7 @@ public final class JsonGraphCompiler {
                         for (Map.Entry<String, Object> entry : newNode.getProperties().entrySet()) {
                             Object val = entry.getValue();
                             if (val instanceof String s && s.contains("{{")) {
-                                resolvedProps.put(entry.getKey(), resolveTemplateString(s, params));
+                                resolvedProps.put(entry.getKey(), substitute(s, params));
                             } else {
                                 resolvedProps.put(entry.getKey(), val);
                             }
@@ -293,18 +283,6 @@ public final class JsonGraphCompiler {
     }
 
     private String substitute(String s, Map<String, Object> params) {
-        if (s == null || !s.contains("{{"))
-            return s;
-        for (Map.Entry<String, Object> entry : params.entrySet()) {
-            String key = "{{" + entry.getKey() + "}}";
-            if (s.contains(key)) {
-                s = s.replace(key, String.valueOf(entry.getValue()));
-            }
-        }
-        return s;
-    }
-
-    private String resolveTemplateString(String s, Map<String, Object> params) {
         if (s == null || !s.contains("{{"))
             return s;
         for (Map.Entry<String, Object> entry : params.entrySet()) {

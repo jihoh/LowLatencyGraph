@@ -135,6 +135,17 @@ public class CoreGraphComplexDemo {
             // throughput and preventing jitter.
             if (endOfBatch && graph != null) {
                 graph.stabilize();
+                com.trading.drg.engine.UpdatedNodes updated = graph.updatedNodes();
+                if (updated.count() > 0) {
+                    log.info("Stabilization complete. {} nodes updated:", updated.count());
+                    updated.forEach(node -> {
+                        if (node instanceof com.trading.drg.api.ScalarValue sv) {
+                            log.info("  -> {} = {}", node.name(), sv.value());
+                        } else {
+                            log.info("  -> {} (updated)", node.name());
+                        }
+                    });
+                }
             }
 
             long bytesAllocated = profiler.stop();

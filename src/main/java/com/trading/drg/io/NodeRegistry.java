@@ -50,13 +50,23 @@ public final class NodeRegistry {
     public record NodeMetadata(String[] namedInputs, JsonGraphCompiler.NodeFactory factory) {
     }
 
-    private final Map<NodeType, NodeMetadata> registry = new HashMap<>();
+    private final Map<String, NodeMetadata> registry = new HashMap<>();
 
     public NodeRegistry() {
         registerBuiltIns();
     }
 
-    public void registerFactory(NodeType type, JsonGraphCompiler.NodeFactory factory) {
+    /**
+     * Installs a {@link NodeProvider}, registering all of its custom
+     * node types into this registry.
+     *
+     * @param provider the node provider to install
+     */
+    public void install(NodeProvider provider) {
+        provider.register(this);
+    }
+
+    private void registerFactory(NodeType type, JsonGraphCompiler.NodeFactory factory) {
         String[] named = null;
         Class<?> nodeClass = type.getNodeClass();
 
@@ -79,16 +89,16 @@ public final class NodeRegistry {
             }
         }
 
-        registerFactory(type, named, factory);
+        registerFactory(type.name(), named, factory);
     }
 
-    public void registerFactory(NodeType type, String[] namedInputs,
+    public void registerFactory(String type, String[] namedInputs,
             JsonGraphCompiler.NodeFactory factory) {
-        registry.put(type, new NodeMetadata(namedInputs, factory));
+        registry.put(type.toUpperCase(), new NodeMetadata(namedInputs, factory));
     }
 
-    public NodeMetadata getMetadata(NodeType type) {
-        return registry.get(type);
+    public NodeMetadata getMetadata(String type) {
+        return registry.get(type.toUpperCase());
     }
 
     // ── Built-in Factories ──────────────────────────────────────────
@@ -161,35 +171,35 @@ public final class NodeRegistry {
         });
         
         // --- High-Performance Special Nodes ---
-        registerFactory(NodeType.THROTTLE, new String[]{"input"}, (name, props, deps) -> {
+        registerFactory(NodeType.THROTTLE.name(), new String[]{"input"}, (name, props, deps) -> {
             long windowMs = (long) JsonGraphCompiler.getDouble(props, "windowMs", 100.0);
             return GraphBuilder.create().throttle(name, (ScalarValue) deps[0], windowMs);
         });
         
-        registerFactory(NodeType.TIME_DECAY, new String[]{"input"}, (name, props, deps) -> {
+        registerFactory(NodeType.TIME_DECAY.name(), new String[]{"input"}, (name, props, deps) -> {
             long halfLifeMs = (long) JsonGraphCompiler.getDouble(props, "halfLifeMs", 100.0);
             return GraphBuilder.create().timeDecay(name, (ScalarValue) deps[0], halfLifeMs);
         });
         
-        registerFactory(NodeType.CONDITION, new String[]{"input"}, (name, props, deps) -> {
+        registerFactory(NodeType.CONDITION.name(), new String[]{"input"}, (name, props, deps) -> {
             String op = props.getOrDefault("operator", ">").toString();
             double threshold = JsonGraphCompiler.getDouble(props, "threshold", 0.0);
             ScalarValue input = (ScalarValue) deps[0];
             
             return GraphBuilder.create().condition(name, input, v -> {
-                switch(op) {
-                    case ">": return v > threshold;
-                    case "<": return v < threshold;
-                    case ">=": return v >= threshold;
-                    case "<=": return v <= threshold;
-                    case "==": return v == threshold;
-                    case "!=": return v != threshold;
-                    default: throw new IllegalArgumentException("Unknown operator: " + op);
-                }
+                return switch (op) {
+                    case ">"  -> v > threshold;
+                    case "<"  -> v < threshold;
+                    case ">=" -> v >= threshold;
+                    case "<=" -> v <= threshold;
+                    case "==" -> v == threshold;
+                    case "!=" -> v != threshold;
+                    default -> throw new IllegalArgumentException("Unknown operator: " + op);
+                };
             });
         });
         
-        registerFactory(NodeType.SWITCH, new String[]{"input", "condition"}, (name, props, deps) -> {
+        registerFactory(NodeType.SWITCH.name(), new String[]{"input", "condition"}, (name, props, deps) -> {
             ScalarValue input = (ScalarValue) deps[0];
             BooleanNode condition = (BooleanNode) deps[1];
 
@@ -207,33 +217,57 @@ public final class NodeRegistry {
 
     // ── Helper methods to eliminate Fn registration boilerplate ──────────
 
-    private void registerFn1(NodeType type, Function<Map<String, Object>, Fn1> supplier) {
-        registerFactory(type, (name, props, deps) -> {
+    private JsonGraphCompiler.NodeFactory fn1Factory(Function<Map<String, Object>, Fn1> supplier) {
+        return (name, props, deps) -> {
             Fn1 fn = supplier.apply(props);
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
                     () -> fn.apply(((ScalarValue) deps[0]).value()));
-        });
+        };
     }
 
-    private void registerFn2(NodeType type, Function<Map<String, Object>, Fn2> supplier) {
-        registerFactory(type, (name, props, deps) -> {
+    private void registerFn1(NodeType type, Function<Map<String, Object>, Fn1> supplier) {
+        registerFactory(type, fn1Factory(supplier));
+    }
+
+    public void registerFn1(String type, String[] namedInputs, Function<Map<String, Object>, Fn1> supplier) {
+        registerFactory(type, namedInputs, fn1Factory(supplier));
+    }
+
+    private JsonGraphCompiler.NodeFactory fn2Factory(Function<Map<String, Object>, Fn2> supplier) {
+        return (name, props, deps) -> {
             Fn2 fn = supplier.apply(props);
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
                     () -> fn.apply(((ScalarValue) deps[0]).value(), ((ScalarValue) deps[1]).value()));
-        });
+        };
     }
 
-    private void registerFn3(NodeType type, Function<Map<String, Object>, Fn3> supplier) {
-        registerFactory(type, (name, props, deps) -> {
+    private void registerFn2(NodeType type, Function<Map<String, Object>, Fn2> supplier) {
+        registerFactory(type, fn2Factory(supplier));
+    }
+
+    public void registerFn2(String type, String[] namedInputs, Function<Map<String, Object>, Fn2> supplier) {
+        registerFactory(type, namedInputs, fn2Factory(supplier));
+    }
+
+    private JsonGraphCompiler.NodeFactory fn3Factory(Function<Map<String, Object>, Fn3> supplier) {
+        return (name, props, deps) -> {
             Fn3 fn = supplier.apply(props);
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props),
                     () -> fn.apply(((ScalarValue) deps[0]).value(),
                             ((ScalarValue) deps[1]).value(), ((ScalarValue) deps[2]).value()));
-        });
+        };
     }
 
-    private void registerFnN(NodeType type, Function<Map<String, Object>, FnN> supplier) {
-        registerFactory(type, (name, props, deps) -> {
+    private void registerFn3(NodeType type, Function<Map<String, Object>, Fn3> supplier) {
+        registerFactory(type, fn3Factory(supplier));
+    }
+
+    public void registerFn3(String type, String[] namedInputs, Function<Map<String, Object>, Fn3> supplier) {
+        registerFactory(type, namedInputs, fn3Factory(supplier));
+    }
+
+    private JsonGraphCompiler.NodeFactory fnNFactory(Function<Map<String, Object>, FnN> supplier) {
+        return (name, props, deps) -> {
             FnN fn = supplier.apply(props);
             double[] scratch = new double[deps.length];
             return new ScalarCalcNode(name, JsonGraphCompiler.parseCutoff(props), () -> {
@@ -241,11 +275,19 @@ public final class NodeRegistry {
                     scratch[i] = ((ScalarValue) deps[i]).value();
                 return fn.apply(scratch);
             });
-        });
+        };
     }
 
-    public void registerVectorMathFn(NodeType type, Function<Map<String, Object>, VectorMathFn> supplier) {
-        registerFactory(type, (name, props, deps) -> {
+    private void registerFnN(NodeType type, Function<Map<String, Object>, FnN> supplier) {
+        registerFactory(type, fnNFactory(supplier));
+    }
+
+    public void registerFnN(String type, String[] namedInputs, Function<Map<String, Object>, FnN> supplier) {
+        registerFactory(type, namedInputs, fnNFactory(supplier));
+    }
+
+    private JsonGraphCompiler.NodeFactory vectorMathFactory(Function<Map<String, Object>, VectorMathFn> supplier) {
+        return (name, props, deps) -> {
             int size = JsonGraphCompiler.getInt(props, "size", 0);
             if (size <= 0)
                 throw new IllegalArgumentException(
@@ -261,6 +303,14 @@ public final class NodeRegistry {
                     scratch[i] = ((ScalarValue) deps[i]).value();
                 fn.apply(scratch, out);
             }, deps);
-        });
+        };
+    }
+
+    private void registerVectorMathFn(NodeType type, Function<Map<String, Object>, VectorMathFn> supplier) {
+        registerFactory(type, vectorMathFactory(supplier));
+    }
+
+    public void registerVectorMathFn(String type, String[] namedInputs, Function<Map<String, Object>, VectorMathFn> supplier) {
+        registerFactory(type, namedInputs, vectorMathFactory(supplier));
     }
 }

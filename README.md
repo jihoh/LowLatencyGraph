@@ -402,61 +402,144 @@ Applied to Scalar nodes. If a new computed value differs from its old value by l
 
 ---
 
-## 5. Advanced: Custom Node Creation in Java
+## 5. Advanced: Custom Node Registration
 
-If the pre-built mathematical functions do not suit your needs, you can easily create custom nodes by implementing functional interfaces.
+If the built-in calculators don't cover your use case, you can register custom nodes without touching the core library. The extension point is `NodeProvider` — a single-method interface that bundles your registrations and plugs cleanly into `NodeRegistry`.
 
-### Creating a Custom `Fn2` Node
+> **Rule:** Never modify `NodeRegistry` or `NodeType` directly. Always implement `NodeProvider` in your own package.
+
+### Step 1 — Implement your calculator
+
+Pick the functional interface that matches your input arity:
+
+| Interface | Inputs | Use when… |
+|---|---|---|
+| `Fn1` | 1 scalar | single-input transforms (e.g. log return, clamp) |
+| `Fn2` | 2 scalars | pairwise operations (e.g. spread, ratio) |
+| `Fn3` | 3 scalars | three-input formulas (e.g. triangular arb) |
+| `FnN` | N scalars | variable-arity aggregations (e.g. custom weighted avg) |
+| `VectorMathFn` | N scalars → M outputs | multi-output models (e.g. risk factor decomposition) |
 
 ```java
-
-// 1. Implement the Fn2 interface (2 scalar inputs → 1 output)
+// Example: 2-input custom spread that guards against division by zero
 public class RatioSpread implements Fn2 {
     @Override
     public double apply(double a, double b) {
-        if (b == 0.0) return Double.NaN;
-        return a / b;
+        return b == 0.0 ? Double.NaN : a / b;
     }
 }
-
-// 2. Use it in the DSL
-GraphBuilder builder = GraphBuilder.create();
-ScalarSourceNode src1 = builder.scalarSource("A", 10.0);
-ScalarSourceNode src2 = builder.scalarSource("B", 5.0);
-ScalarCalcNode result = builder.compute("Ratio", new RatioSpread(), src1, src2);
 ```
 
-### Creating a Custom N-Input Node
+### Step 2 — Create a `NodeProvider`
+
+Bundle all your registrations into one class:
 
 ```java
+package com.myteam.alpha;
 
-// 1. Implement FnN for variable-arity input
-public class MyCustomAlgo implements FnN {
+import com.trading.drg.io.NodeProvider;
+import com.trading.drg.io.NodeRegistry;
+
+public class AlphaNodeProvider implements NodeProvider {
+
     @Override
-    public double apply(double[] inputs) {
-        if (inputs == null || inputs.length < 2) return Double.NaN;
-        return (inputs[0] * inputs[1]) / (inputs.length > 2 ? inputs[2] : 1.0);
+    public void register(NodeRegistry registry) {
+
+        // Fn2: 2 named scalar inputs
+        registry.registerFn2(
+            "RATIO_SPREAD",
+            new String[]{"a", "b"},
+            props -> new RatioSpread()
+        );
+
+        // Fn1 with a property parameter read from JSON
+        registry.registerFn1(
+            "CUSTOM_EWMA",
+            new String[]{"input"},
+            props -> new CustomEwma(JsonGraphCompiler.getDouble(props, "alpha", 0.1))
+        );
+
+        // FnN: variable number of inputs — input keys are resolved by sort order in JSON
+        registry.registerFnN(
+            "WEIGHTED_PNL",
+            null,   // null = unbounded inputs, keys resolved alphabetically
+            props -> new WeightedPnl()
+        );
+
+        // VectorMathFn: N scalar inputs → M scalar outputs (auto-expanded by compiler)
+        registry.registerVectorMathFn(
+            "RISK_DECOMP",
+            new String[]{"spot", "vol", "rate"},
+            props -> new RiskDecomposition(JsonGraphCompiler.getInt(props, "size", 3))
+        );
     }
 }
+```
 
-// 2. Use computeN for N-input nodes
+### Step 3 — Install before graph compilation
+
+Call `install()` once at application startup, before any `CoreGraph` is constructed:
+
+```java
+JsonGraphCompiler compiler = new JsonGraphCompiler();
+compiler.getRegistry().install(new AlphaNodeProvider());
+
+// Now compile — custom types are fully available
+CompiledGraph compiled = compiler.compile(GraphDefinition.fromFile("fx_arb.json"));
+```
+
+Or, if you use the `CoreGraph` convenience constructor, wire it through the underlying compiler:
+
+```java
+CoreGraph graph = new CoreGraph("src/main/resources/fx_arb.json",
+    compiler -> compiler.getRegistry().install(new AlphaNodeProvider()));
+```
+
+### Step 4 — Reference in JSON
+
+Once registered, your custom type name is available in any JSON graph definition:
+
+```json
+{
+    "name": "RATIO_SPREAD_NODE",
+    "type": "ratio_spread",
+    "inputs": {
+        "a": "EUR_USD",
+        "b": "GBP_USD"
+    }
+}
+```
+
+```json
+{
+    "name": "RISK_DECOMP_NODE",
+    "type": "risk_decomp",
+    "inputs": {
+        "spot": "SpotSource",
+        "vol":  "VolSource",
+        "rate": "RateSource"
+    },
+    "properties": {
+        "size": 3,
+        "auto_expand": true,
+        "auto_expand_labels": ["DeltaRisk", "VegaRisk", "RhoRisk"]
+    }
+}
+```
+
+> **Note:** Type names in JSON are **case-insensitive**. `"ratio_spread"`, `"RATIO_SPREAD"`, and `"Ratio_Spread"` all resolve to the same factory.
+
+### Creating a Custom Java-only Node (DSL only)
+
+If you only need the node in programmatic graphs (not JSON), you can use the `GraphBuilder` directly without registering anything:
+
+```java
 GraphBuilder builder = GraphBuilder.create();
 ScalarSourceNode src1 = builder.scalarSource("A", 10.0);
 ScalarSourceNode src2 = builder.scalarSource("B", 5.0);
-ScalarSourceNode src3 = builder.scalarSource("C", 2.0);
-ScalarCalcNode result = builder.computeN("MyAlgo", new MyCustomAlgo(), src1, src2, src3);
-```
 
-### Registering Custom Nodes for JSON
-
-To make your custom Java node available to analysts writing JSON definitions, register it in `NodeRegistry.java`:
-
-```java
-// 1. Add to the NodeType enum
-MY_ALGO(MyCustomAlgo.class),
-
-// 2. Register in NodeRegistry.registerBuiltIns()
-registerFnN(NodeType.MY_ALGO, p -> new MyCustomAlgo());
+// Inline Fn2 — no registration needed
+ScalarCalcNode result = builder.compute("Ratio", new RatioSpread(), src1, src2);
 ```
 
 ---
