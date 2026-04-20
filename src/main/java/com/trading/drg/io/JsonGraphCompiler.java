@@ -105,9 +105,9 @@ public final class JsonGraphCompiler {
 
                 if (nd.getInputs() != null && !nd.getInputs().isEmpty()) {
                     if (meta.namedInputs() != null) {
-                        deps = new Node[meta.namedInputs().length];
+                        deps = new Node[meta.namedInputs().size()];
                         for (int i = 0; i < deps.length; i++) {
-                            String inputKey = meta.namedInputs()[i];
+                            String inputKey = meta.namedInputs().get(i);
                             String depName = nd.getInputs().get(inputKey);
                             if (depName == null) {
                                 throw new IllegalArgumentException(
@@ -161,7 +161,7 @@ public final class JsonGraphCompiler {
                 Collections.unmodifiableMap(edgeLabels));
     }
 
-    static ScalarCutoff parseCutoff(Map<String, Object> props) {
+    public static ScalarCutoff parseCutoff(Map<String, Object> props) {
         Object o = props.get("cutoff");
         if (o == null)
             return ScalarCutoffs.EXACT;
@@ -177,14 +177,14 @@ public final class JsonGraphCompiler {
         return ScalarCutoffs.EXACT;
     }
 
-    static double getDouble(Map<String, Object> props, String key, double def) {
+    public static double getDouble(Map<String, Object> props, String key, double def) {
         Object v = props.get(key);
         if (v == null)
             return def;
         return v instanceof Number n ? n.doubleValue() : Double.parseDouble(v.toString());
     }
 
-    static int getInt(Map<String, Object> props, String key, int def) {
+    public static int getInt(Map<String, Object> props, String key, int def) {
         Object v = props.get(key);
         if (v == null)
             return def;

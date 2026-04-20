@@ -25,6 +25,11 @@ import com.trading.drg.node.ThrottleNode;
 import com.trading.drg.node.TimeDecayNode;
 import com.trading.drg.node.VectorCalcNode;
 import com.trading.drg.node.VectorSourceNode;
+
+import java.util.Arrays;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 /**
  * Enum of all built-in node types.
  */
@@ -54,7 +59,6 @@ public enum NodeType {
     TIME_DECAY(TimeDecayNode.class),
     SWITCH(SwitchNode.class),
     CONDITION(BooleanNode.class),
-    VECTOR_MATH(VectorCalcNode.class),
     TEMPLATE(null);
 
     private final Class<?> nodeClass;
@@ -67,12 +71,14 @@ public enum NodeType {
         return nodeClass;
     }
 
+    /** Pre-built O(1) lookup map; built once at class-load time. */
+    private static final Map<String, NodeType> BY_NAME = Arrays.stream(values())
+            .collect(Collectors.toMap(t -> t.name().toUpperCase(), t -> t));
+
     public static NodeType fromString(String text) {
-        for (NodeType b : values()) {
-            if (b.name().equalsIgnoreCase(text)) {
-                return b;
-            }
-        }
-        throw new IllegalArgumentException("Unknown NodeType: " + text);
+        NodeType t = BY_NAME.get(text.toUpperCase());
+        if (t == null)
+            throw new IllegalArgumentException("Unknown NodeType: " + text);
+        return t;
     }
 }

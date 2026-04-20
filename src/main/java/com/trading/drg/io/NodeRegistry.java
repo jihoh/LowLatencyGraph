@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.Arrays;
 
 /**
  * Registry mapping {@link NodeType}s to their respective instantiation
@@ -46,8 +47,11 @@ import java.lang.reflect.Parameter;
  */
 public final class NodeRegistry {
 
-    /** Metadata describing a node's required inputs and its factory. */
-    public record NodeMetadata(String[] namedInputs, JsonGraphCompiler.NodeFactory factory) {
+    /**
+     * Metadata describing a node's required inputs and its factory.
+     * {@code namedInputs} is an immutable list, or {@code null} for unbounded FnN nodes.
+     */
+    public record NodeMetadata(List<String> namedInputs, JsonGraphCompiler.NodeFactory factory) {
     }
 
     private final Map<String, NodeMetadata> registry = new HashMap<>();
@@ -62,8 +66,18 @@ public final class NodeRegistry {
      *
      * @param provider the node provider to install
      */
-    public void install(NodeProvider provider) {
+    /**
+     * Installs a {@link NodeProvider} and returns {@code this} for fluent chaining.
+     *
+     * <pre>{@code
+     * compiler.getRegistry()
+     *     .install(new AlphaProvider())
+     *     .install(new BetaProvider());
+     * }</pre>
+     */
+    public NodeRegistry install(NodeProvider provider) {
         provider.register(this);
+        return this;
     }
 
     private void registerFactory(NodeType type, JsonGraphCompiler.NodeFactory factory) {
@@ -99,7 +113,14 @@ public final class NodeRegistry {
 
     public void registerFactory(String type, String[] namedInputs,
             JsonGraphCompiler.NodeFactory factory) {
-        registry.put(type.toUpperCase(), new NodeMetadata(namedInputs, factory));
+        String key = type.toUpperCase();
+        if (registry.containsKey(key)) {
+            throw new IllegalStateException(
+                    "Node type already registered: '" + key + "'. " +
+                    "Use a unique type name or remove the duplicate NodeProvider.");
+        }
+        List<String> inputs = (namedInputs == null) ? null : List.of(namedInputs);
+        registry.put(key, new NodeMetadata(inputs, factory));
     }
 
     public NodeMetadata getMetadata(String type) {

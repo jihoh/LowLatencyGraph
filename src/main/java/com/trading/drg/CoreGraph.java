@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import lombok.Getter;
 
 /**
@@ -41,11 +42,34 @@ public class CoreGraph {
 
     /** Creates a new CoreGraph from a JSON file path string. */
     public CoreGraph(String jsonPath) {
-        this(Path.of(jsonPath));
+        this(Path.of(jsonPath), c -> {});
     }
 
     /** Creates a new CoreGraph from a JSON file path. */
     public CoreGraph(Path jsonPath) {
+        this(jsonPath, c -> {});
+    }
+
+    /**
+     * Creates a new CoreGraph from a JSON file path string, allowing
+     * custom {@link com.trading.drg.io.NodeProvider}s to be installed
+     * before compilation.
+     *
+     * <pre>{@code
+     * CoreGraph graph = new CoreGraph("bond_pricer.json",
+     *     compiler -> compiler.getRegistry().install(new AlphaNodeProvider()));
+     * }</pre>
+     */
+    public CoreGraph(String jsonPath, Consumer<JsonGraphCompiler> configure) {
+        this(Path.of(jsonPath), configure);
+    }
+
+    /**
+     * Creates a new CoreGraph from a JSON file path, allowing
+     * custom {@link com.trading.drg.io.NodeProvider}s to be installed
+     * before compilation.
+     */
+    public CoreGraph(Path jsonPath, Consumer<JsonGraphCompiler> configure) {
         GraphDefinition graphDef;
         try {
             ObjectMapper mapper = new ObjectMapper();
@@ -54,6 +78,7 @@ public class CoreGraph {
             throw new RuntimeException("Failed to load graph definition from " + jsonPath, e);
         }
         JsonGraphCompiler compiler = new JsonGraphCompiler();
+        configure.accept(compiler);
         JsonGraphCompiler.CompiledGraph compiled = compiler.compile(graphDef);
 
         GraphDefinition.GraphInfo info = graphDef.getGraph();

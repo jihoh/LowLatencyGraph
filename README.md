@@ -542,6 +542,83 @@ ScalarSourceNode src2 = builder.scalarSource("B", 5.0);
 ScalarCalcNode result = builder.compute("Ratio", new RatioSpread(), src1, src2);
 ```
 
+### Example: Multi-Output Vector Math (`VectorMathFn`)
+
+`VectorMathFn` is for nodes that take **N scalar inputs** and produce **M scalar outputs** — for example, a risk factor decomposition that takes a position, vol, and rate, and simultaneously outputs delta, vega, and rho risk.
+
+Because every `VectorMathFn` model is domain-specific, there is no single built-in type for it. You register your own named type via `NodeProvider` and reference it by that name in JSON.
+
+**Step 1 — Implement `VectorMathFn`:**
+
+```java
+public class RiskDecomposition implements VectorMathFn {
+    @Override
+    public void apply(double[] inputs, double[] outputs) {
+        // inputs[0] = spot, inputs[1] = vol, inputs[2] = rate
+        outputs[0] = inputs[0] * inputs[1];         // delta risk
+        outputs[1] = inputs[0] * inputs[2] * 0.5;   // vega risk
+        outputs[2] = inputs[0] * inputs[3];          // rho risk
+    }
+}
+```
+
+**Step 2 — Register it in your `NodeProvider`:**
+
+```java
+public class AlphaNodeProvider implements NodeProvider {
+    @Override
+    public void register(NodeRegistry registry) {
+        registry.registerVectorMathFn(
+            "RISK_DECOMP",                          // JSON type name
+            new String[]{"spot", "vol", "rate"},    // named scalar inputs
+            props -> new RiskDecomposition()
+        );
+    }
+}
+```
+
+**Step 3 — Install before graph compilation:**
+
+```java
+CoreGraph graph = new CoreGraph("pricing.json",
+    compiler -> compiler.getRegistry().install(new AlphaNodeProvider()));
+```
+
+**Step 4 — Reference in JSON with `auto_expand`:**
+
+```json
+{
+    "name": "RiskFactors",
+    "type": "risk_decomp",
+    "inputs": {
+        "spot": "SpotSource",
+        "vol":  "VolSource",
+        "rate": "RateSource"
+    },
+    "properties": {
+        "size": 3,
+        "auto_expand": true,
+        "auto_expand_labels": ["DeltaRisk", "VegaRisk", "RhoRisk"]
+    }
+}
+```
+
+When `auto_expand` is `true`, the compiler automatically generates individually addressable scalar child nodes for each output:
+- `RiskFactors.DeltaRisk`
+- `RiskFactors.VegaRisk`
+- `RiskFactors.RhoRisk`
+
+These scalars can then be used as inputs to further downstream nodes in the graph.
+
+```java
+// Read individual risk outputs after stabilization
+double delta = graph.getDouble("RiskFactors.DeltaRisk");
+double vega  = graph.getDouble("RiskFactors.VegaRisk");
+double rho   = graph.getDouble("RiskFactors.RhoRisk");
+```
+
+> **Note:** The scratch buffers passed to `VectorMathFn.apply(inputs, outputs)` are pre-allocated once and reused every stabilization cycle — zero GC on the hot path.
+
 ---
 
 ## 6. Advanced: Vector Operations
