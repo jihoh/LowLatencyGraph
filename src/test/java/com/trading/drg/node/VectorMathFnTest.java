@@ -153,4 +153,34 @@ public class VectorMathFnTest {
         assertEquals(60.0, vol.value(), 1e-12);   // 3*4*5
         assertEquals(94.0, sa.value(), 1e-12);     // 2*(12+20+15)
     }
+
+    @Test
+    public void testWithMixedScalarAndVectorInputs() {
+        VectorSourceNode vec = builder.vectorSource("vec_in", 3);
+        ScalarSourceNode scalar = builder.scalarSource("scalar_in", 2.0);
+
+        VectorCalcNode result = builder.computeVectorMath("mixed_stats", 1, 1e-15,
+                (inputs, outputs) -> {
+                    // inputs[0], inputs[1], inputs[2] from vec
+                    // inputs[3] from scalar 
+                    double sumVec = inputs[0] + inputs[1] + inputs[2];
+                    outputs[0] = sumVec * inputs[3];
+                }, vec, scalar);
+
+        StabilizationEngine engine = builder.build();
+        TopologicalOrder topo = engine.topology();
+        engine.stabilize();
+
+        // Initially vector is 0,0,0
+        VectorValue resVec = (VectorValue) topo.node(topo.topoIndex("mixed_stats"));
+        assertEquals(0.0, resVec.valueAt(0), 1e-12);
+
+        // Update vector
+        vec.update(new double[]{1.0, 2.0, 3.0});
+        engine.markDirty(topo.topoIndex("vec_in"));
+        engine.stabilize();
+
+        // Sum = 6.0, multiplied by scalar 2.0 => 12.0
+        assertEquals(12.0, resVec.valueAt(0), 1e-12);
+    }
 }

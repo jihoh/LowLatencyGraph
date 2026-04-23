@@ -199,22 +199,42 @@ public final class GraphBuilder {
     /**
      * computeVectorMath: Creates a vector computation node mapping N scalar inputs to M outputs via VectorMathFn.
      */
-    public VectorCalcNode computeVectorMath(String name, int size, double tolerance, VectorMathFn fn, ScalarValue... inputs) {
+    public VectorCalcNode computeVectorMath(String name, int size, double tolerance, VectorMathFn fn, com.trading.drg.api.Node... inputs) {
         checkNotBuilt();
         if (size <= 0)
             throw new IllegalArgumentException("computeVectorMath '" + name + "' requires positive size, got: " + size);
+
+        // Calculate total input dimension
+        int inputDim = 0;
+        for (com.trading.drg.api.Node in : inputs) {
+            if (in instanceof com.trading.drg.api.VectorValue v) {
+                inputDim += v.size();
+            } else if (in instanceof com.trading.drg.api.ScalarValue) {
+                inputDim += 1;
+            } else {
+                throw new IllegalArgumentException("Unsupported input type for computeVectorMath: " + in.getClass());
+            }
+        }
+
         // Allocate scratch buffer once at build time.
-        final double[] scratch = new double[inputs.length];
+        final double[] scratch = new double[inputDim];
         
         VectorCalcNode node = new VectorCalcNode(name, size, tolerance, (inNodes, out) -> {
-            for (int i = 0; i < inputs.length; i++) {
-                scratch[i] = inputs[i].value();
+            int idx = 0;
+            for (com.trading.drg.api.Node in : inputs) {
+                if (in instanceof com.trading.drg.api.VectorValue v) {
+                    for (int i = 0; i < v.size(); i++) {
+                        scratch[idx++] = v.valueAt(i);
+                    }
+                } else if (in instanceof com.trading.drg.api.ScalarValue s) {
+                    scratch[idx++] = s.value();
+                }
             }
             fn.apply(scratch, out);
         }, inputs);
         
         register(node);
-        for (ScalarValue in : inputs) {
+        for (com.trading.drg.api.Node in : inputs) {
             addEdge(in.name(), name);
         }
         return node;
