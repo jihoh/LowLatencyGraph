@@ -322,11 +322,28 @@ public final class NodeRegistry {
 
             VectorMathFn fn = supplier.apply(props);
 
+            int inputDim = 0;
+            for (com.trading.drg.api.Node in : deps) {
+                if (in instanceof VectorValue v) {
+                    inputDim += v.size();
+                } else if (in instanceof ScalarValue) {
+                    inputDim += 1;
+                }
+            }
+
             // Build scratch buffer once; reused every stabilization cycle.
-            final double[] scratch = new double[deps.length];
+            final double[] scratch = new double[inputDim];
             return new VectorCalcNode(name, size, tolerance, (inNodes, out) -> {
-                for (int i = 0; i < deps.length; i++)
-                    scratch[i] = ((ScalarValue) deps[i]).value();
+                int idx = 0;
+                for (com.trading.drg.api.Node in : deps) {
+                    if (in instanceof VectorValue v) {
+                        for (int i = 0; i < v.size(); i++) {
+                            scratch[idx++] = v.valueAt(i);
+                        }
+                    } else if (in instanceof ScalarValue s) {
+                        scratch[idx++] = s.value();
+                    }
+                }
                 fn.apply(scratch, out);
             }, deps);
         };
