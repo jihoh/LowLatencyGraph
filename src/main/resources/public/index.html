@@ -186,30 +186,42 @@
                     <h3 id="header-stab-metrics" style="cursor: pointer; user-select: none;">Stabilization Metrics
                         <span>▼</span>
                     </h3>
-                    <div id="content-stab-metrics" class="metric-row metric-grid-3">
-                        <div class="metric-small">
-                            <span class="label">Epoch</span>
-                            <span class="value" id="epoch-value">0</span>
+                    <div id="content-stab-metrics">
+                        <div class="metric-row metric-grid-3">
+                            <div class="metric-small">
+                                <span class="label">Epoch</span>
+                                <span class="value" id="epoch-value">0</span>
+                            </div>
+                            <div class="metric-small">
+                                <span class="label">Events in Epoch</span>
+                                <span class="value" id="events-epoch-value">0</span>
+                            </div>
+                            <div class="metric-small">
+                                <span class="label">Evaluated Nodes</span>
+                                <span class="value" id="reactive-eff">0</span>
+                            </div>
+                            <div class="metric-small">
+                                <span class="label">Latency (μs)</span>
+                                <span class="value" id="lat-latest">0.00</span>
+                            </div>
+                            <div class="metric-small">
+                                <span class="label">Avg Latency (μs)</span>
+                                <span class="value" id="lat-avg">0.00</span>
+                            </div>
+                            <div class="metric-small" title="Thread allocation rate natively on hot path">
+                                <span class="label">Malloc (Byte)</span>
+                                <span class="value" id="jvm-allocated-bytes">0</span>
+                            </div>
                         </div>
-                        <div class="metric-small">
-                            <span class="label">Events in Epoch</span>
-                            <span class="value" id="events-epoch-value">0</span>
-                        </div>
-                        <div class="metric-small">
-                            <span class="label">Evaluated Nodes</span>
-                            <span class="value" id="reactive-eff">0</span>
-                        </div>
-                        <div class="metric-small">
-                            <span class="label">Latency (μs)</span>
-                            <span class="value" id="lat-latest">0.00</span>
-                        </div>
-                        <div class="metric-small">
-                            <span class="label">Avg Latency (μs)</span>
-                            <span class="value" id="lat-avg">0.00</span>
-                        </div>
-                        <div class="metric-small" title="Thread allocation rate natively on hot path">
-                            <span class="label">Malloc (Byte)</span>
-                            <span class="value" id="jvm-allocated-bytes">0</span>
+                        <div style="margin-top: 12px; width: 100%;">
+                            <span class="label" style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-bottom: 4px;">Latency Percentiles (μs)</span>
+                            <div id="percentiles-chart"
+                                style="width: 100%; height: 200px; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; position: relative;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 16px; margin-top: 6px;">
+                                <span id="legend-rolling" style="font-size: 0.7rem; color: #1abc9c; cursor: pointer; user-select: none;">● Rolling <span id="rolling-window-label" style="opacity: 0.6;"></span></span>
+                                <span id="legend-alltime" style="font-size: 0.7rem; color: #f39c12; cursor: pointer; user-select: none;">● All-Time <span id="warmup-label" style="opacity: 0.6;"></span></span>
+                            </div>
                         </div>
                     </div>
 

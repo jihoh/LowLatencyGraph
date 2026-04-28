@@ -41,6 +41,8 @@ public final class JsonSnapshotSerializer {
             AllocationProfiler allocationProfiler,
             double maxBackpressure,
             double lastLatency, double avgLatency,
+            double[] percentiles, double[] rollingPercentiles,
+            long rollingWindowSec, long warmupEpochs,
             boolean hasLatency, boolean hasProfile,
             NodeProfileListener profileListener,
             long[] nanCounters) {
@@ -84,6 +86,24 @@ public final class JsonSnapshotSerializer {
             appendDouble(sb, lastLatency);
             sb.append(",\"avg\":");
             appendDouble(sb, avgLatency);
+            if (percentiles != null && percentiles.length == 7) {
+                sb.append(",\"percentiles\":[");
+                for (int p = 0; p < 7; p++) {
+                    if (p > 0) sb.append(",");
+                    appendDouble(sb, percentiles[p]);
+                }
+                sb.append("]");
+            }
+            if (rollingPercentiles != null && rollingPercentiles.length == 7) {
+                sb.append(",\"rollingPercentiles\":[");
+                for (int p = 0; p < 7; p++) {
+                    if (p > 0) sb.append(",");
+                    appendDouble(sb, rollingPercentiles[p]);
+                }
+                sb.append("]");
+            }
+            sb.append(",\"rollingWindowSec\":").append(rollingWindowSec);
+            sb.append(",\"warmupEpochs\":").append(warmupEpochs);
             sb.append("}");
         }
 

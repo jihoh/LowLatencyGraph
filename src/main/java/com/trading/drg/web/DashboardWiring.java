@@ -38,15 +38,32 @@ public final class DashboardWiring {
     private AllocationProfiler allocationProfiler;
     private GraphDashboardServer dashboardServer;
     private long throttleIntervalMs = 0;
+    private long rollingWindowSec = 3600L;      // default: 1 hour
+    private long warmupEpochs = 0L;             // default: no warmup skip
 
     public DashboardWiring(CoreGraph graph) {
         this.graph = graph;
     }
 
+    /** Configures the rolling window duration (in seconds) for latency percentile tracking. */
+    public DashboardWiring withRollingWindowSec(long sec) {
+        this.rollingWindowSec = sec;
+        return this;
+    }
+
+    /**
+     * Configures the number of warmup epochs to skip for all-time percentile
+     * tracking.
+     */
+    public DashboardWiring withWarmupEpochs(long epochs) {
+        this.warmupEpochs = epochs;
+        return this;
+    }
+
     /** Enables latency tracking. */
     public DashboardWiring enableLatencyTracking() {
         if (this.latencyListener == null) {
-            this.latencyListener = new LatencyTrackingListener();
+            this.latencyListener = new LatencyTrackingListener(rollingWindowSec, warmupEpochs);
             graph.setListener(this.latencyListener);
         }
         return this;

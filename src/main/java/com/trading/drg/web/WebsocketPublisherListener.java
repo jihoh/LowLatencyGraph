@@ -69,6 +69,8 @@ public class WebsocketPublisherListener implements StabilizationListener {
     private final long[] bufEpochEvents = new long[2];
     private final double[] bufLastLatency = new double[2];
     private final double[] bufAvgLatency = new double[2];
+    private final double[][] bufPercentiles = new double[2][7];
+    private final double[][] bufRollingPercentiles = new double[2][7];
 
     // Engine writes to buffers[writeSlot], then publishes via readySlot
     private final AtomicInteger readySlot = new AtomicInteger(-1);
@@ -289,6 +291,15 @@ public class WebsocketPublisherListener implements StabilizationListener {
         bufEpochEvents[ws] = engine.lastEpochEvents();
         bufLastLatency[ws] = latencyListener != null ? latencyListener.lastLatencyMicros() : Double.NaN;
         bufAvgLatency[ws] = latencyListener != null ? latencyListener.avgLatencyMicros() : Double.NaN;
+        if (latencyListener != null) {
+            latencyListener.fillAllTimePercentilesMicros(bufPercentiles[ws]);
+            latencyListener.fillRollingPercentilesMicros(bufRollingPercentiles[ws]);
+        } else {
+            for (int p = 0; p < 7; p++) {
+                bufPercentiles[ws][p] = Double.NaN;
+                bufRollingPercentiles[ws][p] = Double.NaN;
+            }
+        }
 
         // Publish: atomically make this slot visible to I/O thread
         readySlot.set(ws);
@@ -347,6 +358,9 @@ public class WebsocketPublisherListener implements StabilizationListener {
                     bufScalars[slot], bufVectors[slot], bufHeaders[slot],
                     jvmMetrics, allocationProfiler, reportedBp,
                     bufLastLatency[slot], bufAvgLatency[slot],
+                    bufPercentiles[slot], bufRollingPercentiles[slot],
+                    latencyListener != null ? latencyListener.getRollingWindowSec() : 0,
+                    latencyListener != null ? latencyListener.getWarmupEpochs() : 0,
                     latencyListener != null, profileListener != null,
                     profileListener, nanCounters);
 

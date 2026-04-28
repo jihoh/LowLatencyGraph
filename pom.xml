@@ -27,7 +27,7 @@
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
-      <version>1.18.36</version>
+      <version>1.18.46</version>
     </dependency>
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
@@ -38,6 +38,11 @@
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-core</artifactId>
       <version>2.22.1</version>
+    </dependency>
+    <dependency>
+        <groupId>org.hdrhistogram</groupId>
+        <artifactId>HdrHistogram</artifactId>
+        <version>2.1.12</version>
     </dependency>
         <!-- Web / Dashboard -->
         <dependency>
@@ -74,7 +79,7 @@
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
-                            <version>1.18.36</version>
+                            <version>1.18.46</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>

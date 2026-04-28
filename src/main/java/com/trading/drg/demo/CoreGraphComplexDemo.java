@@ -24,7 +24,7 @@ import java.util.concurrent.ThreadFactory;
 @Log4j2
 public class CoreGraphComplexDemo {
 
-    private static final int PORT = 8080;
+    private static final int PORT = 8089;
     private static final int RING_BUFFER_SIZE = 1024;
 
     public static void main(String[] args) throws Exception {
@@ -54,6 +54,8 @@ public class CoreGraphComplexDemo {
         // 3. Setup Dashboard Server with Telemetry
         new com.trading.drg.web.DashboardWiring(graph)
                 .enableNodeProfiling()
+                .withRollingWindowSec(300)
+                .withWarmupEpochs(500)
                 .enableLatencyTracking()
                 .bindDisruptorTelemetry(ringBuffer)
                 .withAllocationProfiler(handler.getProfiler())
@@ -135,17 +137,17 @@ public class CoreGraphComplexDemo {
             // throughput and preventing jitter.
             if (endOfBatch && graph != null) {
                 graph.stabilize();
-                com.trading.drg.engine.UpdatedNodes updated = graph.updatedNodes();
-                if (updated.count() > 0) {
-                    log.info("Stabilization complete. {} nodes updated:", updated.count());
-                    updated.forEach(node -> {
-                        if (node instanceof com.trading.drg.api.ScalarValue sv) {
-                            log.info("  -> {} = {}", node.name(), sv.value());
-                        } else {
-                            log.info("  -> {} (updated)", node.name());
-                        }
-                    });
-                }
+                // com.trading.drg.engine.UpdatedNodes updated = graph.updatedNodes();
+                // if (updated.count() > 0) {
+                // log.info("Stabilization complete. {} nodes updated:", updated.count());
+                // updated.forEach(node -> {
+                // if (node instanceof com.trading.drg.api.ScalarValue sv) {
+                // log.info(" -> {} = {}", node.name(), sv.value());
+                // } else {
+                // log.info(" -> {} (updated)", node.name());
+                // }
+                // });
+                // }
             }
 
             long bytesAllocated = profiler.stop();

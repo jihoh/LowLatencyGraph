@@ -699,6 +699,32 @@ function updateMetricsDOM(payload) {
             if (payload.metrics.latency.avg !== undefined) {
                 latAvg.textContent = formatVal(payload.metrics.latency.avg, 2);
             }
+            if (payload.metrics.latency.rollingPercentiles && rollingPercentilesSeries) {
+                const r = payload.metrics.latency.rollingPercentiles;
+                for (let i = 0; i < 7; i++) rollingPercentilesData[i].value = r[i];
+                rollingPercentilesSeries.setData(rollingPercentilesData);
+            }
+            if (payload.metrics.latency.percentiles && alltimePercentilesSeries) {
+                const p = payload.metrics.latency.percentiles;
+                for (let i = 0; i < 7; i++) alltimePercentilesData[i].value = p[i];
+                alltimePercentilesSeries.setData(alltimePercentilesData);
+            }
+            // Update chart labels from backend config (once)
+            if (payload.metrics.latency.rollingWindowSec !== undefined) {
+                const el = document.getElementById('rolling-window-label');
+                if (el) {
+                    const sec = payload.metrics.latency.rollingWindowSec;
+                    const label = sec >= 3600 ? `${sec / 3600}h window` : sec >= 60 ? `${sec / 60}m window` : `${sec}s window`;
+                    el.textContent = '— ' + label;
+                }
+            }
+            if (payload.metrics.latency.warmupEpochs !== undefined) {
+                const el = document.getElementById('warmup-label');
+                if (el) {
+                    const epochs = payload.metrics.latency.warmupEpochs;
+                    el.textContent = epochs > 0 ? '— skip ' + epochs.toLocaleString() + ' epochs' : '';
+                }
+            }
         }
         if (payload.metrics.profile) {
             updateProfileTable(payload.metrics.profile);
@@ -2555,3 +2581,90 @@ function initSettings() {
     // Apply the initial HTML state directly to the JavaScript history engine
     applyHistorySettings();
 }
+
+let percentilesChart = null;
+let rollingPercentilesSeries = null;
+let alltimePercentilesSeries = null;
+
+// Pre-allocated data arrays — mutated in-place each tick to avoid GC pressure
+const rollingPercentilesData = [
+    { time: 1, value: 0 }, { time: 2, value: 0 }, { time: 3, value: 0 },
+    { time: 4, value: 0 }, { time: 5, value: 0 }, { time: 6, value: 0 }, { time: 7, value: 0 }
+];
+const alltimePercentilesData = [
+    { time: 1, value: 0 }, { time: 2, value: 0 }, { time: 3, value: 0 },
+    { time: 4, value: 0 }, { time: 5, value: 0 }, { time: 6, value: 0 }, { time: 7, value: 0 }
+];
+
+const PERCENTILE_LABELS = ['P50', 'P75', 'P90', 'P99', 'P99.9', 'P99.99', 'P99.999'];
+
+function initPercentilesChart() {
+    const container = document.getElementById('percentiles-chart');
+    if (!container) return;
+
+    percentilesChart = LightweightCharts.createChart(container, {
+        layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#94a3b8' },
+        grid: { vertLines: { color: 'rgba(255, 255, 255, 0.05)' }, horzLines: { color: 'rgba(255, 255, 255, 0.05)' } },
+        crosshair: { mode: LightweightCharts.CrosshairMode.Magnet },
+        localization: {
+            timeFormatter: (time) => {
+                const idx = Math.floor(time) - 1;
+                return (idx >= 0 && idx < 7) ? PERCENTILE_LABELS[idx] : String(time);
+            }
+        },
+        timeScale: {
+            timeVisible: false,
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            tickMarkFormatter: (time) => {
+                const idx = Math.floor(time) - 1;
+                return (idx >= 0 && idx < 7) ? PERCENTILE_LABELS[idx] : String(time);
+            }
+        },
+        rightPriceScale: { borderColor: 'rgba(255, 255, 255, 0.1)' }
+    });
+
+    rollingPercentilesSeries = percentilesChart.addLineSeries({
+        color: '#1abc9c', lineWidth: 2,
+        crosshairMarkerVisible: true, lastValueVisible: false, priceLineVisible: false
+    });
+    alltimePercentilesSeries = percentilesChart.addLineSeries({
+        color: '#f39c12', lineWidth: 2,
+        crosshairMarkerVisible: true, lastValueVisible: false, priceLineVisible: false
+    });
+
+    rollingPercentilesSeries.setData(rollingPercentilesData);
+    alltimePercentilesSeries.setData(alltimePercentilesData);
+    percentilesChart.timeScale().fitContent();
+
+    const ro = new ResizeObserver(() => {
+        if (percentilesChart && container.clientWidth > 0 && container.clientHeight > 0) {
+            percentilesChart.resize(container.clientWidth, container.clientHeight);
+        }
+    });
+    ro.observe(container);
+
+    // Legend click-to-toggle
+    let rollingVisible = true;
+    let alltimeVisible = true;
+    const legendRolling = document.getElementById('legend-rolling');
+    const legendAlltime = document.getElementById('legend-alltime');
+
+    if (legendRolling) {
+        legendRolling.addEventListener('click', () => {
+            rollingVisible = !rollingVisible;
+            rollingPercentilesSeries.applyOptions({ visible: rollingVisible });
+            legendRolling.style.color = rollingVisible ? '#1abc9c' : '#555';
+            legendRolling.style.opacity = rollingVisible ? '1' : '0.4';
+        });
+    }
+    if (legendAlltime) {
+        legendAlltime.addEventListener('click', () => {
+            alltimeVisible = !alltimeVisible;
+            alltimePercentilesSeries.applyOptions({ visible: alltimeVisible });
+            legendAlltime.style.color = alltimeVisible ? '#f39c12' : '#555';
+            legendAlltime.style.opacity = alltimeVisible ? '1' : '0.4';
+        });
+    }
+}
+
+window.addEventListener('DOMContentLoaded', initPercentilesChart);
