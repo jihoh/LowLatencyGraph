@@ -430,6 +430,9 @@ function openDetailsModal(nodeName) {
                     return `${idx}`;
                 }
             },
+            localization: {
+                priceFormatter: (price) => formatVal(price)
+            },
         });
 
         detailsVectorSeries = detailsVectorChart.addLineSeries({
@@ -1687,7 +1690,8 @@ function initChart() {
             tickMarkFormatter: formatEpochTime
         },
         localization: {
-            timeFormatter: formatEpochTime
+            timeFormatter: formatEpochTime,
+            priceFormatter: (price) => formatVal(price)
         }
     });
 
