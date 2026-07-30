@@ -52,7 +52,8 @@ public class CoreGraphComplexDemo {
         RingBuffer<MarketDataEvent> ringBuffer = disruptor.start();
 
         // 3. Start timer nodes — publish synthetic ticks into the same RingBuffer
-        graph.startTimers((timer, nodeId) -> {
+        com.trading.drg.timer.GraphTimerScheduler timerScheduler = new com.trading.drg.timer.GraphTimerScheduler(graph);
+        timerScheduler.start((timer, nodeId) -> {
             long seq = ringBuffer.next();
             try {
                 MarketDataEvent event = ringBuffer.get(seq);

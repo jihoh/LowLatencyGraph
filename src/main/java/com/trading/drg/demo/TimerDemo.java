@@ -48,7 +48,8 @@ public class TimerDemo {
         RingBuffer<TimerEvent> ringBuffer = disruptor.start();
 
         // 3. Start Timer Scheduler — publishes synthetic ticks into the RingBuffer
-        graph.startTimers((timer, nodeId) -> {
+        com.trading.drg.timer.GraphTimerScheduler timerScheduler = new com.trading.drg.timer.GraphTimerScheduler(graph);
+        timerScheduler.start((timer, nodeId) -> {
             long seq = ringBuffer.next();
             try {
                 TimerEvent event = ringBuffer.get(seq);
@@ -57,7 +58,7 @@ public class TimerDemo {
                 ringBuffer.publish(seq);
             }
         });
-        log.info("Timers started (1s, 2s, 5s intervals)");
+        log.info("Timers started (1s, 2s, 0.5s intervals)");
 
         // 4. Enable Live Web Dashboard Telemetry on Port 8089
         new DashboardWiring(graph)
