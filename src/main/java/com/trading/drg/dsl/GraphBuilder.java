@@ -380,6 +380,22 @@ public final class GraphBuilder {
         return node;
     }
 
+    /**
+     * Creates a TimerSourceNode that fires every {@code intervalMs} milliseconds,
+     * emitting a wall-clock timestamp as its value.
+     *
+     * <p>The timer acts as a source node — downstream nodes re-evaluate on each tick.
+     * Use this to drive time-dependent calculations (EMA, time-decay, TWAP) that
+     * need periodic re-evaluation even during market silence.
+     */
+    public com.trading.drg.node.TimerSourceNode timer(String name, long intervalMs) {
+        checkNotBuilt();
+        com.trading.drg.node.TimerSourceNode node = new com.trading.drg.node.TimerSourceNode(name, intervalMs);
+        register(node);
+        sourceNames.add(name);
+        return node;
+    }
+
     // ── Templates ────────────────────────────────────────────────
 
     public <C, T> T template(String prefix, TemplateFactory<C, T> factory, C config) {

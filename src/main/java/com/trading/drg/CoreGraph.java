@@ -2,6 +2,7 @@ package com.trading.drg;
 
 import com.trading.drg.api.Node;
 import com.trading.drg.api.StabilizationListener;
+import com.trading.drg.api.TimerTickCallback;
 import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.engine.TopologicalOrder;
 import com.trading.drg.engine.UpdatedNodes;
@@ -9,13 +10,20 @@ import com.trading.drg.io.GraphDefinition;
 import com.trading.drg.io.JsonGraphCompiler;
 import com.trading.drg.api.ScalarValue;
 import com.trading.drg.node.ScalarSourceNode;
+import com.trading.drg.node.TimerSourceNode;
 import com.trading.drg.node.VectorSourceNode;
 import com.trading.drg.engine.telemetry.CompositeStabilizationListener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
 import java.util.function.Consumer;
 import lombok.Getter;
 
@@ -25,6 +33,7 @@ import lombok.Getter;
  */
 @Getter
 public class CoreGraph {
+
     private final StabilizationEngine engine;
     private final Map<String, Node> nodes;
 
@@ -40,14 +49,20 @@ public class CoreGraph {
     // Cache source nodes for O(1) updates
     private final Node[] sourceNodes;
 
+    // Single shared scheduler for all TimerSourceNodes
+    private ScheduledExecutorService timerScheduler;
+    private List<ScheduledFuture<?>> timerFutures;
+
     /** Creates a new CoreGraph from a JSON file path string. */
     public CoreGraph(String jsonPath) {
-        this(Path.of(jsonPath), c -> {});
+        this(Path.of(jsonPath), c -> {
+        });
     }
 
     /** Creates a new CoreGraph from a JSON file path. */
     public CoreGraph(Path jsonPath) {
-        this(jsonPath, c -> {});
+        this(jsonPath, c -> {
+        });
     }
 
     /**
@@ -57,7 +72,7 @@ public class CoreGraph {
      *
      * <pre>{@code
      * CoreGraph graph = new CoreGraph("bond_pricer.json",
-     *     compiler -> compiler.getRegistry().install(new AlphaNodeProvider()));
+     *         compiler -> compiler.getRegistry().install(new AlphaNodeProvider()));
      * }</pre>
      */
     public CoreGraph(String jsonPath, Consumer<JsonGraphCompiler> configure) {
@@ -177,8 +192,73 @@ public class CoreGraph {
         return engine.stabilize();
     }
 
-    /** Returns the set of nodes whose values changed in the last stabilize() call. */
+    /**
+     * Returns the set of nodes whose values changed in the last stabilize() call.
+     */
     public UpdatedNodes updatedNodes() {
         return engine.updatedNodes();
+    }
+
+    // ── Timer Lifecycle ──────────────────────────────────────────
+
+    /**
+     * Starts all {@link TimerSourceNode}s in the graph using a single shared
+     * daemon thread for scheduling.
+     *
+     * <p>
+     * The provided {@code onTimerTick} callback is invoked on the shared
+     * scheduler thread at each timer node's configured interval. For
+     * Disruptor-based setups, this callback should publish a synthetic event
+     * into the RingBuffer that, when consumed, calls
+     * {@link TimerSourceNode#tick()},
+     * {@link StabilizationEngine#markDirty(int)}, and
+     * {@link #stabilize()}.
+     *
+     * <pre>{@code
+     * graph.startTimers((timer, nodeId) -> {
+     *     ringBuffer.publishEvent((event, seq) -> {
+     *         event.setTimerNodeId(nodeId);
+     *     });
+     * });
+     * }</pre>
+     *
+     * @param onTimerTick callback receiving the timer node and its topological ID
+     */
+    public void startTimers(TimerTickCallback onTimerTick) {
+        if (timerScheduler != null) {
+            throw new IllegalStateException("Timers already started");
+        }
+        timerScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "coregraph-timer");
+            t.setDaemon(true);
+            return t;
+        });
+        timerFutures = new ArrayList<>();
+
+        TopologicalOrder topology = engine.topology();
+        for (int i = 0; i < topology.nodeCount(); i++) {
+            if (topology.node(i) instanceof TimerSourceNode timer) {
+                final int nodeId = i;
+                long intervalMs = timer.intervalMs();
+                ScheduledFuture<?> future = timerScheduler.scheduleWithFixedDelay(
+                        () -> onTimerTick.onTick(timer, nodeId),
+                        intervalMs, intervalMs, TimeUnit.MILLISECONDS);
+                timerFutures.add(future);
+            }
+        }
+    }
+
+    /** Stops all running timers and shuts down the shared scheduler. */
+    public void stopTimers() {
+        if (timerFutures != null) {
+            for (ScheduledFuture<?> future : timerFutures) {
+                future.cancel(false);
+            }
+            timerFutures = null;
+        }
+        if (timerScheduler != null) {
+            timerScheduler.shutdown();
+            timerScheduler = null;
+        }
     }
 }

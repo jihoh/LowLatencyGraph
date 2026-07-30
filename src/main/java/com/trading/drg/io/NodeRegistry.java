@@ -158,7 +158,7 @@ public final class NodeRegistry {
 
         // --- Source / Structural Nodes (unique logic, kept explicit) ---
         registerFactory(NodeType.SCALAR_SOURCE,
-                (name, props, deps) -> new ScalarSourceNode(name, JsonGraphCompiler.getDouble(props, "value", 0.0),
+                (name, props, deps) -> new ScalarSourceNode(name, JsonGraphCompiler.getDouble(props, "value", Double.NaN),
                         JsonGraphCompiler.parseCutoff(props)));
         registerFactory(NodeType.VECTOR_SOURCE, (name, props, deps) -> {
             int size = JsonGraphCompiler.getInt(props, "size", 0);
@@ -205,6 +205,11 @@ public final class NodeRegistry {
         registerFactory(NodeType.TIME_DECAY, new String[] { "input" }, (name, props, deps) -> {
             long halfLifeMs = (long) JsonGraphCompiler.getDouble(props, "halfLifeMs", 100.0);
             return GraphBuilder.create().timeDecay(name, (ScalarValue) deps[0], halfLifeMs);
+        });
+
+        registerFactory(NodeType.TIMER, (name, props, deps) -> {
+            long intervalMs = (long) JsonGraphCompiler.getDouble(props, "intervalMs", 1000.0);
+            return new com.trading.drg.node.TimerSourceNode(name, intervalMs);
         });
 
         registerFactory(NodeType.CONDITION, new String[] { "input" }, (name, props, deps) -> {

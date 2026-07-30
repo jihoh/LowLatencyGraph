@@ -41,7 +41,7 @@ public class CoreGraphComplexDemo {
                 MarketDataEvent::new,
                 bufferSize,
                 threadFactory,
-                ProducerType.SINGLE,
+                ProducerType.MULTI,
                 new YieldingWaitStrategy());
 
         // Bind our logic handler to the ring buffer
@@ -51,7 +51,19 @@ public class CoreGraphComplexDemo {
         // Start Disruptor Native Executor
         RingBuffer<MarketDataEvent> ringBuffer = disruptor.start();
 
-        // 3. Setup Dashboard Server with Telemetry
+        // 3. Start timer nodes — publish synthetic ticks into the same RingBuffer
+        graph.startTimers((timer, nodeId) -> {
+            long seq = ringBuffer.next();
+            try {
+                MarketDataEvent event = ringBuffer.get(seq);
+                event.setTimerTick(nodeId);
+            } finally {
+                ringBuffer.publish(seq);
+            }
+        });
+        log.info("Timer nodes started (publishing into Disruptor RingBuffer)");
+
+        // 4. Setup Dashboard Server with Telemetry
         new com.trading.drg.web.DashboardWiring(graph)
                 .enableNodeProfiling()
                 .withRollingWindowSec(300)
@@ -61,7 +73,7 @@ public class CoreGraphComplexDemo {
                 .withAllocationProfiler(handler.getProfiler())
                 .enableDashboardServer(PORT);
 
-        // 4. Simulate Market Feed (Producer Thread)
+        // 5. Simulate Market Feed (Producer Thread)
         simulateMarketFeed(ringBuffer);
     }
 
@@ -129,25 +141,19 @@ public class CoreGraphComplexDemo {
             // Snapshot current Thread Allocated Bytes
             profiler.start();
 
-            // Zero-allocation, Zero GC topological update based purely on Trie routing
-            router.route(event);
+            if (event.getEventType() == MarketDataEvent.TYPE_TIMER) {
+                // Timer tick: mark the timer node dirty for downstream propagation
+                graph.getEngine().markDirty(event.getTimerNodeId());
+            } else if (event.getEventType() == MarketDataEvent.TYPE_QUOTE) {
+                // Market data: zero-allocation Trie routing
+                router.route(event);
+            }
 
             // The beauty of the Disruptor is endOfBatch.
             // It guarantees we only stabilize the graph ONCE per burst, maximizing
             // throughput and preventing jitter.
             if (endOfBatch && graph != null) {
                 graph.stabilize();
-                // com.trading.drg.engine.UpdatedNodes updated = graph.updatedNodes();
-                // if (updated.count() > 0) {
-                // log.info("Stabilization complete. {} nodes updated:", updated.count());
-                // updated.forEach(node -> {
-                // if (node instanceof com.trading.drg.api.ScalarValue sv) {
-                // log.info(" -> {} = {}", node.name(), sv.value());
-                // } else {
-                // log.info(" -> {} (updated)", node.name());
-                // }
-                // });
-                // }
             }
 
             long bytesAllocated = profiler.stop();
@@ -160,6 +166,12 @@ public class CoreGraphComplexDemo {
 
     @Getter
     public static class MarketDataEvent {
+        public static final byte TYPE_NONE = 0;
+        public static final byte TYPE_QUOTE = 1;
+        public static final byte TYPE_TIMER = 2;
+
+        private byte eventType = TYPE_NONE;
+
         @com.trading.drg.api.GraphAutoRouter.RoutingKey(order = 1)
         private String instrument;
         @com.trading.drg.api.GraphAutoRouter.RoutingKey(order = 2)
@@ -174,20 +186,31 @@ public class CoreGraphComplexDemo {
         @com.trading.drg.api.GraphAutoRouter.RoutingValue
         private double askQty;
 
+        private int timerNodeId = -1;
+
         public MarketDataEvent() {
             clear();
         }
 
         public void clear() {
+            this.eventType = TYPE_NONE;
             this.venue = null;
             this.instrument = null;
             this.bid = Double.NaN;
             this.bidQty = Double.NaN;
             this.ask = Double.NaN;
             this.askQty = Double.NaN;
+            this.timerNodeId = -1;
+        }
+
+        /** Configures this event as a timer tick for the given node ID. */
+        public void setTimerTick(int nodeId) {
+            this.eventType = TYPE_TIMER;
+            this.timerNodeId = nodeId;
         }
 
         public void setQuote(String venue, String instrument, double bid, double bidQty, double ask, double askQty) {
+            this.eventType = TYPE_QUOTE;
             this.venue = venue;
             this.instrument = instrument;
             this.bid = bid;

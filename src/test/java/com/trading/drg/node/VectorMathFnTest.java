@@ -7,7 +7,7 @@ import com.trading.drg.engine.StabilizationEngine;
 import com.trading.drg.engine.TopologicalOrder;
 import com.trading.drg.io.GraphDefinition;
 import com.trading.drg.io.JsonGraphCompiler;
-import com.trading.drg.io.NodeType;
+
 
 import java.util.List;
 import java.util.Map;
@@ -133,7 +133,7 @@ public class VectorMathFnTest {
 
         // Register custom VectorMathFn on the compiler
         JsonGraphCompiler compiler = new JsonGraphCompiler();
-        compiler.getRegistry().registerVectorMathFn(NodeType.VECTOR_MATH, props -> {
+        compiler.getRegistry().registerVectorMathFn("VECTOR_MATH", null, props -> {
             return (inputs, outputs) -> {
                 double w = inputs[0], h = inputs[1], d = inputs[2];
                 outputs[0] = w * h * d;                           // volume
@@ -171,11 +171,11 @@ public class VectorMathFnTest {
         TopologicalOrder topo = engine.topology();
         engine.stabilize();
 
-        // Initially vector is 0,0,0
+        // Initially vector is NaN — computation yields NaN
         VectorValue resVec = (VectorValue) topo.node(topo.topoIndex("mixed_stats"));
-        assertEquals(0.0, resVec.valueAt(0), 1e-12);
+        assertTrue("Initial value should be NaN", Double.isNaN(resVec.valueAt(0)));
 
-        // Update vector
+        // Update vector with real values
         vec.update(new double[]{1.0, 2.0, 3.0});
         engine.markDirty(topo.topoIndex("vec_in"));
         engine.stabilize();

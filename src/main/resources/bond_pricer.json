@@ -136,6 +136,42 @@
                 "inputs": {
                     "input": "Global.Score"
                 }
+            },
+            {
+                "name": "1 sec timer",
+                "type": "TIMER",
+                "properties": {
+                    "intervalMs": 1000
+                }
+            },
+            {
+                "name": "2 sec timer",
+                "type": "TIMER",
+                "properties": {
+                    "intervalMs": 2000
+                }
+            },
+            {
+                "name": "UST_2Y.mid.ewma",
+                "type": "TIME_DECAY",
+                "inputs": {
+                    "input": "UST_2Y.mid",
+                    "trigger": "1 sec timer"
+                },
+                "properties": {
+                    "halfLifeMs": 500
+                }
+            },
+            {
+                "name": "UST_10Y.mid.ewma",
+                "type": "TIME_DECAY",
+                "inputs": {
+                    "input": "UST_10Y.mid",
+                    "trigger": "2 sec timer"
+                },
+                "properties": {
+                    "halfLifeMs": 500
+                }
             }
         ]
     }

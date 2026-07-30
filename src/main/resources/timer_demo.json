@@ -1,0 +1,65 @@
+{
+    "graph": {
+        "name": "TIMER ONLY DEMO",
+        "version": "1.0",
+        "nodes": [
+            {
+                "name": "1 sec timer",
+                "type": "TIMER",
+                "description": "Fires a periodic tick event every 1000 milliseconds",
+                "properties": {
+                    "intervalMs": 1000
+                }
+            },
+            {
+                "name": "2 sec timer",
+                "type": "TIMER",
+                "description": "Fires a periodic tick event every 2000 milliseconds",
+                "properties": {
+                    "intervalMs": 2000
+                }
+            },
+            {
+                "name": "0.5 sec timer",
+                "type": "TIMER",
+                "description": "Fires a periodic tick event every 500 milliseconds",
+                "properties": {
+                    "intervalMs": 500
+                }
+            },
+            {
+                "name": "1 sec timer.ewma",
+                "type": "EWMA",
+                "description": "Exponential Moving Average of 1 sec timer ticks",
+                "inputs": {
+                    "input": "1 sec timer"
+                },
+                "properties": {
+                    "alpha": 0.2
+                }
+            },
+            {
+                "name": "2 sec timer.ewma",
+                "type": "EWMA",
+                "description": "Exponential Moving Average of 2 sec timer ticks",
+                "inputs": {
+                    "input": "2 sec timer"
+                },
+                "properties": {
+                    "alpha": 0.2
+                }
+            },
+            {
+                "name": "0.5 sec timer.ewma",
+                "type": "EWMA",
+                "description": "Exponential Moving Average of 0.5 sec timer ticks",
+                "inputs": {
+                    "input": "0.5 sec timer"
+                },
+                "properties": {
+                    "alpha": 0.2
+                }
+            }
+        ]
+    }
+}

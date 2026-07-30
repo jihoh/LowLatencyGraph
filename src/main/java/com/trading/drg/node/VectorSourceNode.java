@@ -3,6 +3,8 @@ package com.trading.drg.node;
 import com.trading.drg.api.SourceNode;
 import com.trading.drg.api.VectorValue;
 
+import java.util.Arrays;
+
 /**
  * A source node for array-based data.
  * If any element in the vector exceeds the tolerance threshold, the entire node
@@ -14,7 +16,6 @@ public final class VectorSourceNode implements SourceNode, VectorValue {
     private final int size;
     private double[] currentValues;
     private double[] previousValues;
-    private boolean initialized = false;
     private String[] headers = null;
 
     public VectorSourceNode(String name, int size, double tolerance) {
@@ -23,8 +24,8 @@ public final class VectorSourceNode implements SourceNode, VectorValue {
         this.size = size;
         this.currentValues = new double[size];
         this.previousValues = new double[size];
-        // previousValues initialized to 0.0 by default, strict initialization handled
-        // by flag
+        Arrays.fill(currentValues, Double.NaN);
+        Arrays.fill(previousValues, Double.NaN);
     }
 
     /** Creates a vector source with default tolerance (1e-15). */
@@ -82,17 +83,17 @@ public final class VectorSourceNode implements SourceNode, VectorValue {
 
     @Override
     public boolean stabilize() {
-        // Check for initialization (first run)
-        if (!initialized) {
+        // First run: previousValues are all NaN — always propagate.
+        if (Double.isNaN(previousValues[0])) {
             System.arraycopy(currentValues, 0, previousValues, 0, size);
-            initialized = true;
             return true;
         }
 
-        // Check for changes
+        // Check for changes (handles NaN transitions correctly)
         boolean changed = false;
         for (int i = 0; i < size; i++) {
-            if (Math.abs(currentValues[i] - previousValues[i]) > tolerance) {
+            if (Double.isNaN(currentValues[i]) != Double.isNaN(previousValues[i])
+                    || Math.abs(currentValues[i] - previousValues[i]) > tolerance) {
                 changed = true;
                 break;
             }
