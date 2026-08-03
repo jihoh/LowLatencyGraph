@@ -23,7 +23,9 @@ import com.trading.drg.node.ScalarSourceNode;
 import com.trading.drg.node.SwitchNode;
 import com.trading.drg.node.ThrottleNode;
 import com.trading.drg.node.TimeDecayNode;
+import com.trading.drg.node.TimerEwmaNode;
 import com.trading.drg.node.TimerSourceNode;
+import com.trading.drg.node.TimerTwapNode;
 import com.trading.drg.node.VectorCalcNode;
 import com.trading.drg.node.VectorSourceNode;
 
@@ -58,6 +60,8 @@ public enum NodeType {
     COMPUTE_VECTOR(VectorCalcNode.class),
     THROTTLE(ThrottleNode.class),
     TIME_DECAY(TimeDecayNode.class),
+    TIMER_EWMA(TimerEwmaNode.class),
+    TIMER_TWAP(TimerTwapNode.class),
     TIMER(TimerSourceNode.class),
     SWITCH(SwitchNode.class),
     CONDITION(BooleanNode.class),

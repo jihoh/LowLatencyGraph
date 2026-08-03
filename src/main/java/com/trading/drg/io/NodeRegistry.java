@@ -207,6 +207,27 @@ public final class NodeRegistry {
             return GraphBuilder.create().timeDecay(name, (ScalarValue) deps[0], halfLifeMs);
         });
 
+        registerFactory(NodeType.TIMER_EWMA, (name, props, deps) -> {
+            long halfLifeMs = (long) JsonGraphCompiler.getDouble(props, "halfLifeMs", 100.0);
+            if (deps.length >= 2) {
+                return GraphBuilder.create().timerEwma(name, (ScalarValue) deps[0], (ScalarValue) deps[1], halfLifeMs);
+            } else if (deps.length == 1) {
+                return GraphBuilder.create().timerEwma(name, (ScalarValue) deps[0], halfLifeMs);
+            } else {
+                throw new IllegalArgumentException("TIMER_EWMA node '" + name + "' requires at least 1 input dependency");
+            }
+        });
+
+        registerFactory(NodeType.TIMER_TWAP, (name, props, deps) -> {
+            if (deps.length >= 2) {
+                return GraphBuilder.create().timerTwap(name, (ScalarValue) deps[0], (ScalarValue) deps[1]);
+            } else if (deps.length == 1) {
+                return GraphBuilder.create().timerTwap(name, (ScalarValue) deps[0]);
+            } else {
+                throw new IllegalArgumentException("TIMER_TWAP node '" + name + "' requires at least 1 input dependency");
+            }
+        });
+
         registerFactory(NodeType.TIMER, (name, props, deps) -> {
             long intervalMs = (long) JsonGraphCompiler.getDouble(props, "intervalMs", 1000.0);
             return new com.trading.drg.node.TimerSourceNode(name, intervalMs);

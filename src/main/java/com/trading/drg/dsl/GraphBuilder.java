@@ -381,6 +381,59 @@ public final class GraphBuilder {
     }
 
     /**
+     * Creates a TimerEwmaNode that calculates a time-elapsed EWMA driven by periodic timer tick events
+     * (and/or market data updates).
+     *
+     * @param name       Unique name of the node
+     * @param input      Data source to compute EWMA over
+     * @param timer      Timer source node that triggers periodic evaluation
+     * @param halfLifeMs Exponential decay half-life in milliseconds
+     */
+    public com.trading.drg.node.TimerEwmaNode timerEwma(String name, com.trading.drg.api.ScalarValue input, com.trading.drg.api.ScalarValue timer, long halfLifeMs) {
+        checkNotBuilt();
+        com.trading.drg.node.TimerEwmaNode node = new com.trading.drg.node.TimerEwmaNode(name, input, timer, halfLifeMs);
+        register(node);
+        addEdge(input.name(), name);
+        if (timer != null && !timer.name().equals(input.name())) {
+            addEdge(timer.name(), name);
+        }
+        return node;
+    }
+
+    /**
+     * Creates a TimerEwmaNode where the timer node itself acts as the input data source.
+     */
+    public com.trading.drg.node.TimerEwmaNode timerEwma(String name, com.trading.drg.api.ScalarValue timerInput, long halfLifeMs) {
+        return timerEwma(name, timerInput, timerInput, halfLifeMs);
+    }
+
+    /**
+     * Creates a TimerTwapNode that calculates Time-Weighted Average Price (TWAP)
+     * driven by periodic timer tick events (and/or market data updates).
+     *
+     * @param name  Unique name of the node
+     * @param input Data source to compute TWAP over
+     * @param timer Timer source node that triggers periodic evaluation
+     */
+    public com.trading.drg.node.TimerTwapNode timerTwap(String name, com.trading.drg.api.ScalarValue input, com.trading.drg.api.ScalarValue timer) {
+        checkNotBuilt();
+        com.trading.drg.node.TimerTwapNode node = new com.trading.drg.node.TimerTwapNode(name, input, timer);
+        register(node);
+        addEdge(input.name(), name);
+        if (timer != null && !timer.name().equals(input.name())) {
+            addEdge(timer.name(), name);
+        }
+        return node;
+    }
+
+    /**
+     * Creates a TimerTwapNode where the timer node itself acts as the input data source.
+     */
+    public com.trading.drg.node.TimerTwapNode timerTwap(String name, com.trading.drg.api.ScalarValue timerInput) {
+        return timerTwap(name, timerInput, timerInput);
+    }
+
+    /**
      * Creates a TimerSourceNode that fires every {@code intervalMs} milliseconds,
      * emitting a wall-clock timestamp as its value.
      *
